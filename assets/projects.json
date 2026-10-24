@@ -1,0 +1,5 @@
+[
+  {"id":"eclipse-arena","name":"Eclipse Arena","type":"Android game","description":"2D fighting game","repo":"PerchikHot/Eclipse-Arena-","icon":"sports_martial_arts"},
+  {"id":"shadow-rp","name":"Shadow RP","type":"Android app","description":"Offline roleplay chats and AI models","repo":"PerchikHot/Shadow-rp","icon":"forum"},
+  {"id":"shadow-garden","name":"Shadow Garden","type":"Minecraft mod","description":"Forge 1.20.1 mod","repo":null,"icon":"forest"}
+]

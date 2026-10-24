@@ -27,6 +27,7 @@ jobs:
           PY
       - run: flutter pub get
       - run: flutter analyze
+      - run: flutter test
       - run: flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with:
@@ -44,6 +45,8 @@ jobs:
       - name: Remove generated template test
         run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
       - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
         with:

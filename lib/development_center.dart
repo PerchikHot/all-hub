@@ -82,8 +82,10 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
                       'Ссылка: ${run['html_url']}. '
                       'Проверь ошибки, предложи исправления и не изменяй код без подтверждения.';
                     await Clipboard.setData(ClipboardData(text: prompt));
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Запрос для ИИ скопирован')));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Запрос для ИИ скопирован')));
+                    }
                   },
                   icon: const Icon(Icons.smart_toy_outlined), label: const Text('Запрос для ИИ')),
               ]),

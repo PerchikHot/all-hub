@@ -1,0 +1,44 @@
+name: Record All Hub Build Status
+on:
+  workflow_run:
+    workflows: ["Build All Hub"]
+    types: [completed]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  record:
+    if: github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Save build status for All Hub dashboard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          mkdir -p ci
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" > /tmp/hub-jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?per_page=100" > /tmp/hub-artifacts.json
+          jq -n --arg run_id "$RUN_ID" --arg run_url "$RUN_URL" \
+            --arg conclusion "$CONCLUSION" --arg head_sha "$HEAD_SHA" \
+            --slurpfile jobs /tmp/hub-jobs.json \
+            --slurpfile artifacts /tmp/hub-artifacts.json \
+            '{run_id: ($run_id|tonumber), run_url:$run_url,
+              conclusion:$conclusion, head_sha:$head_sha,
+              jobs: [$jobs[0].jobs[]|{name, status, conclusion, html_url, id}],
+              artifacts: [$artifacts[0].artifacts[]|{name, size_in_bytes, expired, archive_download_url}]}' \
+            > ci/latest-build.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/latest-build.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: record latest build status [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

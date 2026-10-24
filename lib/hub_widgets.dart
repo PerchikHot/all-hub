@@ -17,7 +17,7 @@ class HubBanner extends StatelessWidget {
       border: Border.all(color: const Color(0xFF6542B0)),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Icon(Icons.hub_rounded, color: Color(0xFFC6A8FF), size: 36),
+      const HubAvatar(size: 48),
       const SizedBox(height: 14),
       const Text('ALL HUB', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900, letterSpacing: 2)),
       const SizedBox(height: 6),
@@ -53,4 +53,38 @@ class HubProjectHeader extends StatelessWidget {
       ]),
     );
   }
+}
+
+class HubAvatar extends StatelessWidget {
+  final double size;
+  const HubAvatar({super.key, this.size = 48});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size, height: size,
+    child: CustomPaint(painter: _ShadowEmblemPainter()),
+  );
+}
+
+/// Temporary original silhouette until the approved character art is supplied.
+class _ShadowEmblemPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 100, size.height / 100);
+    final hood = Path()
+      ..moveTo(50, 6)
+      ..cubicTo(22, 7, 9, 32, 10, 74)
+      ..quadraticBezierTo(50, 101, 90, 74)
+      ..cubicTo(91, 32, 78, 7, 50, 6)
+      ..close();
+    canvas.drawPath(hood, Paint()..color = const Color(0xFF050716));
+    canvas.drawPath(hood, Paint()..style = PaintingStyle.stroke
+      ..strokeWidth = 3..color = const Color(0xFF9164D8));
+    final eye = Paint()..color = const Color(0xFFFF405B);
+    canvas.drawOval(const Rect.fromLTWH(24, 52, 21, 8), eye);
+    canvas.drawOval(const Rect.fromLTWH(55, 52, 21, 8), eye);
+    canvas.restore();
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

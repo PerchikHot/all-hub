@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'hub_widgets.dart';
 import 'development_center.dart';
+import 'project_covers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -88,6 +89,11 @@ class _HomePageState extends State<HomePage> {
   String search = '';
   bool showOnlyAvailable = false;
   late final Future<List<Project>> projects = _loadProjects();
+  @override
+  void initState() {
+    super.initState();
+    CoverSettings.load();
+  }
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {
     final data = await rootBundle.loadString('assets/projects.json');
@@ -105,7 +111,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
-      actions: [IconButton(tooltip: 'Refresh GitHub data', onPressed: refresh, icon: const Icon(Icons.refresh))]),
+      actions: [IconButton(tooltip: 'Обновить данные GitHub', onPressed: refresh, icon: const Icon(Icons.refresh))]),
     body: FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Catalog error: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
@@ -116,33 +122,33 @@ class _HomePageState extends State<HomePage> {
       return ListView(padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[
-          TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search projects', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
+          TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
           const SizedBox(height: 12),
-          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'All' : c == 'game' ? 'Games' : c == 'app' ? 'Apps' : 'Mods'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
+          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'All' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
           const SizedBox(height: 16),
         ],
-        Text(tab == 0 ? 'Your projects' : 'Build status', style: Theme.of(context).textTheme.headlineSmall),
+        Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
-        for (final project in (tab == 0 ? filtered : items)) Card(color: hubPanel, clipBehavior: Clip.antiAlias, child: Column(children: [HubProjectHeader(title: project.name, type: project.type), Padding(
+        for (final project in (tab == 0 ? filtered : items)) Card(color: hubPanel, clipBehavior: Clip.antiAlias, child: Column(children: [ProjectCover(id: project.id, title: project.name, type: project.type), Padding(
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(project.name, style: Theme.of(context).textTheme.titleLarge),
-              Text(project.type, style: Theme.of(context).textTheme.bodySmall),
+              Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : 'Мод Minecraft', style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
-            if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Repository not configured yet'))
+            if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!), builder: (context, s) {
               if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),
-                Text('Release: ${i.version ?? 'not published'}'),
-                Text('CI: ${i.workflowStatus ?? 'not available'}'),
+                Text('Релиз: ${i.version ?? 'не опубликован'}'),
+                Text('Сборка: ${i.workflowStatus ?? 'нет данных'}'),
                 if (i.error != null) Text(i.error!, style: TextStyle(color: Theme.of(context).colorScheme.tertiary)),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
-                  OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Repository')),
-                  if (tab == 0 && i.downloadUrl != null) FilledButton.icon(onPressed: () => open(i.downloadUrl!), icon: const Icon(Icons.download), label: const Text('Get release')),
+                  OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
+                  if (tab == 0 && i.downloadUrl != null) FilledButton.icon(onPressed: () => open(i.downloadUrl!), icon: const Icon(Icons.download), label: const Text('Скачать релиз')),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),
                 ]),
               ]);
@@ -151,9 +157,9 @@ class _HomePageState extends State<HomePage> {
       ]);
     }),
     bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [
-      NavigationDestination(icon: Icon(Icons.grid_view), label: 'Projects'),
-      NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Development'),
-      NavigationDestination(icon: Icon(Icons.settings), label: 'About'),
+      NavigationDestination(icon: Icon(Icons.grid_view), label: 'Проекты'),
+      NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Разработка'),
+      NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
     ]),
   );
 }

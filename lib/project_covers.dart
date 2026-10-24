@@ -93,10 +93,10 @@ class _ProjectCoverState extends State<ProjectCover> {
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
       child: Stack(fit: StackFit.expand, children: [
         if (localFile != null)
-          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink())
+          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
         else
           Image.network('https://picsum.photos/id/$photoId/900/420',
-            fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+            fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
           colors: [Color(0x22000000), Color(0xCC080D20)]))),

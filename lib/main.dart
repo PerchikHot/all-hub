@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'hub_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -69,8 +70,8 @@ class AllHub extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'All Hub', debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4D9DFF), brightness: Brightness.dark),
-      scaffoldBackgroundColor: const Color(0xFF0A1221)),
+      colorScheme: ColorScheme.fromSeed(seedColor: hubPurple, brightness: Brightness.dark),
+      scaffoldBackgroundColor: hubBackground),
     home: const HomePage());
 }
 
@@ -110,6 +111,7 @@ class _HomePageState extends State<HomePage> {
       if (tab == 2) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('All Hub v0.1.0\n\nAndroid + Windows source project.\nGitHub release checks and CI status.\n\nInstallation, local model management and self-updates are planned for later versions.', textAlign: TextAlign.center)));
       final filtered = items.where((p) => (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return ListView(padding: const EdgeInsets.all(16), children: [
+        if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[
           TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search projects', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
           const SizedBox(height: 12),
@@ -118,7 +120,7 @@ class _HomePageState extends State<HomePage> {
         ],
         Text(tab == 0 ? 'Your projects' : 'Build status', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
-        for (final project in (tab == 0 ? filtered : items)) Card(clipBehavior: Clip.antiAlias, child: Padding(
+        for (final project in (tab == 0 ? filtered : items)) Card(color: hubPanel, clipBehavior: Clip.antiAlias, child: Column(children: [HubProjectHeader(title: project.name, type: project.type), Padding(
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(project.name, style: Theme.of(context).textTheme.titleLarge),
@@ -142,7 +144,7 @@ class _HomePageState extends State<HomePage> {
                 ]),
               ]);
             }),
-          ]))),
+          ]))])),
       ]);
     }),
     bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [

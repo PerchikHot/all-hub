@@ -15,6 +15,16 @@ jobs:
           channel: stable
       - name: Generate Android platform scaffolding
         run: flutter create --platforms=android --project-name all_hub .
+      - name: Configure generated Android project
+        run: |
+          rm -f test/widget_test.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1)
+          p.write_text(s)
+          PY
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter build apk --debug
@@ -31,6 +41,8 @@ jobs:
           channel: stable
       - name: Generate Windows platform scaffolding
         run: flutter create --platforms=windows --project-name all_hub .
+      - name: Remove generated template test
+        run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
       - run: flutter pub get
       - run: flutter build windows --release
       - uses: actions/upload-artifact@v4

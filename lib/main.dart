@@ -82,6 +82,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int tab = 0;
+  String category = 'All';
+  String search = '';
   late final Future<List<Project>> projects = _loadProjects();
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {
@@ -106,10 +108,17 @@ class _HomePageState extends State<HomePage> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 2) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('All Hub v0.1.0\n\nAndroid + Windows source project.\nGitHub release checks and CI status.\n\nInstallation, local model management and self-updates are planned for later versions.', textAlign: TextAlign.center)));
+      final filtered = items.where((p) => (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return ListView(padding: const EdgeInsets.all(16), children: [
+        if (tab == 0) ...[
+          TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search projects', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'All' : c == 'game' ? 'Games' : c == 'app' ? 'Apps' : 'Mods'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
+          const SizedBox(height: 16),
+        ],
         Text(tab == 0 ? 'Your projects' : 'Build status', style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 16),
-        for (final project in items) Card(clipBehavior: Clip.antiAlias, child: Padding(
+        for (final project in (tab == 0 ? filtered : items)) Card(clipBehavior: Clip.antiAlias, child: Padding(
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(project.name, style: Theme.of(context).textTheme.titleLarge),

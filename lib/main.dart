@@ -85,6 +85,7 @@ class _HomePageState extends State<HomePage> {
   int tab = 0;
   String category = 'All';
   String search = '';
+  bool showOnlyAvailable = false;
   late final Future<List<Project>> projects = _loadProjects();
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {
@@ -109,7 +110,7 @@ class _HomePageState extends State<HomePage> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 2) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('All Hub v0.1.0\n\nAndroid + Windows source project.\nGitHub release checks and CI status.\n\nInstallation, local model management and self-updates are planned for later versions.', textAlign: TextAlign.center)));
-      final filtered = items.where((p) => (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
+      final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return ListView(padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[

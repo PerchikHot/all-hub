@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'hub_widgets.dart';
+import 'development_center.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -109,6 +110,7 @@ class _HomePageState extends State<HomePage> {
       if (snap.hasError) return Center(child: Text('Catalog error: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
+      if (tab == 1) return const DevelopmentCenter();
       if (tab == 2) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('All Hub v0.1.0\n\nAndroid + Windows source project.\nGitHub release checks and CI status.\n\nInstallation, local model management and self-updates are planned for later versions.', textAlign: TextAlign.center)));
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return ListView(padding: const EdgeInsets.all(16), children: [

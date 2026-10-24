@@ -43,13 +43,11 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Центр разработки'), actions: [
-      IconButton(onPressed: refresh, icon: const Icon(Icons.refresh), tooltip: 'Обновить')
-    ]),
+
     body: FutureBuilder<Map<String, dynamic>>(future: data, builder: (context, snapshot) {
-      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      if (!snapshot.hasData) return const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Загружаем сборки GitHub…')]));
       return ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('Сборки GitHub Actions', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
+        Row(children: [const Expanded(child: Text('Сборки GitHub Actions', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold))), IconButton(onPressed: refresh, icon: const Icon(Icons.refresh), tooltip: 'Обновить сборки')]),
         const SizedBox(height: 8),
         const Text('Реальные данные GitHub. Для анализа ошибок можно скопировать запрос и передать его ИИ.'),
         const SizedBox(height: 12),

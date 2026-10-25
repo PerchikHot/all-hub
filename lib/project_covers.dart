@@ -37,30 +37,7 @@ class CoverSettings {
     } catch (_) {
       return false;
     }
-    if (selected != null && Platform.isAndroid && !await Directory(selected).exists()) selected = null;
-    if (selected == null) {
-      if (!Platform.isAndroid) return false;
-      // Android's document provider may not expose a readable directory path.
-      // Import selected photos into persistent app storage instead.
-      final picked = await FilePicker.platform.pickFiles(
-        type: FileType.image, allowMultiple: true, withData: false);
-      if (picked == null || picked.files.isEmpty) return false;
-      final base = await getApplicationSupportDirectory();
-      final imported = Directory('${base.path}/all_hub_covers');
-      await imported.create(recursive: true);
-      var count = 0;
-      for (final item in picked.files) {
-        if (item.path == null) continue;
-        try {
-          final ext = item.extension?.toLowerCase() ?? 'jpg';
-          if (!['png', 'jpg', 'jpeg', 'webp', 'bmp'].contains(ext)) continue;
-          await File(item.path!).copy('${imported.path}/cover_${DateTime.now().microsecondsSinceEpoch}_$count.$ext');
-          count++;
-        } catch (_) {}
-      }
-      if (count == 0) return false;
-      selected = imported.path;
-    }
+    if (selected == null) return false;
     folder = selected;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('desktop_cover_folder', selected);

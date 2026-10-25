@@ -139,7 +139,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
-                  if (tab == 0 && i.downloadUrl != null) FilledButton.icon(onPressed: () => open(i.downloadUrl!), icon: const Icon(Icons.download), label: Text(Platform.isAndroid ? 'Скачать APK' : 'Скачать Windows')),
+                  if (tab == 0) FilledButton.icon(onPressed: () => open(i.downloadUrl ?? 'https://github.com/${project.repo}/actions'), icon: const Icon(Icons.download), label: Text(i.downloadUrl != null ? (Platform.isAndroid ? 'Скачать APK' : 'Скачать Windows') : 'Сборки и загрузки')),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),
                 ]),
               ]);

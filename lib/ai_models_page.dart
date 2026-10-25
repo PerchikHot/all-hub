@@ -45,11 +45,31 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (mounted) setState(() => paths = next);
   }
   Future<void> remove(String path) async {
+    final support = await getApplicationSupportDirectory();
+    final managedDir = Directory('${support.path}/models').absolute.path;
+    final file = File(path);
+    if (file.absolute.path.startsWith('$managedDir${Platform.pathSeparator}') && await file.exists()) {
+      try { await file.delete(); } catch (_) {}
+    }
     final next = paths.where((p) => p != path).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);
     if (mounted) setState(() => paths = next);
   }
+  Future<void> confirmRemove(String path) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Удалить модель?'),
+      content: const Text('Импортированная в All Hub копия GGUF будет удалена с устройства. Исходный файл вне приложения останется без изменений.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+      ],
+    ));
+    if (confirmed == true) await remove(path);
+  }
+  String fileSize(int bytes) => bytes >= 1073741824
+      ? '${(bytes / 1073741824).toStringAsFixed(2)} ГБ'
+      : '${(bytes / 1048576).toStringAsFixed(0)} МБ';
   @override
   Widget build(BuildContext context) => Column(children: [
     Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<int>(
@@ -65,11 +85,11 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     for (final path in paths)
-      FutureBuilder<bool>(future: File(path).exists(), builder: (context, snap) => Card(child: ListTile(
-        leading: Icon(snap.data == true ? Icons.memory : Icons.warning_amber),
+      FutureBuilder<FileStat?>(future: File(path).stat().then((s) => s.type == FileSystemEntityType.file ? s : null).catchError((_) => null), builder: (context, snap) => Card(child: ListTile(
+        leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
-        subtitle: Text(snap.data == true ? 'Файл доступен • движок не подключён' : 'Файл недоступен'),
-        trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => remove(path), icon: const Icon(Icons.close)),
+        subtitle: Text(snap.data != null ? '${fileSize(snap.data!.size)} • движок не подключён' : 'Файл недоступен'),
+        trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
       ))),
   ])),
   ]);

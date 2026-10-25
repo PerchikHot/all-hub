@@ -24,6 +24,11 @@ jobs:
           s = p.read_text()
           s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1)
           p.write_text(s)
+          gradle = Path('android/app/build.gradle.kts')
+          g = gradle.read_text()
+          g = g.replace('applicationId = "com.example.all_hub"', 'applicationId = "com.perchikhot.allhub"')
+          g = g.replace('versionCode = flutter.versionCode', 'versionCode = flutter.versionCode')
+          gradle.write_text(g)
           PY
       - run: flutter pub get
       - name: Align Android compile SDK with plugin requirements

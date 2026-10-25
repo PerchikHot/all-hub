@@ -128,6 +128,8 @@ class _ProjectCoverState extends State<ProjectCover> {
   }
   // Danbooru tag search: general-rated art by default, explicit only by opt-in.
   void onSettingsChanged() {
+    // Never display images from the previous content mode while fetching replacements.
+    setState(() { webCovers = []; webIndex = 0; failedImages.clear(); });
     refresh();
     if (loadingWeb) { reloadQueued = true; return; }
     loadWebCovers();
@@ -139,7 +141,7 @@ class _ProjectCoverState extends State<ProjectCover> {
     final cacheKey = '${widget.id}:$adult';
     final saved = CoverSettings.cache[cacheKey];
     if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
-      if (mounted) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
+      if (mounted && CoverSettings.adultCovers == adult && widget.id == cacheKey.split(':').first) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
       loadingWeb = false;
       return;
     }

@@ -17,7 +17,9 @@ class GgufHeader {
       if (size < 24) return null;
       final data = await file.read(24);
       if (data.length != 24 || data[0] != 0x47 || data[1] != 0x47 ||
-          data[2] != 0x55 || data[3] != 0x46) return null;
+          data[2] != 0x55 || data[3] != 0x46) {
+        return null;
+      }
       final view = ByteData.sublistView(Uint8List.fromList(data));
       final version = view.getUint32(4, Endian.little);
       if (version < 2 || version > 3) return null;

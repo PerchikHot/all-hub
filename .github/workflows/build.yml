@@ -56,6 +56,8 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter build apk --debug
+      - name: Verify Android package
+        run: test -s build/app/outputs/flutter-apk/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: AllHub-Android-debug
@@ -81,6 +83,8 @@ jobs:
         run: |
           $release = 'build/windows/x64/runner/Release'
           if (!(Test-Path "$release/all_hub.exe")) { throw 'Windows executable missing' }
+          if (!(Test-Path "$release/flutter_windows.dll")) { throw 'Flutter runtime missing' }
+          if (!(Test-Path "$release/data")) { throw 'Windows data assets missing' }
           Compress-Archive -Path "$release/*" -DestinationPath 'AllHub-Windows-portable.zip' -Force
       - uses: actions/upload-artifact@v4
         with:

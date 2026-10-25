@@ -52,9 +52,9 @@ class _CodexPageState extends State<CodexPage> {
           : result.stderr.toString().trim();
       });
     } catch (e) {
-      if (mounted) setState(() => error = 'Не удалось запустить Codex: $e. Проверь команду codex и авторизацию.');
+      if (mounted) { setState(() => error = 'Не удалось запустить Codex: $e. Проверь команду codex и авторизацию.'); }
     } finally {
-      if (mounted) setState(() => running = false);
+      if (mounted) { setState(() => running = false); }
     }
   }
   @override

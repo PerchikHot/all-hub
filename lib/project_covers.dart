@@ -161,7 +161,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           if (item['rating']?.toString() != 'e') continue;
           final tags = (item['tag_string'] ?? '').toString().toLowerCase();
           if (RegExp(r'(^|\\s)(loli|shota|child|underage)(\\s|$)').hasMatch(tags)) continue;
-          final url = item['large_file_url']?.toString() ?? item['file_url']?.toString();
+          final url = item['large_file_url']?.toString() ?? item['file_url']?.toString() ?? item['preview_file_url']?.toString();
           if (url != null && url.startsWith('https://')) urls.add(url);
         }
         if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
@@ -191,7 +191,7 @@ class _ProjectCoverState extends State<ProjectCover> {
       if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
       if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
     } catch (_) {
-      // Offline: retain gradient fallback.
+      // Offline or API unavailable: retain local image / gradient fallback.
     } finally {
       loadingWeb = false;
     }

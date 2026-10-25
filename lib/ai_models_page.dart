@@ -60,9 +60,14 @@ class _AiModelsPageState extends State<AiModelsPage> {
           await dest.create(recursive: true);
           path = '${dest.path}/${DateTime.now().microsecondsSinceEpoch}_${f.name}';
           await File(f.path!).copy(path);
+          if (await ggufVersion(path) == null) {
+            await File(path).delete();
+            invalidCount++;
+            continue;
+          }
         }
         if (!next.contains(path)) { next.add(path); importedCount++; }
-      } catch (_) {}
+      } catch (_) { invalidCount++; }
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);

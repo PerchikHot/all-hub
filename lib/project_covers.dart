@@ -13,6 +13,8 @@ import 'package:path_provider/path_provider.dart';
 class CoverSettings {
   static String? folder;
   static bool adultCovers = false;
+  static final Map<String, List<String>> cache = {};
+  static final Map<String, DateTime> cacheAt = {};
   static Future<void> setAdultCovers(bool enabled) async {
     adultCovers = enabled;
     final prefs = await SharedPreferences.getInstance();
@@ -34,6 +36,7 @@ class CoverSettings {
     } catch (_) {
       return false;
     }
+    if (selected != null && Platform.isAndroid && !await Directory(selected).exists()) selected = null;
     if (selected == null) {
       if (!Platform.isAndroid) return false;
       // Android's document provider may not expose a readable directory path.
@@ -109,7 +112,13 @@ class _ProjectCoverState extends State<ProjectCover> {
   Future<void> loadWebCovers() async {
     if (loadingWeb) return;
     loadingWeb = true;
-    if (mounted) setState(() { webCovers = []; webIndex = 0; });
+    final cacheKey = '${widget.id}:${CoverSettings.adultCovers}';
+    final saved = CoverSettings.cache[cacheKey];
+    if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
+      if (mounted) setState(() { webCovers = saved; webIndex = 0; });
+      loadingWeb = false;
+      return;
+    }
     final id = widget.id;
     final queries = <String, String>{
       'all-hub': 'anime illustration',
@@ -142,6 +151,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           final url = item['large_file_url']?.toString() ?? item['file_url']?.toString();
           if (url != null && url.startsWith('https://')) urls.add(url);
         }
+        if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
         if (mounted && widget.id == id && CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
         return;
       }
@@ -165,6 +175,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           if (mime.startsWith('image/') && url != null && url.startsWith('https://')) urls.add(url);
         }
       }
+      if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
       if (mounted && widget.id == id && !CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
     } catch (_) {
       // Offline: retain gradient fallback.

@@ -114,6 +114,15 @@ class _HomePageState extends State<HomePage> {
             subtitle: const Text('Поиск по тегам Danbooru для взрослых персонажей. Может содержать откровенные изображения. Локальные фото имеют приоритет.'),
             value: CoverSettings.adultCovers,
             onChanged: (enabled) => CoverSettings.setAdultCovers(enabled))),
+        ValueListenableBuilder<int>(valueListenable: CoverSettings.statusRevision,
+          builder: (context, revision, child) => ExpansionTile(
+            title: const Text('Диагностика интернет-обложек'),
+            subtitle: Text(CoverSettings.errors.isEmpty
+              ? 'Ошибок поиска пока нет'
+              : 'Проблемы: ${CoverSettings.errors.length}'),
+            children: CoverSettings.errors.entries.map((entry) =>
+              ListTile(title: Text(entry.key), subtitle: Text(entry.value))).toList(),
+          )),
         const ListTile(title: Text('All Hub 0.5.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);

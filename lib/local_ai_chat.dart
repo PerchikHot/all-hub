@@ -39,7 +39,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
       }); }
     } catch (e) {
-      if (mounted) { setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; });
+      if (mounted) { setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; }); }
     }
   }
   Future<void> send() async {

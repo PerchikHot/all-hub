@@ -84,7 +84,13 @@ class _AiModelsPageState extends State<AiModelsPage> {
     final managedDir = Directory('${support.path}/models').absolute.path;
     final file = File(path);
     if (file.absolute.path.startsWith('$managedDir${Platform.pathSeparator}') && await file.exists()) {
-      try { await file.delete(); } catch (_) {}
+      try {
+        await file.delete();
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось удалить файл модели: $e')));
+        return;
+      }
     }
     final next = paths.where((p) => p != path).toList();
     final prefs = await SharedPreferences.getInstance();
@@ -100,7 +106,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
         FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
       ],
     ));
-    if (confirmed == true) await remove(path);
+    if (confirmed == true && mounted) await remove(path);
   }
   String fileSize(int bytes) => bytes >= 1073741824
       ? '${(bytes / 1073741824).toStringAsFixed(2)} ГБ'

@@ -15,6 +15,8 @@ class CoverSettings {
   static bool adultCovers = false;
   static final Map<String, List<String>> cache = {};
   static final Map<String, DateTime> cacheAt = {};
+  static final Map<String, String> errors = {};
+  static final Map<String, Future<List<String>>> pending = {};
   static Future<void> setAdultCovers(bool enabled) async {
     adultCovers = enabled;
     final prefs = await SharedPreferences.getInstance();
@@ -158,7 +160,11 @@ class _ProjectCoverState extends State<ProjectCover> {
           'tags': tags[id] ?? tags['all-hub']!, 'limit':'20',
         });
         final response = await http.get(uri, headers: {'User-Agent':'AllHub/0.5 (cover viewer)'}).timeout(const Duration(seconds: 12));
-        if (response.statusCode != 200) return;
+        if (response.statusCode != 200) {
+          CoverSettings.errors[id] = 'Danbooru: HTTP ${response.statusCode}';
+          CoverSettings.revision.value++;
+          return;
+        }
         final posts = jsonDecode(response.body) as List<dynamic>;
         final urls = <String>[];
         for (final post in posts) {
@@ -169,7 +175,9 @@ class _ProjectCoverState extends State<ProjectCover> {
           final url = item['large_file_url']?.toString() ?? item['file_url']?.toString() ?? item['preview_file_url']?.toString();
           if (url != null && url.startsWith('https://')) urls.add(url);
         }
-        if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
+        if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); CoverSettings.errors.remove(id); }
+        else { CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений'; }
+        CoverSettings.revision.value++;
         if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
         return;
       }
@@ -178,7 +186,11 @@ class _ProjectCoverState extends State<ProjectCover> {
       });
       final response = await http.get(uri, headers: {'User-Agent':'AllHub/0.5 (cover viewer)'})
           .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) return;
+      if (response.statusCode != 200) {
+        CoverSettings.errors[id] = 'Danbooru: HTTP ${response.statusCode}';
+        CoverSettings.revision.value++;
+        return;
+      }
       final posts = jsonDecode(response.body) as List<dynamic>;
       final urls = <String>[];
       for (final post in posts) {
@@ -191,11 +203,17 @@ class _ProjectCoverState extends State<ProjectCover> {
       if (urls.isNotEmpty) {
         CoverSettings.cache[cacheKey] = urls;
         CoverSettings.cacheAt[cacheKey] = DateTime.now();
+        CoverSettings.errors.remove(id);
+      } else {
+        CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений';
       }
+      CoverSettings.revision.value++;
       if (mounted && widget.id == id && CoverSettings.adultCovers == adult) {
         setState(() { webCovers = urls; webIndex = 0; });
       }
-    } catch (_) {
+    } catch (e) {
+      CoverSettings.errors[id] = 'Ошибка поиска: $e';
+      CoverSettings.revision.value++;
       // Offline or API unavailable: retain local image / gradient fallback.
     } finally {
       loadingWeb = false;
@@ -247,6 +265,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         else if (webCovers.isNotEmpty)
           Image.network(webCovers[webIndex], fit: BoxFit.cover,
             gaplessPlayback: true,
+            headers: const {'User-Agent': 'AllHub/0.5 (cover viewer)'},
             errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(

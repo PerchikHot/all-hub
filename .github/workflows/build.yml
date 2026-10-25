@@ -53,14 +53,50 @@ jobs:
               gradle.write_text(text)
               print(f'Updated {gradle} to compileSdk 36')
           PY
+      - name: Configure persistent release signing
+        env:
+          ALLHUB_KEYSTORE_BASE64: ${{ secrets.ALLHUB_KEYSTORE_BASE64 }}
+          ALLHUB_STORE_PASSWORD: ${{ secrets.ALLHUB_STORE_PASSWORD }}
+          ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
+          ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import os, base64
+          from pathlib import Path
+          names = ['ALLHUB_KEYSTORE_BASE64','ALLHUB_STORE_PASSWORD','ALLHUB_KEY_PASSWORD','ALLHUB_KEY_ALIAS']
+          if not all(os.getenv(n) for n in names):
+              raise SystemExit('Missing release signing secrets: ' + ', '.join(n for n in names if not os.getenv(n)))
+          Path('android/app/allhub-release.jks').write_bytes(base64.b64decode(os.environ['ALLHUB_KEYSTORE_BASE64']))
+          gradle = Path('android/app/build.gradle.kts')
+          content = gradle.read_text()
+          content = 'import java.util.Properties\\n' + content
+          marker = 'android {'
+          signing = """val signingProps = Properties()
+          signingProps["storePassword"] = System.getenv("ALLHUB_STORE_PASSWORD")
+          signingProps["keyPassword"] = System.getenv("ALLHUB_KEY_PASSWORD")
+          signingProps["keyAlias"] = System.getenv("ALLHUB_KEY_ALIAS")
+          android {
+              signingConfigs {
+                  create("allhubRelease") {
+                      storeFile = file("allhub-release.jks")
+                      storePassword = signingProps["storePassword"] as String
+                      keyPassword = signingProps["keyPassword"] as String
+                      keyAlias = signingProps["keyAlias"] as String
+                  }
+              }
+          """
+          content = content.replace(marker, signing, 1)
+          content = content.replace('signingConfig = signingConfigs.getByName("debug")','signingConfig = signingConfigs.getByName("allhubRelease")')
+          gradle.write_text(content)
+          PY
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --debug
+      - run: flutter build apk --release
       - name: Verify Android package
-        run: test -s build/app/outputs/flutter-apk/app-debug.apk
+        run: test -s build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: AllHub-Android-debug
+          name: AllHub-Android-release
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
   windows:

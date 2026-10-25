@@ -53,9 +53,9 @@ class _AiModelsPageState extends State<AiModelsPage> {
   @override
   Widget build(BuildContext context) => Column(children: [
     Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<int>(
-      segments: const [ButtonSegment(value:0,label:Text('Ollama')),ButtonSegment(value:1,label:Text('GGUF'))],
+      segments: const [ButtonSegment(value:0,label:Text('Ollama')),ButtonSegment(value:1,label:Text('Codex')),ButtonSegment(value:2,label:Text('GGUF'))],
       selected:{mode},onSelectionChanged:(v)=>setState(()=>mode=v.first))),
-    Expanded(child:mode == 0 ? const LocalAiChat() : ListView(padding: const EdgeInsets.all(20), children: [
+    Expanded(child:mode == 0 ? const LocalAiChat() : mode == 1 ? const CodexPage() : ListView(padding: const EdgeInsets.all(20), children: [
     Text('Локальные ИИ-модели', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 12),
     const Text('Добавь уже скачанные GGUF-модели. Они останутся локальными. Это список файлов, а не запущенный ИИ: для общения потребуется подключить совместимый движок инференса.'),

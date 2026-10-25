@@ -122,9 +122,9 @@ class _ProjectCoverState extends State<ProjectCover> {
       if (CoverSettings.adultCovers) {
         // Only adult-character searches; reject posts marked as young characters.
         final tags = <String, String>{
-          'eclipse-arena': 'erza_scarlet futanari rating:explicit -loli -shota',
-          'shadow-rp': 'boa_hancock futanari rating:explicit -loli -shota',
-          'shadow-garden': 'futanari adult rating:explicit -loli -shota',
+          'eclipse-arena': 'erza_scarlet futanari',
+          'shadow-rp': 'boa_hancock futanari',
+          'shadow-garden': 'futanari rating:explicit',
           'all-hub': 'futanari adult rating:explicit -loli -shota',
         };
         final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
@@ -136,6 +136,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         final urls = <String>[];
         for (final post in posts) {
           final item = post as Map<String, dynamic>;
+          if (item['rating']?.toString() != 'e') continue;
           final tags = (item['tag_string'] ?? '').toString().toLowerCase();
           if (RegExp(r'(^|\\s)(loli|shota|child|underage)(\\s|$)').hasMatch(tags)) continue;
           final url = item['large_file_url']?.toString() ?? item['file_url']?.toString();

@@ -26,7 +26,7 @@ class _CodexPageState extends State<CodexPage> {
     folder.text = chosen;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('codex_workspace', chosen);
-    if (mounted) { setState(() {});
+    if (mounted) { setState(() {}); }
   }
   Future<void> run() async {
     final task = prompt.text.trim();

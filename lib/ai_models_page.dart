@@ -29,12 +29,12 @@ class _AiModelsPageState extends State<AiModelsPage> {
   void initState() { super.initState(); load(); }
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() {
+    if (mounted) { setState(() {
       paths = prefs.getStringList('ai_model_paths') ?? [];
       final saved = prefs.getString('ai_selected_gguf');
       selectedGguf = paths.contains(saved) ? saved : null;
       busy = false;
-    });
+    }); }
   }
   Future<void> selectGguf(String path) async {
     if (!paths.contains(path) || await inspect(path) == null) return;
@@ -85,8 +85,10 @@ class _AiModelsPageState extends State<AiModelsPage> {
       await prefs.setStringList('ai_model_paths', next);
       if (mounted) setState(() { paths = next; inspections.clear(); });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка импорта моделей: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка импорта моделей: $e')));
+      }
     } finally {
       if (mounted) {
         setState(() => importing = false);
@@ -103,8 +105,10 @@ class _AiModelsPageState extends State<AiModelsPage> {
       try {
         await file.delete();
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Не удалось удалить файл модели: $e')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Не удалось удалить файл модели: $e')));
+        }
         return;
       }
     }
@@ -114,11 +118,13 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (selectedGguf == path) {
       await prefs.remove('ai_selected_gguf');
     }
-    if (mounted) setState(() {
-      paths = next;
-      inspections.remove(path);
-      if (selectedGguf == path) selectedGguf = null;
-    });
+    if (mounted) {
+      setState(() {
+        paths = next;
+        inspections.remove(path);
+        if (selectedGguf == path) selectedGguf = null;
+      });
+    }
   }
   Future<void> confirmRemove(String path) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(

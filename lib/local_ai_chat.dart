@@ -17,6 +17,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
   String? selected;
   bool sending = false;
   bool restoring = true;
+  bool checkingConnection = false;
+  int connectionRevision = 0;
   String historyKey(String model) => 'ollama_chat_history_model_$model';
   Future<void> selectModel(String? model) async {
     if (sending || model == null || model == selected) return;
@@ -69,6 +71,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
     await fetchModels();
   }
   Future<void> fetchModels() async {
+    final revision = ++connectionRevision;
+    if (mounted) setState(() => checkingConnection = true);
     try {
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
       final response = await http.get(Uri.parse('$base/api/tags')).timeout(const Duration(seconds: 8));
@@ -76,6 +80,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final names = (decoded['models'] as List<dynamic>? ?? [])
           .map((e) => (e as Map<String, dynamic>)['name'].toString()).toList();
+      if (!mounted || revision != connectionRevision) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ollama_endpoint', base);
       if (mounted) setState(() {
@@ -89,7 +94,9 @@ class _LocalAiChatState extends State<LocalAiChat> {
         await selectModel(next);
       }
     } catch (e) {
-      if (mounted) { setState(() { models = []; error = 'Нет подключения к Ollama: $e. Сохранённая переписка доступна офлайн.'; }); }
+      if (mounted && revision == connectionRevision) { setState(() { models = []; error = 'Нет подключения к Ollama: $e. Сохранённая переписка доступна офлайн.'; }); }
+    } finally {
+      if (mounted && revision == connectionRevision) setState(() => checkingConnection = false);
     }
   }
   Future<void> send() async {
@@ -128,7 +135,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         Expanded(child: DropdownButton<String>(isExpanded:true, value:models.contains(selected) ? selected : null,
           hint: const Text('Выбери модель'), items: models.map((m) => DropdownMenuItem(value:m,child:Text(m,overflow:TextOverflow.ellipsis))).toList(),
           onChanged: sending ? null : selectModel)),
-        IconButton(onPressed:fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
+        IconButton(onPressed:checkingConnection ? null : fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
         IconButton(onPressed:sending || restoring || messages.isEmpty ? null : () async {
           final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
             title: const Text('Очистить переписку?'),
@@ -141,6 +148,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
           if (confirmed == true) await clearMessages();
         }, icon: const Icon(Icons.delete_outline), tooltip: 'Очистить историю'),
       ]),
+      if (checkingConnection) const LinearProgressIndicator(),
       if (Platform.isAndroid) const Padding(padding: EdgeInsets.only(top:8), child: Text('На телефоне 127.0.0.1 означает сам телефон, а не компьютер. Чтобы подключить Ollama на ПК, укажи адрес компьютера в одной Wi-Fi сети, например http://192.168.1.10:11434. Ollama на ПК должна разрешать подключения из локальной сети.')),
       if (error != null) Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
     ])),

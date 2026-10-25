@@ -56,11 +56,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}: ${response.body}');
       final result = jsonDecode(response.body) as Map<String, dynamic>;
       final message = result['message'] as Map<String, dynamic>;
-      if (mounted) setState(() => messages.add({'role':'assistant','content':message['content'].toString()}));
+      if (mounted) { setState(() => messages.add({'role':'assistant','content':message['content'].toString()})); }
     } catch (e) {
-      if (mounted) setState(() => error = 'Ошибка ответа: $e');
+      if (mounted) { setState(() => error = 'Ошибка ответа: $e'); }
     } finally {
-      if (mounted) setState(() => sending = false);
+      if (mounted) { setState(() => sending = false); }
     }
   }
   @override

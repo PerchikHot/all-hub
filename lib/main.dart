@@ -113,7 +113,7 @@ class _HomePageState extends State<HomePage> {
             children: CoverSettings.errors.entries.map((entry) =>
               ListTile(title: Text(entry.key), subtitle: Text(entry.value))).toList(),
           )),
-        const ListTile(title: Text('All Hub 0.5.1'),
+        const ListTile(title: Text('All Hub 0.6.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);
   @override

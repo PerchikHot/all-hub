@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:file_picker/file_picker.dart';
@@ -47,11 +48,13 @@ class ProjectCover extends StatefulWidget {
 class _ProjectCoverState extends State<ProjectCover> {
   File? localFile;
   int generation = 0;
+  Timer? rotationTimer;
   @override
   void initState() {
     super.initState();
     CoverSettings.revision.addListener(refresh);
     refresh();
+    rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) => refresh());
   }
   @override
   void didUpdateWidget(covariant ProjectCover oldWidget) {
@@ -60,6 +63,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   }
   @override
   void dispose() {
+    rotationTimer?.cancel();
     CoverSettings.revision.removeListener(refresh);
     super.dispose();
   }
@@ -75,7 +79,9 @@ class _ProjectCoverState extends State<ProjectCover> {
             entry is File && RegExp(r'\.(png|jpg|jpeg|webp|bmp)$', caseSensitive: false).hasMatch(entry.path)
           ).cast<File>().toList();
           if (files.isNotEmpty) {
-            selected = files[Random().nextInt(files.length)];
+            final alternatives = files.where((f) => f.path != localFile?.path).toList();
+            final candidates = alternatives.isNotEmpty ? alternatives : files;
+            selected = candidates[Random().nextInt(candidates.length)];
           }
         }
       } catch (_) { /* Inaccessible directory: show built-in fallback. */ }

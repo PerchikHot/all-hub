@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Pick a local image directory on Windows or Android where supported by the platform.
 /// No local images are uploaded. Unsupported directory access falls back to remote covers.
@@ -23,7 +24,29 @@ class CoverSettings {
     } catch (_) {
       return false;
     }
-    if (selected == null) return false;
+    if (selected == null) {
+      if (!Platform.isAndroid) return false;
+      // Android's document provider may not expose a readable directory path.
+      // Import selected photos into persistent app storage instead.
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image, allowMultiple: true, withData: false);
+      if (picked == null || picked.files.isEmpty) return false;
+      final base = await getApplicationSupportDirectory();
+      final imported = Directory('${base.path}/all_hub_covers');
+      await imported.create(recursive: true);
+      var count = 0;
+      for (final item in picked.files) {
+        if (item.path == null) continue;
+        try {
+          final ext = item.extension?.toLowerCase() ?? 'jpg';
+          if (!['png', 'jpg', 'jpeg', 'webp', 'bmp'].contains(ext)) continue;
+          await File(item.path!).copy('${imported.path}/cover_${DateTime.now().microsecondsSinceEpoch}_$count.$ext');
+          count++;
+        } catch (_) {}
+      }
+      if (count == 0) return false;
+      selected = imported.path;
+    }
     folder = selected;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('desktop_cover_folder', selected);

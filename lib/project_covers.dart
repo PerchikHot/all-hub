@@ -31,6 +31,7 @@ class CoverSettings {
   static Future<bool> chooseFolder() async {
     if (!Platform.isWindows && !Platform.isAndroid) return false;
     String? selected;
+    if (Platform.isAndroid) return importImages();
     try {
       selected = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Папка с обложками All Hub');
     } catch (_) {
@@ -66,6 +67,29 @@ class CoverSettings {
     revision.value++;
     return true;
   }
+  static Future<bool> importImages() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.image, allowMultiple: true, withData: false);
+    if (picked == null || picked.files.isEmpty) return false;
+    final base = await getApplicationSupportDirectory();
+    final imported = Directory('${base.path}/all_hub_covers');
+    await imported.create(recursive: true);
+    var count = 0;
+    for (final item in picked.files) {
+      if (item.path == null) continue;
+      final ext = item.extension?.toLowerCase() ?? 'jpg';
+      if (!['png','jpg','jpeg','webp','bmp'].contains(ext)) continue;
+      try {
+        await File(item.path!).copy('${imported.path}/cover_${DateTime.now().microsecondsSinceEpoch}_$count.$ext');
+        count++;
+      } catch (_) {}
+    }
+    if (count == 0) return false;
+    folder = imported.path;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('desktop_cover_folder', folder!);
+    revision.value++;
+    return true;
+  }
   static Future<void> clear() async {
     folder = null;
     final prefs = await SharedPreferences.getInstance();
@@ -87,6 +111,8 @@ class _ProjectCoverState extends State<ProjectCover> {
   int webIndex = 0;
   bool loadingWeb = false;
   int generation = 0;
+  List<File> localCandidates = [];
+  String? scannedFolder;
   Timer? rotationTimer;
   @override
   void initState() {
@@ -94,7 +120,16 @@ class _ProjectCoverState extends State<ProjectCover> {
     CoverSettings.revision.addListener(onSettingsChanged);
     refresh();
     loadWebCovers();
-    rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) { refresh(); if (webCovers.isNotEmpty && mounted) setState(() => webIndex = (webIndex + 1) % webCovers.length); });
+    rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      if (localCandidates.isNotEmpty) {
+        final alternatives = localCandidates.where((f) => f.path != localFile?.path).toList();
+        final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;
+        setState(() => localFile = candidates[Random().nextInt(candidates.length)]);
+      } else if (webCovers.isNotEmpty) {
+        setState(() => webIndex = (webIndex + 1) % webCovers.length);
+      }
+    });
   }
   @override
   void didUpdateWidget(covariant ProjectCover oldWidget) {
@@ -112,7 +147,8 @@ class _ProjectCoverState extends State<ProjectCover> {
   Future<void> loadWebCovers() async {
     if (loadingWeb) return;
     loadingWeb = true;
-    final cacheKey = '${widget.id}:${CoverSettings.adultCovers}';
+    final adult = CoverSettings.adultCovers;
+    final cacheKey = '${widget.id}:$adult';
     final saved = CoverSettings.cache[cacheKey];
     if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
       if (mounted) setState(() { webCovers = saved; webIndex = 0; });
@@ -128,13 +164,13 @@ class _ProjectCoverState extends State<ProjectCover> {
     };
     final search = queries[id] ?? 'anime cosplay';
     try {
-      if (CoverSettings.adultCovers) {
+      if (adult) {
         // Only adult-character searches; reject posts marked as young characters.
         final tags = <String, String>{
           'eclipse-arena': 'erza_scarlet futanari',
           'shadow-rp': 'boa_hancock futanari',
           'shadow-garden': 'futanari rating:explicit',
-          'all-hub': 'futanari adult rating:explicit -loli -shota',
+          'all-hub': 'futanari rating:explicit',
         };
         final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
           'tags': tags[id] ?? tags['all-hub']!, 'limit':'20',
@@ -152,7 +188,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           if (url != null && url.startsWith('https://')) urls.add(url);
         }
         if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
-        if (mounted && widget.id == id && CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
+        if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
         return;
       }
       final uri = Uri.https('commons.wikimedia.org', '/w/api.php', {
@@ -176,7 +212,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         }
       }
       if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
-      if (mounted && widget.id == id && !CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
+      if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
     } catch (_) {
       // Offline: retain gradient fallback.
     } finally {
@@ -189,11 +225,13 @@ class _ProjectCoverState extends State<ProjectCover> {
     final folder = CoverSettings.folder;
     if ((Platform.isWindows || Platform.isAndroid) && folder != null) {
       try {
+        if (scannedFolder != folder) { localCandidates = []; scannedFolder = folder; }
         final dir = Directory(folder);
         if (await dir.exists()) {
           final files = await dir.list(followLinks: false).where((entry) =>
             entry is File && RegExp(r'\.(png|jpg|jpeg|webp|bmp)$', caseSensitive: false).hasMatch(entry.path)
           ).cast<File>().toList();
+          localCandidates = files;
           if (files.isNotEmpty) {
             final alternatives = files.where((f) => f.path != localFile?.path).toList();
             final candidates = alternatives.isNotEmpty ? alternatives : files;
@@ -202,6 +240,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         }
       } catch (_) { /* Inaccessible directory: show built-in fallback. */ }
     }
+    if (folder == null) { localCandidates = []; scannedFolder = null; }
     if (mounted && current == generation) setState(() => localFile = selected);
   }
   @override
@@ -221,6 +260,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
         else if (webCovers.isNotEmpty)
           Image.network(webCovers[webIndex], fit: BoxFit.cover,
+            gaplessPlayback: true,
             errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(

@@ -33,13 +33,13 @@ class _LocalAiChatState extends State<LocalAiChat> {
           .map((e) => (e as Map<String, dynamic>)['name'].toString()).toList();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ollama_endpoint', base);
-      if (mounted) setState(() {
+      if (mounted) { setState(() {
         models = names;
         selected = names.contains(selected) ? selected : (names.isEmpty ? null : names.first);
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
-      });
+      }); }
     } catch (e) {
-      if (mounted) setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; });
+      if (mounted) { setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; });
     }
   }
   Future<void> send() async {

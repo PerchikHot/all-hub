@@ -92,7 +92,12 @@ jobs:
           PY
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --release
+      - name: Build signed Android release APK
+        env:
+          ALLHUB_STORE_PASSWORD: ${{ secrets.ALLHUB_STORE_PASSWORD }}
+          ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
+          ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
+        run: flutter build apk --release
       - name: Verify Android package
         run: test -s build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4

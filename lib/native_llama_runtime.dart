@@ -20,7 +20,12 @@ class NativeLlamaRuntime {
       if (version() != 1) {
         return 'Найден несовместимый нативный движок';
       }
-      return 'Нативный мост обнаружен; загрузка модели ещё не реализована';
+      final ready = library.lookupFunction<Int32 Function(), int Function()>(
+        'allhub_llama_inference_ready',
+      );
+      return ready() == 1
+          ? 'Нативный движок сообщает о готовности к инференсу'
+          : 'Нативный ARM64-мост подключён; llama.cpp и генерация пока не встроены';
     } on ArgumentError {
       return 'Нативный GGUF-движок не установлен в APK';
     } on Object catch (_) {

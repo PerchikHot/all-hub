@@ -85,17 +85,7 @@ class _HomePageState extends State<HomePage> {
     CoverSettings.revision.value++;
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))),
-    body: FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
-      if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
-      if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-      final items = snap.data!;
-      if (tab == 1) return const DevelopmentCenter();
-      if (tab == 2) return const AiModelsPage();
-      if (tab == 3) {
-        return ListView(padding: const EdgeInsets.all(20), children: [
+  Widget _settings() => ListView(padding: const EdgeInsets.all(20), children: [
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),
           subtitle: Text('Каталог обновляется из GitHub, файлы загрузки выбираются под платформу.')),
@@ -126,7 +116,15 @@ class _HomePageState extends State<HomePage> {
         const ListTile(title: Text('All Hub 0.5.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);
-      }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))),
+    body: tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? _settings() :
+      FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
+      if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
+      if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+      final items = snap.data!;
+
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],

@@ -63,6 +63,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
+    final preferred = prefs.getString('ollama_selected_model');
+    if (preferred != null && preferred.isNotEmpty) await selectModel(preferred);
     if (mounted) setState(() => restoring = false);
     await fetchModels();
   }
@@ -78,7 +80,6 @@ class _LocalAiChatState extends State<LocalAiChat> {
       await prefs.setString('ollama_endpoint', base);
       if (mounted) setState(() {
         models = names;
-        if (names.isEmpty) selected = null;
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
       });
       if (names.isNotEmpty && mounted) {
@@ -88,12 +89,12 @@ class _LocalAiChatState extends State<LocalAiChat> {
         await selectModel(next);
       }
     } catch (e) {
-      if (mounted) { setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; }); }
+      if (mounted) { setState(() { models = []; error = 'Нет подключения к Ollama: $e. Сохранённая переписка доступна офлайн.'; }); }
     }
   }
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || sending || selected == null || restoring) return;
+    if (text.isEmpty || sending || selected == null || restoring || !models.contains(selected)) return;
     input.clear();
     setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
     await saveMessages();
@@ -124,7 +125,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
     Padding(padding: const EdgeInsets.all(12), child: Column(children: [
       TextField(controller: address, decoration: const InputDecoration(labelText: 'Адрес Ollama (ПК или локальный сервер)', isDense:true)),
       Row(children: [
-        Expanded(child: DropdownButton<String>(isExpanded:true, value:selected,
+        Expanded(child: DropdownButton<String>(isExpanded:true, value:models.contains(selected) ? selected : null,
           hint: const Text('Выбери модель'), items: models.map((m) => DropdownMenuItem(value:m,child:Text(m,overflow:TextOverflow.ellipsis))).toList(),
           onChanged: sending ? null : selectModel)),
         IconButton(onPressed:fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
@@ -152,7 +153,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
     SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[
       Expanded(child:TextField(controller:input, maxLines:3,minLines:1,
         onSubmitted:(_) => send(),decoration:const InputDecoration(hintText:'Напиши сообщение…',border:OutlineInputBorder()))),
-      IconButton(onPressed:sending?null:send,icon:const Icon(Icons.send)),
+      IconButton(onPressed:sending || !models.contains(selected) ? null : send,icon:const Icon(Icons.send)),
     ]))),
   ]);
 }

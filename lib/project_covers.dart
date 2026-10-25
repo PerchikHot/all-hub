@@ -138,14 +138,14 @@ class _ProjectCoverState extends State<ProjectCover> {
     if (loadingWeb) return;
     loadingWeb = true;
     final adult = CoverSettings.adultCovers;
-    final cacheKey = '${widget.id}:$adult';
+    final id = widget.id;
+    final cacheKey = '$id:$adult';
     final saved = CoverSettings.cache[cacheKey];
     if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
-      if (mounted && CoverSettings.adultCovers == adult && widget.id == cacheKey.split(':').first) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
+      if (mounted && CoverSettings.adultCovers == adult && widget.id == id) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
       loadingWeb = false;
       return;
     }
-    final id = widget.id;
     final queries = <String, String>{
       'all-hub': 'anime_girl rating:general',
       'eclipse-arena': 'erza_scarlet rating:general',

@@ -69,7 +69,7 @@ jobs:
           Path('android/app/allhub-release.jks').write_bytes(base64.b64decode(os.environ['ALLHUB_KEYSTORE_BASE64']))
           gradle = Path('android/app/build.gradle.kts')
           content = gradle.read_text()
-          content = 'import java.util.Properties\\n' + content
+          content = 'import java.util.Properties\n' + content
           marker = 'android {'
           signing = """val signingProps = Properties()
           signingProps["storePassword"] = System.getenv("ALLHUB_STORE_PASSWORD")
@@ -97,7 +97,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AllHub-Android-release
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
   windows:
     runs-on: windows-latest

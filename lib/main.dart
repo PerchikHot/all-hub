@@ -89,13 +89,14 @@ class _HomePageState extends State<HomePage> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 1) return const DevelopmentCenter();
-      if (tab == 2) return ListView(padding: const EdgeInsets.all(20), children: [
+      if (tab == 2) {
+        return ListView(padding: const EdgeInsets.all(20), children: [
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),
           subtitle: Text('Каталог обновляется из GitHub, файлы загрузки выбираются под платформу.')),
         if (Platform.isWindows || Platform.isAndroid) ...[
           ValueListenableBuilder<int>(valueListenable: CoverSettings.revision,
-            builder: (context, _, _) => ListTile(title: const Text('Папка изображений'),
+            builder: (context, revision, child) => ListTile(title: const Text('Папка изображений'),
               subtitle: Text(CoverSettings.folder ?? 'Не выбрана'))),
           FilledButton(onPressed: () async { await CoverSettings.chooseFolder(); },
             child: const Text('Выбрать / переназначить папку')),
@@ -104,7 +105,8 @@ class _HomePageState extends State<HomePage> {
         ],
         const ListTile(title: Text('All Hub 0.4.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
-      ]);
+        ]);
+      }
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return ListView(padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],

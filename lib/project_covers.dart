@@ -122,7 +122,8 @@ class _ProjectCoverState extends State<ProjectCover> {
       if (pages != null) {
         for (final item in pages.values) {
           final page = item as Map<String, dynamic>;
-          final info = (page['imageinfo'] as List<dynamic>?)?.first as Map<String, dynamic>?;
+          final infos = page['imageinfo'] as List<dynamic>?;
+          final info = infos != null && infos.isNotEmpty ? infos.first as Map<String, dynamic> : null;
           final mime = info?['mime']?.toString() ?? '';
           final url = info?['thumburl']?.toString();
           if (mime.startsWith('image/') && url != null && url.startsWith('https://')) urls.add(url);

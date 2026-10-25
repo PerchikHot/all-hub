@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,19 @@ class _AiModelsPageState extends State<AiModelsPage> {
   bool importing = false;
   int importedCount = 0;
   int mode = 0;
+  int invalidCount = 0;
+  Future<int?> ggufVersion(String path) async {
+    RandomAccessFile? handle;
+    try {
+      handle = await File(path).open();
+      final bytes = await handle.read(8);
+      if (bytes.length != 8 || bytes[0] != 0x47 || bytes[1] != 0x47 ||
+          bytes[2] != 0x55 || bytes[3] != 0x46) return null;
+      final version = ByteData.sublistView(Uint8List.fromList(bytes)).getUint32(4, Endian.little);
+      return version >= 1 && version <= 4 ? version : null;
+    } catch (_) { return null; }
+    finally { await handle?.close(); }
+  }
   @override
   void initState() { super.initState(); load(); }
   Future<void> load() async {
@@ -27,11 +41,12 @@ class _AiModelsPageState extends State<AiModelsPage> {
   Future<void> addModels() async {
     final picked = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: true);
     if (picked == null) return;
-    if (mounted) setState(() { importing = true; importedCount = 0; });
+    if (mounted) setState(() { importing = true; importedCount = 0; invalidCount = 0; });
     final next = [...paths];
     final support = await getApplicationSupportDirectory();
     for (final f in picked.files) {
       if (f.path == null || !f.name.toLowerCase().endsWith('.gguf')) continue;
+      if (await ggufVersion(f.path!) == null) { invalidCount++; continue; }
       try {
         String path = f.path!;
         if (Platform.isAndroid) {
@@ -46,7 +61,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);
     if (mounted) setState(() { paths = next; importing = false; });
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Импортировано GGUF: $importedCount')));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Импортировано GGUF: $importedCount. Неверных файлов: $invalidCount')));
   }
   Future<void> remove(String path) async {
     final support = await getApplicationSupportDirectory();
@@ -90,10 +105,10 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     for (final path in paths)
-      FutureBuilder<FileStat?>(future: File(path).stat().then((s) => s.type == FileSystemEntityType.file ? s : null).catchError((_) => null), builder: (context, snap) => Card(child: ListTile(
+      FutureBuilder<int?>(future: ggufVersion(path), builder: (context, snap) => Card(child: ListTile(
         leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
-        subtitle: Text(snap.data != null ? '${fileSize(snap.data!.size)} • движок не подключён' : 'Файл недоступен'),
+        subtitle: Text(snap.data != null ? 'GGUF v${snap.data} • движок не подключён' : 'Невозможно прочитать GGUF'),
         trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
       ))),
   ])),

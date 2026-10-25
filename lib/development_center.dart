@@ -18,36 +18,38 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
   ];
   late Future<Map<String, dynamic>> data = load();
   Future<Map<String, dynamic>> load() async {
-    final result = <String, dynamic>{};
-    for (final repo in repositories) {
+    final entries = await Future.wait(repositories.map((repo) async {
       try {
         final response = await http.get(
           Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=3'),
           headers: const {'Accept':'application/vnd.github+json', 'User-Agent':'AllHub'},
-        ).timeout(const Duration(seconds: 12));
-        if (response.statusCode != 200) {
-          result[repo] = 'HTTP ${response.statusCode}';
-        } else {
-          result[repo] = (jsonDecode(response.body)['workflow_runs'] as List<dynamic>?) ?? [];
-        }
-      } catch (e) { result[repo] = e.toString(); }
-    }
-    return result;
+        ).timeout(const Duration(seconds: 8));
+        if (response.statusCode != 200) return MapEntry<String, dynamic>(repo, 'HTTP ${response.statusCode}');
+        return MapEntry<String, dynamic>(repo, (jsonDecode(response.body)['workflow_runs'] as List<dynamic>?) ?? []);
+      } catch (e) {
+        return MapEntry<String, dynamic>(repo, e.toString());
+      }
+    }));
+    return Map<String, dynamic>.fromEntries(entries);
   }
 
   Future<void> open(String url) async {
     await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
-  void refresh() => setState(() { data = load(); });
+  Future<void> refresh() async {
+    final pending = load();
+    setState(() => data = pending);
+    await pending;
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
 
     body: FutureBuilder<Map<String, dynamic>>(future: data, builder: (context, snapshot) {
       if (!snapshot.hasData) return const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 16), Text('Загружаем сборки GitHub…')]));
-      return ListView(padding: const EdgeInsets.all(16), children: [
-        Row(children: [const Expanded(child: Text('Сборки GitHub Actions', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold))), IconButton(onPressed: refresh, icon: const Icon(Icons.refresh), tooltip: 'Обновить сборки')]),
+      return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
+        const Text('Сборки GitHub Actions', style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         const Text('Реальные данные GitHub. Для анализа ошибок можно скопировать запрос и передать его ИИ.'),
         const SizedBox(height: 12),
@@ -92,7 +94,7 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
             TextButton(onPressed: () => open('https://github.com/$repo/actions'),
               child: const Text('Все сборки →')),
           ]))),
-      ]);
+      ]));
     }),
   );
 }

@@ -103,9 +103,9 @@ class _ProjectCoverState extends State<ProjectCover> {
     final id = widget.id;
     final queries = <String, String>{
       'all-hub': 'anime illustration',
-      'eclipse-arena': 'anime sword cosplay',
-      'shadow-rp': 'anime cosplay',
-      'shadow-garden': 'fantasy anime cosplay',
+      'eclipse-arena': 'Erza Scarlet Fairy Tail cosplay',
+      'shadow-rp': 'Re Zero anime cosplay',
+      'shadow-garden': 'The Eminence in Shadow cosplay',
     };
     final search = queries[id] ?? 'anime cosplay';
     try {

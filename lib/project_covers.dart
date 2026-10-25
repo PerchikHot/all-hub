@@ -16,6 +16,7 @@ class CoverSettings {
   static final Map<String, List<String>> cache = {};
   static final Map<String, DateTime> cacheAt = {};
   static final Map<String, String> errors = {};
+  static final ValueNotifier<int> statusRevision = ValueNotifier<int>(0);
   static final Map<String, Future<List<String>>> pending = {};
   static Future<void> setAdultCovers(bool enabled) async {
     adultCovers = enabled;
@@ -162,7 +163,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         final response = await http.get(uri, headers: {'User-Agent':'AllHub/0.5 (cover viewer)'}).timeout(const Duration(seconds: 12));
         if (response.statusCode != 200) {
           CoverSettings.errors[id] = 'Danbooru: HTTP ${response.statusCode}';
-          CoverSettings.revision.value++;
+          CoverSettings.statusRevision.value++;
           return;
         }
         final posts = jsonDecode(response.body) as List<dynamic>;
@@ -177,7 +178,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         }
         if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); CoverSettings.errors.remove(id); }
         else { CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений'; }
-        CoverSettings.revision.value++;
+        CoverSettings.statusRevision.value++;
         if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
         return;
       }
@@ -188,7 +189,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
         CoverSettings.errors[id] = 'Danbooru: HTTP ${response.statusCode}';
-        CoverSettings.revision.value++;
+        CoverSettings.statusRevision.value++;
         return;
       }
       final posts = jsonDecode(response.body) as List<dynamic>;
@@ -207,13 +208,13 @@ class _ProjectCoverState extends State<ProjectCover> {
       } else {
         CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений';
       }
-      CoverSettings.revision.value++;
+      CoverSettings.statusRevision.value++;
       if (mounted && widget.id == id && CoverSettings.adultCovers == adult) {
         setState(() { webCovers = urls; webIndex = 0; });
       }
     } catch (e) {
       CoverSettings.errors[id] = 'Ошибка поиска: $e';
-      CoverSettings.revision.value++;
+      CoverSettings.statusRevision.value++;
       // Offline or API unavailable: retain local image / gradient fallback.
     } finally {
       loadingWeb = false;

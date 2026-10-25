@@ -119,7 +119,6 @@ class _ProjectCoverState extends State<ProjectCover> {
       ? const [Color(0xFF54218C), Color(0xFF151C4B)]
       : isMod ? const [Color(0xFF153C6B), Color(0xFF33215C)]
       : const [Color(0xFF164778), Color(0xFF41225C)];
-    final photoId = isGame ? 1018 : isMod ? 1043 : 1033;
     return Container(
       height: 172, width: double.infinity,
       clipBehavior: Clip.antiAlias,
@@ -127,9 +126,7 @@ class _ProjectCoverState extends State<ProjectCover> {
       child: Stack(fit: StackFit.expand, children: [
         if (localFile != null)
           Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
-        else
-          Image.network('https://picsum.photos/id/$photoId/900/420',
-            fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
+
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
           colors: [Color(0x22000000), Color(0xCC080D20)]))),

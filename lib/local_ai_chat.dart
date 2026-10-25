@@ -83,10 +83,12 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (!mounted || revision != connectionRevision) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ollama_endpoint', base);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         models = names;
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
-      });
+        });
+      }
       if (names.isNotEmpty && mounted) {
         final preferred = prefs.getString('ollama_selected_model');
         final next = names.contains(selected) ? selected! :

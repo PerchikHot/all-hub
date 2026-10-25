@@ -114,7 +114,7 @@ class _HomePageState extends State<HomePage> {
             subtitle: const Text('Поиск по тегам Danbooru для взрослых персонажей. Может содержать откровенные изображения. Локальные фото имеют приоритет.'),
             value: CoverSettings.adultCovers,
             onChanged: (enabled) => CoverSettings.setAdultCovers(enabled))),
-        const ListTile(title: Text('All Hub 0.4.0'),
+        const ListTile(title: Text('All Hub 0.5.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);
       }

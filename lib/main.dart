@@ -91,12 +91,12 @@ class _HomePageState extends State<HomePage> {
           subtitle: Text('Каталог обновляется из GitHub, файлы загрузки выбираются под платформу.')),
         if (Platform.isWindows || Platform.isAndroid) ...[
           ValueListenableBuilder<int>(valueListenable: CoverSettings.revision,
-            builder: (context, revision, child) => ListTile(title: const Text('Папка изображений'),
+            builder: (context, revision, child) => ListTile(title: Text(Platform.isAndroid ? 'Импортированные изображения' : 'Папка изображений'),
               subtitle: Text(CoverSettings.folder ?? 'Не выбрана'))),
           FilledButton(onPressed: () async { await CoverSettings.chooseFolder(); },
-            child: const Text('Выбрать / переназначить папку')),
+            child: Text(Platform.isAndroid ? 'Добавить изображения' : 'Выбрать / переназначить папку')),
           OutlinedButton(onPressed: () async { await CoverSettings.clear(); },
-            child: const Text('Сбросить папку')),
+            child: Text(Platform.isAndroid ? 'Не использовать импортированные фото' : 'Сбросить папку')),
         ],
         ValueListenableBuilder<int>(valueListenable: CoverSettings.revision,
           builder: (context, revision, child) => SwitchListTile(

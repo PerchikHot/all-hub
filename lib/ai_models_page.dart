@@ -20,6 +20,9 @@ class _AiModelsPageState extends State<AiModelsPage> {
   int importedCount = 0;
   int mode = 0;
   int invalidCount = 0;
+  final Map<String, Future<GgufHeader?>> inspections = {};
+  Future<GgufHeader?> inspect(String path) =>
+      inspections.putIfAbsent(path, () => GgufHeader.read(path));
   @override
   void initState() { super.initState(); load(); }
   Future<void> load() async {
@@ -67,7 +70,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('ai_model_paths', next);
-      if (mounted) setState(() => paths = next);
+      if (mounted) setState(() { paths = next; inspections.remove(path); });
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка импорта моделей: $e')));
@@ -127,7 +130,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     for (final path in paths)
-      FutureBuilder<GgufHeader?>(future: GgufHeader.read(path), builder: (context, snap) => Card(child: ListTile(
+      FutureBuilder<GgufHeader?>(future: inspect(path), builder: (context, snap) => Card(child: ListTile(
         leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
         subtitle: Text(snap.data != null ? 'GGUF v${snap.data!.version} • ${fileSize(snap.data!.bytes)} • тензоров: ${snap.data!.tensorCount} • метаданных: ${snap.data!.metadataCount} • движок не подключён' : 'Невозможно прочитать GGUF'),

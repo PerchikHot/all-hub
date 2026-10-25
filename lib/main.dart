@@ -93,12 +93,12 @@ class _HomePageState extends State<HomePage> {
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),
           subtitle: Text('Каталог обновляется из GitHub, файлы загрузки выбираются под платформу.')),
-        if (Platform.isWindows) ...[
+        if (Platform.isWindows || Platform.isAndroid) ...[
           ValueListenableBuilder<int>(valueListenable: CoverSettings.revision,
             builder: (context, _, _) => ListTile(title: const Text('Папка изображений'),
               subtitle: Text(CoverSettings.folder ?? 'Не выбрана'))),
           FilledButton(onPressed: () async { await CoverSettings.chooseFolder(); },
-            child: const Text('Выбрать папку')),
+            child: const Text('Выбрать / переназначить папку')),
           OutlinedButton(onPressed: () async { await CoverSettings.clear(); },
             child: const Text('Сбросить папку')),
         ],

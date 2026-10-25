@@ -3,6 +3,7 @@ import 'hub_service.dart';
 import 'hub_widgets.dart';
 import 'development_center.dart';
 import 'project_covers.dart';
+import 'ai_models_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -89,7 +90,8 @@ class _HomePageState extends State<HomePage> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 1) return const DevelopmentCenter();
-      if (tab == 2) {
+      if (tab == 3) return const AiModelsPage();
+      if (tab == 4) {
         return ListView(padding: const EdgeInsets.all(20), children: [
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),
@@ -148,6 +150,7 @@ class _HomePageState extends State<HomePage> {
     bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [
       NavigationDestination(icon: Icon(Icons.grid_view), label: 'Проекты'),
       NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Разработка'),
+      NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'ИИ'),
       NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
     ]),
   );

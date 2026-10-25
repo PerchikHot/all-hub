@@ -90,8 +90,8 @@ class _HomePageState extends State<HomePage> {
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 1) return const DevelopmentCenter();
-      if (tab == 3) return const AiModelsPage();
-      if (tab == 4) {
+      if (tab == 2) return const AiModelsPage();
+      if (tab == 3) {
         return ListView(padding: const EdgeInsets.all(20), children: [
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),

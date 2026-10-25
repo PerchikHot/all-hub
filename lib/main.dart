@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'hub_service.dart';
 import 'hub_widgets.dart';
 import 'development_center.dart';
 import 'project_covers.dart';
@@ -40,12 +42,12 @@ class GithubApi {
         for (final a in assets) {
           final file = a as Map<String, dynamic>;
           final name = (file['name'] ?? '').toString().toLowerCase();
-          if (name.endsWith('.apk') || name.endsWith('.exe') || name.endsWith('.msi') || name.endsWith('.zip')) {
+          if ((Platform.isAndroid && name.endsWith('.apk')) || (Platform.isWindows && (name.endsWith('.exe') || name.endsWith('.msi') || name.contains('windows') && name.endsWith('.zip')))) {
             url = file['browser_download_url']?.toString();
             break;
           }
         }
-        url ??= data['html_url']?.toString();
+
       } else if (results[0].statusCode == 404) {
         error = 'No published release';
       } else {
@@ -97,7 +99,8 @@ class _HomePageState extends State<HomePage> {
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {
     final data = await rootBundle.loadString('assets/projects.json');
-    return (jsonDecode(data) as List).map((x) => Project.fromJson(x as Map<String, dynamic>)).toList();
+    final live = await HubService.catalog(data);
+    return live.map((p) => Project(p.id, p.name, p.type, p.description, p.repo)).toList();
   }
   Future<void> open(String url) async {
     final uri = Uri.parse(url);
@@ -106,7 +109,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
   Future<GithubInfo> getInfo(String repo) => info.putIfAbsent(repo, () => GithubApi.inspect(repo));
-  void refresh() => setState(info.clear);
+  void refresh() => setState(() { info.clear(); });
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -148,7 +151,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
-                  if (tab == 0 && i.downloadUrl != null) FilledButton.icon(onPressed: () => open(i.downloadUrl!), icon: const Icon(Icons.download), label: const Text('Скачать релиз')),
+                  if (tab == 0 && i.downloadUrl != null) FilledButton.icon(onPressed: () => open(i.downloadUrl!), icon: const Icon(Icons.download), label: Text(Platform.isAndroid ? 'Скачать APK' : 'Скачать Windows')),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),
                 ]),
               ]);

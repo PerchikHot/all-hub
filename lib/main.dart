@@ -105,6 +105,12 @@ class _HomePageState extends State<HomePage> {
           OutlinedButton(onPressed: () async { await CoverSettings.clear(); },
             child: const Text('Сбросить папку')),
         ],
+        ValueListenableBuilder<int>(valueListenable: CoverSettings.revision,
+          builder: (context, revision, child) => SwitchListTile(
+            title: const Text('Обложки 18+ (футанари)'),
+            subtitle: const Text('Поиск по тегам Danbooru для взрослых персонажей. Может содержать откровенные изображения. Локальные фото имеют приоритет.'),
+            value: CoverSettings.adultCovers,
+            onChanged: (enabled) => CoverSettings.setAdultCovers(enabled))),
         const ListTile(title: Text('All Hub 0.4.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);

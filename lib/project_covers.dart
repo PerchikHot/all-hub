@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'dart:math';
 import 'package:file_picker/file_picker.dart';
@@ -70,6 +72,9 @@ class ProjectCover extends StatefulWidget {
 
 class _ProjectCoverState extends State<ProjectCover> {
   File? localFile;
+  List<String> webCovers = [];
+  int webIndex = 0;
+  bool loadingWeb = false;
   int generation = 0;
   Timer? rotationTimer;
   @override
@@ -77,18 +82,58 @@ class _ProjectCoverState extends State<ProjectCover> {
     super.initState();
     CoverSettings.revision.addListener(refresh);
     refresh();
-    rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) => refresh());
+    loadWebCovers();
+    rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) { refresh(); if (webCovers.isNotEmpty && mounted) setState(() => webIndex = (webIndex + 1) % webCovers.length); });
   }
   @override
   void didUpdateWidget(covariant ProjectCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.id != widget.id) refresh();
+    if (oldWidget.id != widget.id) { refresh(); loadWebCovers(); }
   }
   @override
   void dispose() {
     rotationTimer?.cancel();
     CoverSettings.revision.removeListener(refresh);
     super.dispose();
+  }
+  // Wikimedia Commons supplies public, licensed thumbnail URLs. No adult-content scraping.
+  Future<void> loadWebCovers() async {
+    if (loadingWeb) return;
+    loadingWeb = true;
+    final id = widget.id;
+    final queries = <String, String>{
+      'all-hub': 'anime illustration',
+      'eclipse-arena': 'anime sword cosplay',
+      'shadow-rp': 'anime cosplay',
+      'shadow-garden': 'fantasy anime cosplay',
+    };
+    final search = queries[id] ?? 'anime cosplay';
+    try {
+      final uri = Uri.https('commons.wikimedia.org', '/w/api.php', {
+        'action':'query', 'generator':'search', 'gsrsearch':'filetype:bitmap $search',
+        'gsrnamespace':'6', 'gsrlimit':'15', 'prop':'imageinfo',
+        'iiprop':'url|mime', 'iiurlwidth':'900', 'format':'json',
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) return;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final pages = (json['query'] as Map<String, dynamic>?)?['pages'] as Map<String, dynamic>?;
+      final urls = <String>[];
+      if (pages != null) {
+        for (final item in pages.values) {
+          final page = item as Map<String, dynamic>;
+          final info = (page['imageinfo'] as List<dynamic>?)?.first as Map<String, dynamic>?;
+          final mime = info?['mime']?.toString() ?? '';
+          final url = info?['thumburl']?.toString();
+          if (mime.startsWith('image/') && url != null && url.startsWith('https://')) urls.add(url);
+        }
+      }
+      if (mounted && widget.id == id) setState(() { webCovers = urls; webIndex = 0; });
+    } catch (_) {
+      // Offline: retain gradient fallback.
+    } finally {
+      loadingWeb = false;
+    }
   }
   Future<void> refresh() async {
     final current = ++generation;
@@ -125,7 +170,10 @@ class _ProjectCoverState extends State<ProjectCover> {
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
       child: Stack(fit: StackFit.expand, children: [
         if (localFile != null)
-          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
+          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
+        else if (webCovers.isNotEmpty)
+          Image.network(webCovers[webIndex], fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,

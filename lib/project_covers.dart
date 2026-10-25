@@ -12,10 +12,18 @@ import 'package:path_provider/path_provider.dart';
 /// No local images are uploaded. Unsupported directory access falls back to remote covers.
 class CoverSettings {
   static String? folder;
+  static bool adultCovers = false;
+  static Future<void> setAdultCovers(bool enabled) async {
+    adultCovers = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('adult_covers', enabled);
+    revision.value++;
+  }
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     folder = prefs.getString('desktop_cover_folder');
+    adultCovers = prefs.getBool('adult_covers') ?? false;
     revision.value++;
   }
   static Future<bool> chooseFolder() async {
@@ -80,7 +88,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   @override
   void initState() {
     super.initState();
-    CoverSettings.revision.addListener(refresh);
+    CoverSettings.revision.addListener(onSettingsChanged);
     refresh();
     loadWebCovers();
     rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) { refresh(); if (webCovers.isNotEmpty && mounted) setState(() => webIndex = (webIndex + 1) % webCovers.length); });
@@ -93,13 +101,15 @@ class _ProjectCoverState extends State<ProjectCover> {
   @override
   void dispose() {
     rotationTimer?.cancel();
-    CoverSettings.revision.removeListener(refresh);
+    CoverSettings.revision.removeListener(onSettingsChanged);
     super.dispose();
   }
-  // Wikimedia Commons supplies public, licensed thumbnail URLs. No adult-content scraping.
+  // Opt-in adult-tag searches; otherwise use Wikimedia Commons.
+  void onSettingsChanged() { refresh(); loadWebCovers(); }
   Future<void> loadWebCovers() async {
     if (loadingWeb) return;
     loadingWeb = true;
+    if (mounted) setState(() { webCovers = []; webIndex = 0; });
     final id = widget.id;
     final queries = <String, String>{
       'all-hub': 'anime illustration',
@@ -109,6 +119,31 @@ class _ProjectCoverState extends State<ProjectCover> {
     };
     final search = queries[id] ?? 'anime cosplay';
     try {
+      if (CoverSettings.adultCovers) {
+        // Only adult-character searches; reject posts marked as young characters.
+        final tags = <String, String>{
+          'eclipse-arena': 'erza_scarlet futanari rating:explicit -loli -shota',
+          'shadow-rp': 'boa_hancock futanari rating:explicit -loli -shota',
+          'shadow-garden': 'futanari adult rating:explicit -loli -shota',
+          'all-hub': 'futanari adult rating:explicit -loli -shota',
+        };
+        final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
+          'tags': tags[id] ?? tags['all-hub']!, 'limit':'20',
+        });
+        final response = await http.get(uri, headers: {'User-Agent':'AllHub/0.5 (cover viewer)'}).timeout(const Duration(seconds: 12));
+        if (response.statusCode != 200) return;
+        final posts = jsonDecode(response.body) as List<dynamic>;
+        final urls = <String>[];
+        for (final post in posts) {
+          final item = post as Map<String, dynamic>;
+          final tags = (item['tag_string'] ?? '').toString().toLowerCase();
+          if (RegExp(r'(^|\\s)(loli|shota|child|underage)(\\s|$)').hasMatch(tags)) continue;
+          final url = item['large_file_url']?.toString() ?? item['file_url']?.toString();
+          if (url != null && url.startsWith('https://')) urls.add(url);
+        }
+        if (mounted && widget.id == id && CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
+        return;
+      }
       final uri = Uri.https('commons.wikimedia.org', '/w/api.php', {
         'action':'query', 'generator':'search', 'gsrsearch':'filetype:bitmap $search',
         'gsrnamespace':'6', 'gsrlimit':'15', 'prop':'imageinfo',
@@ -129,7 +164,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           if (mime.startsWith('image/') && url != null && url.startsWith('https://')) urls.add(url);
         }
       }
-      if (mounted && widget.id == id) setState(() { webCovers = urls; webIndex = 0; });
+      if (mounted && widget.id == id && !CoverSettings.adultCovers) setState(() { webCovers = urls; webIndex = 0; });
     } catch (_) {
       // Offline: retain gradient fallback.
     } finally {

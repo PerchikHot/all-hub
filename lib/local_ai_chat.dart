@@ -22,7 +22,16 @@ class _LocalAiChatState extends State<LocalAiChat> {
     if (sending || model == null || model == selected) return;
     await saveMessages();
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(historyKey(model));
+    var saved = prefs.getString(historyKey(model));
+    // One-time migration from the older shared Ollama history.
+    if (saved == null) {
+      final legacy = prefs.getString('ollama_chat_history');
+      if (legacy != null) {
+        saved = legacy;
+        await prefs.setString(historyKey(model), legacy);
+        await prefs.remove('ollama_chat_history');
+      }
+    }
     final loaded = <Map<String, String>>[];
     if (saved != null) {
       try {
@@ -69,6 +78,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
       await prefs.setString('ollama_endpoint', base);
       if (mounted) setState(() {
         models = names;
+        if (names.isEmpty) selected = null;
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
       });
       if (names.isNotEmpty && mounted) {
@@ -83,7 +93,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || sending || selected == null) return;
+    if (text.isEmpty || sending || selected == null || restoring) return;
     input.clear();
     setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
     await saveMessages();

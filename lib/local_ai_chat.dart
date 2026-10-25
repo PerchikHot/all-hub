@@ -17,9 +17,30 @@ class _LocalAiChatState extends State<LocalAiChat> {
   String? selected;
   bool sending = false;
   bool restoring = true;
+  String historyKey(String model) => 'ollama_chat_history_model_$model';
+  Future<void> selectModel(String? model) async {
+    if (sending || model == null || model == selected) return;
+    await saveMessages();
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(historyKey(model));
+    final loaded = <Map<String, String>>[];
+    if (saved != null) {
+      try {
+        final decoded = jsonDecode(saved) as List<dynamic>;
+        loaded.addAll(decoded.whereType<Map>().map((m) => {
+          'role': m['role']?.toString() ?? '',
+          'content': m['content']?.toString() ?? '',
+        }).where((m) => m['role'] == 'user' || m['role'] == 'assistant'));
+      } catch (_) {}
+    }
+    if (mounted) setState(() { selected = model; messages..clear()..addAll(loaded); });
+    await prefs.setString('ollama_selected_model', model);
+  }
   Future<void> saveMessages() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ollama_chat_history', jsonEncode(messages.length > 100
+    final model = selected;
+    if (model == null) return;
+    await prefs.setString(historyKey(model), jsonEncode(messages.length > 100
         ? messages.sublist(messages.length - 100) : messages));
   }
   Future<void> clearMessages() async {
@@ -33,18 +54,6 @@ class _LocalAiChatState extends State<LocalAiChat> {
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
-    try {
-      final saved = prefs.getString('ollama_chat_history');
-      if (saved != null) {
-        final decoded = jsonDecode(saved) as List<dynamic>;
-        if (mounted) setState(() {
-          messages.addAll(decoded.whereType<Map>().map((m) => {
-            'role': m['role']?.toString() ?? 'user',
-            'content': m['content']?.toString() ?? '',
-          }).where((m) => m['role'] == 'user' || m['role'] == 'assistant'));
-        });
-      }
-    } catch (_) { /* Ignore corrupted local history. */ }
     if (mounted) setState(() => restoring = false);
     await fetchModels();
   }
@@ -58,11 +67,16 @@ class _LocalAiChatState extends State<LocalAiChat> {
           .map((e) => (e as Map<String, dynamic>)['name'].toString()).toList();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('ollama_endpoint', base);
-      if (mounted) { setState(() {
+      if (mounted) setState(() {
         models = names;
-        selected = names.contains(selected) ? selected : (names.isEmpty ? null : names.first);
         error = names.isEmpty ? 'В Ollama пока нет доступных моделей' : null;
-      }); }
+      });
+      if (names.isNotEmpty && mounted) {
+        final preferred = prefs.getString('ollama_selected_model');
+        final next = names.contains(selected) ? selected! :
+            names.contains(preferred) ? preferred! : names.first;
+        await selectModel(next);
+      }
     } catch (e) {
       if (mounted) { setState(() { models = []; selected = null; error = 'Нет подключения к Ollama: $e'; }); }
     }
@@ -102,7 +116,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
       Row(children: [
         Expanded(child: DropdownButton<String>(isExpanded:true, value:selected,
           hint: const Text('Выбери модель'), items: models.map((m) => DropdownMenuItem(value:m,child:Text(m,overflow:TextOverflow.ellipsis))).toList(),
-          onChanged: (v) => setState(() => selected=v))),
+          onChanged: sending ? null : selectModel)),
         IconButton(onPressed:fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
         IconButton(onPressed:sending || restoring || messages.isEmpty ? null : () async {
           final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(

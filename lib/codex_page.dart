@@ -26,7 +26,7 @@ class _CodexPageState extends State<CodexPage> {
     folder.text = chosen;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('codex_workspace', chosen);
-    if (mounted) setState(() {});
+    if (mounted) { setState(() {});
   }
   Future<void> run() async {
     final task = prompt.text.trim();
@@ -45,12 +45,12 @@ class _CodexPageState extends State<CodexPage> {
         ['exec', '--sandbox', 'workspace-write', '--skip-git-repo-check', task],
         workingDirectory: workspace,
         runInShell: false);
-      if (mounted) setState(() {
+      if (mounted) { setState(() {
         output.add(result.stdout.toString().trim());
-        if (result.exitCode != 0) error = result.stderr.toString().trim().isEmpty
+        if (result.exitCode != 0) { error = result.stderr.toString().trim().isEmpty
           ? 'Codex завершился с кодом ${result.exitCode}'
-          : result.stderr.toString().trim();
-      });
+          : result.stderr.toString().trim(); }
+      }); }
     } catch (e) {
       if (mounted) { setState(() => error = 'Не удалось запустить Codex: $e. Проверь команду codex и авторизацию.'); }
     } finally {

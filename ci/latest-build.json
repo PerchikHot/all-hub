@@ -1,36 +1,36 @@
 {
-  "run_id": 40190895356,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190895356",
+  "run_id": 40190904918,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190904918",
   "conclusion": "success",
-  "head_sha": "9073662670290197f88ac5afd0bbc11bc19b469a",
+  "head_sha": "f0ceb0ea5fbc132632c59c09983362ae28e49b5e",
   "jobs": [
-    {
-      "name": "windows",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190895356/job/121161479458",
-      "id": 121161479458
-    },
     {
       "name": "android",
       "status": "completed",
       "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190895356/job/121161479599",
-      "id": 121161479599
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190904918/job/121161510302",
+      "id": 121161510302
+    },
+    {
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40190904918/job/121161510547",
+      "id": 121161510547
     }
   ],
   "artifacts": [
     {
-      "name": "AllHub-Android-release",
-      "size_in_bytes": 24595370,
+      "name": "AllHub-Windows",
+      "size_in_bytes": 12224048,
       "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12598071922/zip"
+      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12598011853/zip"
     },
     {
-      "name": "AllHub-Windows",
-      "size_in_bytes": 12223906,
+      "name": "AllHub-Android-release",
+      "size_in_bytes": 24596662,
       "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12597837112/zip"
+      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12597872369/zip"
     }
   ]
 }

@@ -70,7 +70,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList('ai_model_paths', next);
-      if (mounted) setState(() { paths = next; inspections.remove(path); });
+      if (mounted) setState(() { paths = next; inspections.clear(); });
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка импорта моделей: $e')));
@@ -98,7 +98,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     final next = paths.where((p) => p != path).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);
-    if (mounted) setState(() => paths = next);
+    if (mounted) setState(() { paths = next; inspections.remove(path); });
   }
   Future<void> confirmRemove(String path) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(

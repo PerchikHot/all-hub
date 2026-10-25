@@ -60,6 +60,7 @@ jobs:
         with:
           name: AllHub-Android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
   windows:
     runs-on: windows-latest
     steps:
@@ -75,7 +76,14 @@ jobs:
       - run: flutter analyze
       - run: flutter test
       - run: flutter build windows --release
+      - name: Package portable Windows app
+        shell: pwsh
+        run: |
+          $release = 'build/windows/x64/runner/Release'
+          if (!(Test-Path "$release/all_hub.exe")) { throw 'Windows executable missing' }
+          Compress-Archive -Path "$release/*" -DestinationPath 'AllHub-Windows-portable.zip' -Force
       - uses: actions/upload-artifact@v4
         with:
           name: AllHub-Windows
-          path: build/windows/x64/runner/Release/**
+          path: AllHub-Windows-portable.zip
+          if-no-files-found: error

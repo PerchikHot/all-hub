@@ -18,6 +18,8 @@ class _AiModelsPageState extends State<AiModelsPage> {
   List<String> paths = [];
   bool busy = true;
   bool importing = false;
+  double importProgress = 0;
+  String importingName = '';
   int importedCount = 0;
   int mode = 0;
   String? selectedGguf;
@@ -42,11 +44,31 @@ class _AiModelsPageState extends State<AiModelsPage> {
     await prefs.setString('ai_selected_gguf', path);
     if (mounted) setState(() => selectedGguf = path);
   }
+  Future<void> copyWithProgress(File source, File target, String name) async {
+    final total = await source.length();
+    var copied = 0;
+    final sink = target.openWrite();
+    try {
+      await for (final chunk in source.openRead()) {
+        sink.add(chunk);
+        copied += chunk.length;
+        if (mounted) {
+          setState(() {
+            importingName = name;
+            importProgress = total == 0 ? 0 : copied / total;
+          });
+        }
+      }
+      await sink.flush();
+    } finally {
+      await sink.close();
+    }
+  }
   Future<void> addModels() async {
     if (importing) return;
     final picked = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: true);
     if (picked == null) return;
-    if (mounted) setState(() { importing = true; importedCount = 0; invalidCount = 0; });
+    if (mounted) setState(() { importing = true; importedCount = 0; invalidCount = 0; importProgress = 0; importingName = ''; });
     final next = [...paths];
     try {
       final support = await getApplicationSupportDirectory();
@@ -62,7 +84,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
             await dest.create(recursive: true);
             final filename = '${DateTime.now().microsecondsSinceEpoch}_${f.name}';
             temp = File('${dest.path}/$filename.part');
-            await source.copy(temp.path);
+            await copyWithProgress(source, temp, f.name);
             final sourceSize = await source.length();
             if (await temp.length() != sourceSize || await GgufHeader.read(temp.path) == null) {
               invalidCount++;
@@ -91,7 +113,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
       }
     } finally {
       if (mounted) {
-        setState(() => importing = false);
+        setState(() { importing = false; importingName = ''; importProgress = 0; });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Импортировано GGUF: $importedCount. Ошибок: $invalidCount')));
       }
@@ -157,7 +179,10 @@ class _AiModelsPageState extends State<AiModelsPage> {
     ),
     const SizedBox(height: 16),
     FilledButton.icon(onPressed: busy || importing ? null : addModels, icon: const Icon(Icons.add), label: Text(importing ? 'Импортируем модели…' : 'Добавить GGUF-модели')),
-    if (importing) const LinearProgressIndicator(),
+    if (importing) ...[
+      LinearProgressIndicator(value: importProgress),
+      if (importingName.isNotEmpty) Text('$importingName — ${(importProgress * 100).toStringAsFixed(0)}%'),
+    ],
     const SizedBox(height: 16),
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),

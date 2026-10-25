@@ -90,7 +90,7 @@ class _HomePageState extends State<HomePage> {
   String category = 'All';
   String search = '';
   bool showOnlyAvailable = false;
-  late final Future<List<Project>> projects = _loadProjects();
+  late Future<List<Project>> projects = _loadProjects();
   @override
   void initState() {
     super.initState();
@@ -109,14 +109,14 @@ class _HomePageState extends State<HomePage> {
     }
   }
   Future<GithubInfo> getInfo(String repo) => info.putIfAbsent(repo, () => GithubApi.inspect(repo));
-  void refresh() => setState(() { info.clear(); });
+  void refresh() => setState(() { info.clear(); projects = _loadProjects(); });
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
       actions: [IconButton(tooltip: 'Обновить данные GitHub', onPressed: refresh, icon: const Icon(Icons.refresh))]),
     body: FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
-      if (snap.hasError) return Center(child: Text('Catalog error: ${snap.error}'));
+      if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
       final items = snap.data!;
       if (tab == 1) return const DevelopmentCenter();
@@ -142,7 +142,7 @@ class _HomePageState extends State<HomePage> {
         if (tab == 0) ...[
           TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
           const SizedBox(height: 12),
-          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'All' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
+          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'Все' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
           const SizedBox(height: 16),
         ],
         Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall),

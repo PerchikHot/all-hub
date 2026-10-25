@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'local_ai_chat.dart';
 import 'codex_page.dart';
 import 'gguf_header.dart';
+import 'native_llama_runtime.dart';
 
 class AiModelsPage extends StatefulWidget {
   const AiModelsPage({super.key});
@@ -142,6 +143,12 @@ class _AiModelsPageState extends State<AiModelsPage> {
     Text('Локальные ИИ-модели', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 12),
     const Text('Добавь уже скачанные GGUF-модели. Они останутся локальными. Это список файлов, а не запущенный ИИ: для общения потребуется подключить совместимый движок инференса.'),
+    const SizedBox(height: 12),
+    ListTile(
+      leading: const Icon(Icons.memory_outlined),
+      title: const Text('Нативный движок llama.cpp'),
+      subtitle: Text(NativeLlamaRuntime.availability),
+    ),
     const SizedBox(height: 16),
     FilledButton.icon(onPressed: busy || importing ? null : addModels, icon: const Icon(Icons.add), label: Text(importing ? 'Импортируем модели…' : 'Добавить GGUF-модели')),
     if (importing) const LinearProgressIndicator(),

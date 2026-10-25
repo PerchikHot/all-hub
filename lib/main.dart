@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'hub_service.dart';
 import 'hub_widgets.dart';
@@ -6,7 +5,6 @@ import 'development_center.dart';
 import 'project_covers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const AllHub());
@@ -27,44 +25,15 @@ class GithubInfo {
 }
 
 class GithubApi {
-  static const _headers = {'Accept': 'application/vnd.github+json', 'User-Agent': 'AllHub/0.1'};
   static Future<GithubInfo> inspect(String repo) async {
-    try {
-      final results = await Future.wait([
-        http.get(Uri.parse('https://api.github.com/repos/$repo/releases/latest'), headers: _headers).timeout(const Duration(seconds: 12)),
-        http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=1'), headers: _headers).timeout(const Duration(seconds: 12)),
-      ]);
-      String? version, url, status, error;
-      if (results[0].statusCode == 200) {
-        final data = jsonDecode(results[0].body) as Map<String, dynamic>;
-        version = data['tag_name']?.toString();
-        final assets = data['assets'] as List<dynamic>? ?? [];
-        for (final a in assets) {
-          final file = a as Map<String, dynamic>;
-          final name = (file['name'] ?? '').toString().toLowerCase();
-          if ((Platform.isAndroid && name.endsWith('.apk')) || (Platform.isWindows && (name.endsWith('.exe') || name.endsWith('.msi') || name.contains('windows') && name.endsWith('.zip')))) {
-            url = file['browser_download_url']?.toString();
-            break;
-          }
-        }
-
-      } else if (results[0].statusCode == 404) {
-        error = 'No published release';
-      } else {
-        error = 'Release API: HTTP ${results[0].statusCode}';
-      }
-      if (results[1].statusCode == 200) {
-        final data = jsonDecode(results[1].body) as Map<String, dynamic>;
-        final runs = data['workflow_runs'] as List<dynamic>? ?? [];
-        if (runs.isNotEmpty) {
-          final run = runs.first as Map<String, dynamic>;
-          status = "${run['status'] ?? 'unknown'} / ${run['conclusion'] ?? 'pending'}";
-        }
-      }
-      return GithubInfo(version: version, downloadUrl: url, workflowStatus: status, error: error);
-    } catch (e) {
-      return GithubInfo(error: 'Network error: $e');
-    }
+    final result = await HubService.inspect(repo);
+    final available = result.assets.where((a) => a.platform == currentPlatform);
+    return GithubInfo(
+      version: result.version,
+      downloadUrl: available.isEmpty ? null : available.first.url,
+      workflowStatus: result.workflow,
+      error: result.error,
+    );
   }
 }
 

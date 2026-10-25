@@ -16,12 +16,35 @@ class _LocalAiChatState extends State<LocalAiChat> {
   List<String> models = [];
   String? selected;
   bool sending = false;
+  bool restoring = true;
+  Future<void> saveMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ollama_chat_history', jsonEncode(messages));
+  }
+  Future<void> clearMessages() async {
+    if (sending) return;
+    setState(() { messages.clear(); error = null; });
+    await saveMessages();
+  }
   String? error;
   @override
   void initState() { super.initState(); restore(); }
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
+    try {
+      final saved = prefs.getString('ollama_chat_history');
+      if (saved != null) {
+        final decoded = jsonDecode(saved) as List<dynamic>;
+        if (mounted) setState(() {
+          messages.addAll(decoded.whereType<Map>().map((m) => {
+            'role': m['role']?.toString() ?? 'user',
+            'content': m['content']?.toString() ?? '',
+          }).where((m) => m['role'] == 'user' || m['role'] == 'assistant'));
+        });
+      }
+    } catch (_) { /* Ignore corrupted local history. */ }
+    if (mounted) setState(() => restoring = false);
     await fetchModels();
   }
   Future<void> fetchModels() async {
@@ -48,6 +71,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
     if (text.isEmpty || sending || selected == null) return;
     input.clear();
     setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
+    await saveMessages();
     try {
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
       final response = await http.post(Uri.parse('$base/api/chat'),
@@ -57,7 +81,10 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}: ${response.body}');
       final result = jsonDecode(response.body) as Map<String, dynamic>;
       final message = result['message'] as Map<String, dynamic>;
-      if (mounted) { setState(() => messages.add({'role':'assistant','content':message['content'].toString()})); }
+      if (mounted) {
+        setState(() => messages.add({'role':'assistant','content':message['content'].toString()}));
+        await saveMessages();
+      }
     } catch (e) {
       if (mounted) { setState(() => error = 'Ошибка ответа: $e'); }
     } finally {
@@ -75,6 +102,17 @@ class _LocalAiChatState extends State<LocalAiChat> {
           hint: const Text('Выбери модель'), items: models.map((m) => DropdownMenuItem(value:m,child:Text(m,overflow:TextOverflow.ellipsis))).toList(),
           onChanged: (v) => setState(() => selected=v))),
         IconButton(onPressed:fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
+        IconButton(onPressed:sending || restoring || messages.isEmpty ? null : () async {
+          final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+            title: const Text('Очистить переписку?'),
+            content: const Text('История Ollama будет удалена только из All Hub.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Очистить')),
+            ],
+          ));
+          if (confirmed == true) await clearMessages();
+        }, icon: const Icon(Icons.delete_outline), tooltip: 'Очистить историю'),
       ]),
       if (Platform.isAndroid) const Padding(padding: EdgeInsets.only(top:8), child: Text('На телефоне 127.0.0.1 означает сам телефон, а не компьютер. Чтобы подключить Ollama на ПК, укажи адрес компьютера в одной Wi-Fi сети, например http://192.168.1.10:11434. Ollama на ПК должна разрешать подключения из локальной сети.')),
       if (error != null) Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),

@@ -4,8 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// On Windows the user can select a directory. No images are copied or uploaded.
-/// Android uses remote sample photographs; failed requests fall back to gradients.
+/// Pick a local image directory on Windows or Android where supported by the platform.
+/// No local images are uploaded. Unsupported directory access falls back to remote covers.
 class CoverSettings {
   static String? folder;
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
@@ -15,8 +15,13 @@ class CoverSettings {
     revision.value++;
   }
   static Future<bool> chooseFolder() async {
-    if (!Platform.isWindows) return false;
-    final selected = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Папка с обложками All Hub');
+    if (!Platform.isWindows && !Platform.isAndroid) return false;
+    String? selected;
+    try {
+      selected = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Папка с обложками All Hub');
+    } catch (_) {
+      return false;
+    }
     if (selected == null) return false;
     folder = selected;
     final prefs = await SharedPreferences.getInstance();
@@ -62,7 +67,7 @@ class _ProjectCoverState extends State<ProjectCover> {
     final current = ++generation;
     File? selected;
     final folder = CoverSettings.folder;
-    if (Platform.isWindows && folder != null) {
+    if ((Platform.isWindows || Platform.isAndroid) && folder != null) {
       try {
         final dir = Directory(folder);
         if (await dir.exists()) {
@@ -70,7 +75,6 @@ class _ProjectCoverState extends State<ProjectCover> {
             entry is File && RegExp(r'\.(png|jpg|jpeg|webp|bmp)$', caseSensitive: false).hasMatch(entry.path)
           ).cast<File>().toList();
           if (files.isNotEmpty) {
-            // Deterministic for each refresh; no reordering while scrolling.
             selected = files[Random().nextInt(files.length)];
           }
         }

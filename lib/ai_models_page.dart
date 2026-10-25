@@ -19,6 +19,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
   bool importing = false;
   int importedCount = 0;
   int mode = 0;
+  String? selectedGguf;
   int invalidCount = 0;
   final Map<String, Future<GgufHeader?>> inspections = {};
   Future<GgufHeader?> inspect(String path) =>
@@ -27,7 +28,18 @@ class _AiModelsPageState extends State<AiModelsPage> {
   void initState() { super.initState(); load(); }
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() { paths = prefs.getStringList('ai_model_paths') ?? []; busy = false; });
+    if (mounted) setState(() {
+      paths = prefs.getStringList('ai_model_paths') ?? [];
+      final saved = prefs.getString('ai_selected_gguf');
+      selectedGguf = paths.contains(saved) ? saved : null;
+      busy = false;
+    });
+  }
+  Future<void> selectGguf(String path) async {
+    if (!paths.contains(path) || await inspect(path) == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('ai_selected_gguf', path);
+    if (mounted) setState(() => selectedGguf = path);
   }
   Future<void> addModels() async {
     if (importing) return;
@@ -98,7 +110,14 @@ class _AiModelsPageState extends State<AiModelsPage> {
     final next = paths.where((p) => p != path).toList();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);
-    if (mounted) setState(() { paths = next; inspections.remove(path); });
+    if (selectedGguf == path) {
+      await prefs.remove('ai_selected_gguf');
+    }
+    if (mounted) setState(() {
+      paths = next;
+      inspections.remove(path);
+      if (selectedGguf == path) selectedGguf = null;
+    });
   }
   Future<void> confirmRemove(String path) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
@@ -129,12 +148,23 @@ class _AiModelsPageState extends State<AiModelsPage> {
     const SizedBox(height: 16),
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
+    if (selectedGguf != null) const Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Text('Выбранная модель сохранена для будущего локального движка. Генерация текста пока недоступна.'),
+    ),
     for (final path in paths)
       FutureBuilder<GgufHeader?>(future: inspect(path), builder: (context, snap) => Card(child: ListTile(
         leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
         subtitle: Text(snap.data != null ? 'GGUF v${snap.data!.version} • ${fileSize(snap.data!.bytes)} • тензоров: ${snap.data!.tensorCount} • метаданных: ${snap.data!.metadataCount} • движок не подключён' : 'Невозможно прочитать GGUF'),
-        trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(
+            tooltip: selectedGguf == path ? 'Выбранная модель' : 'Выбрать для локального ИИ',
+            onPressed: snap.data == null ? null : () => selectGguf(path),
+            icon: Icon(selectedGguf == path ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+          ),
+          IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
+        ]),
       ))),
   ])),
   ]);

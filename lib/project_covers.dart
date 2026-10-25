@@ -87,6 +87,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   List<String> webCovers = [];
   int webIndex = 0;
   bool loadingWeb = false;
+  bool reloadQueued = false;
   int generation = 0;
   List<File> localCandidates = [];
   String? scannedFolder;
@@ -111,7 +112,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   @override
   void didUpdateWidget(covariant ProjectCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.id != widget.id) { refresh(); loadWebCovers(); }
+    if (oldWidget.id != widget.id) { onSettingsChanged(); }
   }
   @override
   void dispose() {
@@ -120,7 +121,11 @@ class _ProjectCoverState extends State<ProjectCover> {
     super.dispose();
   }
   // Opt-in adult-tag searches; otherwise use Wikimedia Commons.
-  void onSettingsChanged() { refresh(); loadWebCovers(); }
+  void onSettingsChanged() {
+    refresh();
+    if (loadingWeb) { reloadQueued = true; return; }
+    loadWebCovers();
+  }
   Future<void> loadWebCovers() async {
     if (loadingWeb) return;
     loadingWeb = true;
@@ -194,6 +199,10 @@ class _ProjectCoverState extends State<ProjectCover> {
       // Offline or API unavailable: retain local image / gradient fallback.
     } finally {
       loadingWeb = false;
+      if (reloadQueued && mounted) {
+        reloadQueued = false;
+        loadWebCovers();
+      }
     }
   }
   Future<void> refresh() async {

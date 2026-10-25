@@ -79,12 +79,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
   Future<GithubInfo> getInfo(String repo) => info.putIfAbsent(repo, () => GithubApi.inspect(repo));
-  void refresh() => setState(() { info.clear(); projects = _loadProjects(); });
+  Future<void> refresh() async {
+    setState(() { info.clear(); projects = _loadProjects(); });
+    await projects;
+    CoverSettings.revision.value++;
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)),
-      actions: [IconButton(tooltip: 'Обновить данные GitHub', onPressed: refresh, icon: const Icon(Icons.refresh))]),
+    appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))),
     body: FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
@@ -116,7 +119,7 @@ class _HomePageState extends State<HomePage> {
         ]);
       }
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
-      return ListView(padding: const EdgeInsets.all(16), children: [
+      return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[
           TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
@@ -130,7 +133,7 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(project.name, style: Theme.of(context).textTheme.titleLarge),
-              Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : 'Мод Minecraft', style: Theme.of(context).textTheme.bodySmall),
+              Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
             if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
@@ -151,7 +154,7 @@ class _HomePageState extends State<HomePage> {
               ]);
             }),
           ]))])),
-      ]);
+      ]));
     }),
     bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [
       NavigationDestination(icon: Icon(Icons.grid_view), label: 'Проекты'),

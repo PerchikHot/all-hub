@@ -29,6 +29,25 @@ jobs:
           s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1)
           p.write_text(s)
           PY
+      - name: Build llama.cpp CPU runtime for Android ARM64
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v0.7.0 https://github.com/ggml-org/llama.cpp.git /tmp/allhub-llama
+          NDK_ROOT="${ANDROID_NDK_HOME:-}"
+          if [ ! -f "$NDK_ROOT/build/cmake/android.toolchain.cmake" ]; then
+            NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          fi
+          cmake -S /tmp/allhub-llama -B /tmp/allhub-llama-build \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DLLAMA_BUILD_SERVER=OFF -DGGML_OPENMP=OFF \
+            -DGGML_NATIVE=OFF
+          cmake --build /tmp/allhub-llama-build --config Release -j 2
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          find /tmp/allhub-llama-build -type f -name '*.so' -exec cp -v {} android/app/src/main/jniLibs/arm64-v8a/ \;
+          test -s android/app/src/main/jniLibs/arm64-v8a/libllama.so
       - name: Build native ARM64 bridge
         run: |
           set -euo pipefail

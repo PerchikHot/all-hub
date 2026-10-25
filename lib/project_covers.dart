@@ -125,7 +125,7 @@ class _ProjectCoverState extends State<ProjectCover> {
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
       child: Stack(fit: StackFit.expand, children: [
         if (localFile != null)
-          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
+          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,

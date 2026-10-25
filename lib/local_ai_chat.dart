@@ -19,7 +19,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool restoring = true;
   Future<void> saveMessages() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ollama_chat_history', jsonEncode(messages));
+    await prefs.setString('ollama_chat_history', jsonEncode(messages.length > 100
+        ? messages.sublist(messages.length - 100) : messages));
   }
   Future<void> clearMessages() async {
     if (sending) return;
@@ -74,9 +75,10 @@ class _LocalAiChatState extends State<LocalAiChat> {
     await saveMessages();
     try {
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
+      final recent = messages.length > 40 ? messages.sublist(messages.length - 40) : messages;
       final response = await http.post(Uri.parse('$base/api/chat'),
         headers: {'Content-Type':'application/json'},
-        body: jsonEncode({'model':selected,'stream':false,'messages':messages}))
+        body: jsonEncode({'model':selected,'stream':false,'messages':recent}))
         .timeout(const Duration(minutes: 5));
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}: ${response.body}');
       final result = jsonDecode(response.body) as Map<String, dynamic>;
@@ -86,7 +88,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         await saveMessages();
       }
     } catch (e) {
-      if (mounted) { setState(() => error = 'Ошибка ответа: $e'); }
+      if (mounted) { setState(() => error = 'Ошибка ответа: $e. Сообщение сохранено в истории.'); }
     } finally {
       if (mounted) { setState(() => sending = false); }
     }

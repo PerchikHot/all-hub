@@ -20,6 +20,12 @@ class _AiModelsPageState extends State<AiModelsPage> {
   int importedCount = 0;
   int mode = 0;
   int invalidCount = 0;
+  Future<(int?, int?)> ggufDetails(String path) async {
+    final version = await ggufVersion(path);
+    if (version == null) return (null, null);
+    try { return (version, await File(path).length()); }
+    catch (_) { return (version, null); }
+  }
   Future<int?> ggufVersion(String path) async {
     RandomAccessFile? handle;
     try {
@@ -105,10 +111,10 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     for (final path in paths)
-      FutureBuilder<int?>(future: ggufVersion(path), builder: (context, snap) => Card(child: ListTile(
-        leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
+      FutureBuilder<(int?, int?)>(future: ggufDetails(path), builder: (context, snap) => Card(child: ListTile(
+        leading: Icon(snap.data?.$1 != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
-        subtitle: Text(snap.data != null ? 'GGUF v${snap.data} • движок не подключён' : 'Невозможно прочитать GGUF'),
+        subtitle: Text(snap.data?.$1 != null ? 'GGUF v${snap.data!.$1} • ${snap.data!.$2 == null ? "размер неизвестен" : fileSize(snap.data!.$2!)} • движок не подключён' : 'Невозможно прочитать GGUF'),
         trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
       ))),
   ])),

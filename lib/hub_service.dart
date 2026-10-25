@@ -33,12 +33,16 @@ class ProjectStatus {
 class HubService {
   static Future<List<HubProject>> catalog(String bundled) async {
     var content = bundled;
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('catalog_cache');
+    if (cached != null && cached.trimLeft().startsWith('[')) content = cached;
     try {
       final response = await http.get(Uri.parse(
         'https://raw.githubusercontent.com/$repository/main/assets/projects.json'
-      ), headers: _headers).timeout(const Duration(seconds: 9));
+      ), headers: _headers).timeout(const Duration(seconds: 3));
       if (response.statusCode == 200 && response.body.trimLeft().startsWith('[')) {
         content = response.body;
+        await prefs.setString('catalog_cache', content);
       }
     } catch (_) {}
     final list = jsonDecode(content) as List;

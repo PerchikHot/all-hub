@@ -93,6 +93,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   bool reloadQueued = false;
   int generation = 0;
   List<File> localCandidates = [];
+  final Set<String> failedImages = {};
   String? scannedFolder;
   Timer? rotationTimer;
   @override
@@ -108,7 +109,9 @@ class _ProjectCoverState extends State<ProjectCover> {
         final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;
         setState(() => localFile = candidates[Random().nextInt(candidates.length)]);
       } else if (webCovers.isNotEmpty) {
-        setState(() => webIndex = (webIndex + 1) % webCovers.length);
+        final next = List.generate(webCovers.length, (i) => (webIndex + i + 1) % webCovers.length)
+          .where((i) => !failedImages.contains(webCovers[i]));
+        if (next.isNotEmpty) setState(() => webIndex = next.first);
       }
     });
   }
@@ -136,7 +139,7 @@ class _ProjectCoverState extends State<ProjectCover> {
     final cacheKey = '${widget.id}:$adult';
     final saved = CoverSettings.cache[cacheKey];
     if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
-      if (mounted) setState(() { webCovers = saved; webIndex = 0; });
+      if (mounted) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
       loadingWeb = false;
       return;
     }
@@ -179,7 +182,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); CoverSettings.errors.remove(id); }
         else { CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений'; }
         CoverSettings.statusRevision.value++;
-        if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
+        if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; failedImages.clear(); });
         return;
       }
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
@@ -267,7 +270,19 @@ class _ProjectCoverState extends State<ProjectCover> {
           Image.network(webCovers[webIndex], fit: BoxFit.cover,
             gaplessPlayback: true,
             headers: const {'User-Agent': 'AllHub/0.5 (cover viewer)'},
-            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink()),
+            errorBuilder: (context, error, stackTrace) {
+              final failed = webCovers[webIndex];
+              if (!failedImages.contains(failed)) {
+                failedImages.add(failed);
+                Future.microtask(() {
+                  if (!mounted || webCovers.isEmpty) return;
+                  final next = List.generate(webCovers.length, (i) => (webIndex + i + 1) % webCovers.length)
+                    .where((i) => !failedImages.contains(webCovers[i]));
+                  if (next.isNotEmpty) setState(() => webIndex = next.first);
+                });
+              }
+              return const SizedBox.shrink();
+            }),
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,

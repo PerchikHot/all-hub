@@ -47,8 +47,9 @@ class HubService {
 
   static String? assetPlatform(String name) {
     final n = name.toLowerCase();
-    if (n.endsWith('.apk') || n.contains('android')) return 'android';
-    if (n.endsWith('.exe') || n.endsWith('.msi') || n.contains('windows') || n.contains('win64')) return 'windows';
+    if (n.endsWith('.apk')) return 'android';
+    if (n.endsWith('.exe') || n.endsWith('.msi')) return 'windows';
+    if (n.endsWith('.zip') && (n.contains('windows') || n.contains('win64') || n.contains('desktop'))) return 'windows';
     return null;
   }
 
@@ -66,7 +67,7 @@ class HubService {
         final releases = jsonDecode(responses[0].body) as List;
         for (final raw in releases) {
           final release = raw as Map<String, dynamic>;
-          if (release['draft'] == true) continue;
+          if (release['draft'] == true || release['prerelease'] == true) continue;
           final tag = (release['tag_name'] ?? 'latest').toString();
           version ??= tag;
           for (final a in (release['assets'] as List? ?? [])) {
@@ -89,7 +90,9 @@ class HubService {
         }
       }
       return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,
-        assets: assets, error: responses[0].statusCode == 403 ? 'GitHub API: ограничение запросов' : null);
+        assets: assets, error: responses[0].statusCode == 403 ? 'GitHub API: ограничение запросов' :
+          responses[0].statusCode == 404 ? 'Релизы недоступны или репозиторий закрыт' :
+          responses[0].statusCode != 200 ? 'GitHub API: HTTP ${responses[0].statusCode}' : null);
     } catch (e) {
       return ProjectStatus(error: 'Ошибка сети: $e');
     }

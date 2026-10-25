@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'local_ai_chat.dart';
 
 class AiModelsPage extends StatefulWidget {
   const AiModelsPage({super.key});
@@ -13,6 +14,7 @@ class AiModelsPage extends StatefulWidget {
 class _AiModelsPageState extends State<AiModelsPage> {
   List<String> paths = [];
   bool busy = true;
+  bool chat = true;
   @override
   void initState() { super.initState(); load(); }
   Future<void> load() async {
@@ -48,7 +50,11 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (mounted) setState(() => paths = next);
   }
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
+  Widget build(BuildContext context) => Column(children: [
+    Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<bool>(
+      segments: const [ButtonSegment(value:true,label:Text('Чат Ollama')),ButtonSegment(value:false,label:Text('GGUF-файлы'))],
+      selected:{chat},onSelectionChanged:(v)=>setState(()=>chat=v.first))),
+    Expanded(child:chat ? const LocalAiChat() : ListView(padding: const EdgeInsets.all(20), children: [
     Text('Локальные ИИ-модели', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 12),
     const Text('Добавь уже скачанные GGUF-модели. Они останутся локальными. Это список файлов, а не запущенный ИИ: для общения потребуется подключить совместимый движок инференса.'),
@@ -64,5 +70,6 @@ class _AiModelsPageState extends State<AiModelsPage> {
         subtitle: Text(snap.data == true ? 'Файл доступен • движок не подключён' : 'Файл недоступен'),
         trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => remove(path), icon: const Icon(Icons.close)),
       ))),
+  ])),
   ]);
 }

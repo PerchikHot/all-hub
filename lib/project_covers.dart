@@ -120,7 +120,7 @@ class _ProjectCoverState extends State<ProjectCover> {
     CoverSettings.revision.removeListener(onSettingsChanged);
     super.dispose();
   }
-  // Opt-in adult-tag searches; otherwise use Wikimedia Commons.
+  // Danbooru tag search: general-rated art by default, explicit only by opt-in.
   void onSettingsChanged() {
     refresh();
     if (loadingWeb) { reloadQueued = true; return; }
@@ -139,12 +139,12 @@ class _ProjectCoverState extends State<ProjectCover> {
     }
     final id = widget.id;
     final queries = <String, String>{
-      'all-hub': 'anime illustration',
-      'eclipse-arena': 'Erza Scarlet Fairy Tail cosplay',
-      'shadow-rp': 'Re Zero anime cosplay',
-      'shadow-garden': 'The Eminence in Shadow cosplay',
+      'all-hub': 'anime_girl rating:general',
+      'eclipse-arena': 'erza_scarlet rating:general',
+      'shadow-rp': 'boa_hancock rating:general',
+      'shadow-garden': 'alpha_(kage_no_jitsuryokusha_ni_naritakute!) rating:general',
     };
-    final search = queries[id] ?? 'anime cosplay';
+    final search = queries[id] ?? 'anime_girl rating:general';
     try {
       if (adult) {
         // Only adult-character searches; reject posts marked as young characters.
@@ -173,28 +173,28 @@ class _ProjectCoverState extends State<ProjectCover> {
         if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
         return;
       }
-      final uri = Uri.https('commons.wikimedia.org', '/w/api.php', {
-        'action':'query', 'generator':'search', 'gsrsearch':'filetype:bitmap $search',
-        'gsrnamespace':'6', 'gsrlimit':'15', 'prop':'imageinfo',
-        'iiprop':'url|mime', 'iiurlwidth':'900', 'format':'json',
+      final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
+        'tags': search, 'limit': '30',
       });
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(uri, headers: {'User-Agent':'AllHub/0.5 (cover viewer)'})
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return;
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final pages = (json['query'] as Map<String, dynamic>?)?['pages'] as Map<String, dynamic>?;
+      final posts = jsonDecode(response.body) as List<dynamic>;
       final urls = <String>[];
-      if (pages != null) {
-        for (final item in pages.values) {
-          final page = item as Map<String, dynamic>;
-          final infos = page['imageinfo'] as List<dynamic>?;
-          final info = infos != null && infos.isNotEmpty ? infos.first as Map<String, dynamic> : null;
-          final mime = info?['mime']?.toString() ?? '';
-          final url = info?['thumburl']?.toString();
-          if (mime.startsWith('image/') && url != null && url.startsWith('https://')) urls.add(url);
-        }
+      for (final post in posts) {
+        final item = post as Map<String, dynamic>;
+        if (item['rating']?.toString() != 'g') continue;
+        final url = item['preview_file_url']?.toString() ??
+            item['large_file_url']?.toString() ?? item['file_url']?.toString();
+        if (url != null && url.startsWith('https://')) urls.add(url);
       }
-      if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); }
-      if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; });
+      if (urls.isNotEmpty) {
+        CoverSettings.cache[cacheKey] = urls;
+        CoverSettings.cacheAt[cacheKey] = DateTime.now();
+      }
+      if (mounted && widget.id == id && CoverSettings.adultCovers == adult) {
+        setState(() { webCovers = urls; webIndex = 0; });
+      }
     } catch (_) {
       // Offline or API unavailable: retain local image / gradient fallback.
     } finally {

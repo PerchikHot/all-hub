@@ -45,34 +45,57 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (mounted) setState(() { paths = prefs.getStringList('ai_model_paths') ?? []; busy = false; });
   }
   Future<void> addModels() async {
+    if (importing) return;
     final picked = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: true);
     if (picked == null) return;
     if (mounted) setState(() { importing = true; importedCount = 0; invalidCount = 0; });
     final next = [...paths];
-    final support = await getApplicationSupportDirectory();
-    for (final f in picked.files) {
-      if (f.path == null || !f.name.toLowerCase().endsWith('.gguf')) continue;
-      if (await ggufVersion(f.path!) == null) { invalidCount++; continue; }
-      try {
-        String path = f.path!;
-        if (Platform.isAndroid) {
-          final dest = Directory('${support.path}/models');
-          await dest.create(recursive: true);
-          path = '${dest.path}/${DateTime.now().microsecondsSinceEpoch}_${f.name}';
-          await File(f.path!).copy(path);
-          if (await ggufVersion(path) == null) {
-            await File(path).delete();
-            invalidCount++;
-            continue;
+    try {
+      final support = await getApplicationSupportDirectory();
+      for (final f in picked.files) {
+        if (f.path == null || !f.name.toLowerCase().endsWith('.gguf')) continue;
+        File? temp;
+        try {
+          final source = File(f.path!);
+          if (await ggufVersion(source.path) == null) { invalidCount++; continue; }
+          String path = source.path;
+          if (Platform.isAndroid) {
+            final dest = Directory('${support.path}/models');
+            await dest.create(recursive: true);
+            final filename = '${DateTime.now().microsecondsSinceEpoch}_${f.name}';
+            temp = File('${dest.path}/$filename.part');
+            await source.copy(temp.path);
+            final sourceSize = await source.length();
+            if (await temp.length() != sourceSize || await ggufVersion(temp.path) == null) {
+              invalidCount++;
+              continue;
+            }
+            final completed = await temp.rename('${dest.path}/$filename');
+            path = completed.path;
+            temp = null;
+          }
+          if (!next.contains(path)) { next.add(path); importedCount++; }
+        } catch (_) {
+          invalidCount++;
+        } finally {
+          if (temp != null) {
+            try { if (await temp.exists()) await temp.delete(); } catch (_) {}
           }
         }
-        if (!next.contains(path)) { next.add(path); importedCount++; }
-      } catch (_) { invalidCount++; }
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('ai_model_paths', next);
+      if (mounted) setState(() => paths = next);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка импорта моделей: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => importing = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Импортировано GGUF: $importedCount. Ошибок: $invalidCount')));
+      }
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('ai_model_paths', next);
-    if (mounted) setState(() { paths = next; importing = false; });
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Импортировано GGUF: $importedCount. Неверных файлов: $invalidCount')));
   }
   Future<void> remove(String path) async {
     final support = await getApplicationSupportDirectory();

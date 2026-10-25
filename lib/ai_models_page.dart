@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'local_ai_chat.dart';
 import 'codex_page.dart';
+import 'gguf_header.dart';
 
 class AiModelsPage extends StatefulWidget {
   const AiModelsPage({super.key});
@@ -20,24 +20,6 @@ class _AiModelsPageState extends State<AiModelsPage> {
   int importedCount = 0;
   int mode = 0;
   int invalidCount = 0;
-  Future<(int?, int?)> ggufDetails(String path) async {
-    final version = await ggufVersion(path);
-    if (version == null) return (null, null);
-    try { return (version, await File(path).length()); }
-    catch (_) { return (version, null); }
-  }
-  Future<int?> ggufVersion(String path) async {
-    RandomAccessFile? handle;
-    try {
-      handle = await File(path).open();
-      final bytes = await handle.read(8);
-      if (bytes.length != 8 || bytes[0] != 0x47 || bytes[1] != 0x47 ||
-          bytes[2] != 0x55 || bytes[3] != 0x46) return null;
-      final version = ByteData.sublistView(Uint8List.fromList(bytes)).getUint32(4, Endian.little);
-      return version >= 1 && version <= 4 ? version : null;
-    } catch (_) { return null; }
-    finally { await handle?.close(); }
-  }
   @override
   void initState() { super.initState(); load(); }
   Future<void> load() async {
@@ -57,7 +39,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
         File? temp;
         try {
           final source = File(f.path!);
-          if (await ggufVersion(source.path) == null) { invalidCount++; continue; }
+          if (await GgufHeader.read(source.path) == null) { invalidCount++; continue; }
           String path = source.path;
           if (Platform.isAndroid) {
             final dest = Directory('${support.path}/models');
@@ -66,7 +48,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
             temp = File('${dest.path}/$filename.part');
             await source.copy(temp.path);
             final sourceSize = await source.length();
-            if (await temp.length() != sourceSize || await ggufVersion(temp.path) == null) {
+            if (await temp.length() != sourceSize || await GgufHeader.read(temp.path) == null) {
               invalidCount++;
               continue;
             }
@@ -139,8 +121,8 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     for (final path in paths)
-      FutureBuilder<(int?, int?)>(future: ggufDetails(path), builder: (context, snap) => Card(child: ListTile(
-        leading: Icon(snap.data?.$1 != null ? Icons.memory : Icons.warning_amber),
+      FutureBuilder<GgufHeader?>(future: GgufHeader.read(path), builder: (context, snap) => Card(child: ListTile(
+        leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
         subtitle: Text(snap.data?.$1 != null ? 'GGUF v${snap.data!.$1} • ${snap.data!.$2 == null ? "размер неизвестен" : fileSize(snap.data!.$2!)} • движок не подключён' : 'Невозможно прочитать GGUF'),
         trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),

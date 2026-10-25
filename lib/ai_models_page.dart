@@ -124,7 +124,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
       FutureBuilder<GgufHeader?>(future: GgufHeader.read(path), builder: (context, snap) => Card(child: ListTile(
         leading: Icon(snap.data != null ? Icons.memory : Icons.warning_amber),
         title: Text(path.split(Platform.pathSeparator).last),
-        subtitle: Text(snap.data?.$1 != null ? 'GGUF v${snap.data!.$1} • ${snap.data!.$2 == null ? "размер неизвестен" : fileSize(snap.data!.$2!)} • движок не подключён' : 'Невозможно прочитать GGUF'),
+        subtitle: Text(snap.data != null ? 'GGUF v${snap.data!.version} • ${fileSize(snap.data!.bytes)} • тензоров: ${snap.data!.tensorCount} • метаданных: ${snap.data!.metadataCount} • движок не подключён' : 'Невозможно прочитать GGUF'),
         trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => confirmRemove(path), icon: const Icon(Icons.close)),
       ))),
   ])),

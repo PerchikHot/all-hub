@@ -15,6 +15,8 @@ class AiModelsPage extends StatefulWidget {
 class _AiModelsPageState extends State<AiModelsPage> {
   List<String> paths = [];
   bool busy = true;
+  bool importing = false;
+  int importedCount = 0;
   int mode = 0;
   @override
   void initState() { super.initState(); load(); }
@@ -25,6 +27,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
   Future<void> addModels() async {
     final picked = await FilePicker.platform.pickFiles(type: FileType.any, allowMultiple: true);
     if (picked == null) return;
+    if (mounted) setState(() { importing = true; importedCount = 0; });
     final next = [...paths];
     final support = await getApplicationSupportDirectory();
     for (final f in picked.files) {
@@ -37,12 +40,13 @@ class _AiModelsPageState extends State<AiModelsPage> {
           path = '${dest.path}/${DateTime.now().microsecondsSinceEpoch}_${f.name}';
           await File(f.path!).copy(path);
         }
-        if (!next.contains(path)) next.add(path);
+        if (!next.contains(path)) { next.add(path); importedCount++; }
       } catch (_) {}
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('ai_model_paths', next);
-    if (mounted) setState(() => paths = next);
+    if (mounted) setState(() { paths = next; importing = false; });
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Импортировано GGUF: $importedCount')));
   }
   Future<void> remove(String path) async {
     final support = await getApplicationSupportDirectory();
@@ -80,7 +84,8 @@ class _AiModelsPageState extends State<AiModelsPage> {
     const SizedBox(height: 12),
     const Text('Добавь уже скачанные GGUF-модели. Они останутся локальными. Это список файлов, а не запущенный ИИ: для общения потребуется подключить совместимый движок инференса.'),
     const SizedBox(height: 16),
-    FilledButton.icon(onPressed: busy ? null : addModels, icon: const Icon(Icons.add), label: const Text('Добавить GGUF-модели')),
+    FilledButton.icon(onPressed: busy || importing ? null : addModels, icon: const Icon(Icons.add), label: Text(importing ? 'Импортируем модели…' : 'Добавить GGUF-модели')),
+    if (importing) const LinearProgressIndicator(),
     const SizedBox(height: 16),
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),

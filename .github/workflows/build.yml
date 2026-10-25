@@ -1,4 +1,5 @@
 name: Build All Hub
+# Trigger verification of persistent Android signing and latest build fixes.
 on:
   workflow_dispatch:
   push:

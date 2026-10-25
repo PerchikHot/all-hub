@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,6 +76,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
           onChanged: (v) => setState(() => selected=v))),
         IconButton(onPressed:fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
       ]),
+      if (Platform.isAndroid) const Padding(padding: EdgeInsets.only(top:8), child: Text('На телефоне 127.0.0.1 означает сам телефон, а не компьютер. Чтобы подключить Ollama на ПК, укажи адрес компьютера в одной Wi-Fi сети, например http://192.168.1.10:11434. Ollama на ПК должна разрешать подключения из локальной сети.')),
       if (error != null) Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
     ])),
     Expanded(child: ListView.builder(padding:const EdgeInsets.all(12),itemCount:messages.length,itemBuilder:(context,index) {

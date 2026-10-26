@@ -1,3 +1,4 @@
+import 'gguf_chat_page.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -220,9 +221,15 @@ class _AiModelsPageState extends State<AiModelsPage> {
       icon: const Icon(Icons.fact_check_outlined),
       label: Text(testingNativeModel ? 'Проверяем модель…' : 'Проверить модель и контекст'),
     ),
+    if (selectedGguf != null && Platform.isAndroid) FilledButton.icon(
+      onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+        builder: (context) => GgufChatPage(modelPath: selectedGguf!))),
+      icon: const Icon(Icons.chat),
+      label: const Text('Офлайн-чат GGUF (эксперимент)'),
+    ),
     if (selectedGguf != null) const Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
-      child: Text('Выбранная модель сохранена для будущего локального движка. Генерация текста пока недоступна.'),
+      child: Text('Выбранная модель сохранена для будущего локального движка. Генерация экспериментальная: возможны ошибки и высокая нагрузка на память.'),
     ),
     for (final path in paths)
       FutureBuilder<GgufHeader?>(future: inspect(path), builder: (context, snap) => Card(child: ListTile(

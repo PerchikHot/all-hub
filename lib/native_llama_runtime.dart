@@ -23,9 +23,16 @@ class NativeLlamaRuntime {
       final ready = library.lookupFunction<Int32 Function(), int Function()>(
         'allhub_llama_inference_ready',
       );
-      return ready() == 1
-          ? 'Нативный движок сообщает о готовности к инференсу'
-          : 'Нативный ARM64-мост подключён; llama.cpp и генерация пока не встроены';
+      if (ready() == 1) {
+        return 'Нативный мост сообщает о готовности к инференсу';
+      }
+      try {
+        final llama = DynamicLibrary.open('libllama.so');
+        llama.lookup<NativeFunction<Void Function()>>('llama_backend_init');
+        return 'llama.cpp найден в APK; загрузка GGUF и генерация ещё не подключены';
+      } on Object catch (_) {
+        return 'Нативный мост найден, но библиотека llama.cpp недоступна';
+      }
     } on ArgumentError {
       return 'Нативный GGUF-движок не установлен в APK';
     } on Object catch (_) {

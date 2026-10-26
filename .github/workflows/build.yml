@@ -63,6 +63,11 @@ jobs:
             -Landroid/app/src/main/jniLibs/arm64-v8a -lllama \
             -o android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
           test -s android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
+          # The NDK clang++ bridge dynamically links Android's shared C++ runtime.
+          # Flutter does not automatically package this dependency for manually copied .so files.
+          CPP_SHARED="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          test -s "$CPP_SHARED"
+          cp -v "$CPP_SHARED" android/app/src/main/jniLibs/arm64-v8a/libc++_shared.so
       - run: flutter pub get
       - name: Align Android compile SDK with plugin requirements
         run: |
@@ -135,8 +140,14 @@ jobs:
           ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
           ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
         run: flutter build apk --release
-      - name: Verify Android package
-        run: test -s build/app/outputs/flutter-apk/app-release.apk
+      - name: Verify Android package and native dependencies
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -s "$APK"
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/liballhub_llama.so'
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libc++_shared.so'
+          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libllama.so'
       - uses: actions/upload-artifact@v4
         with:
           name: AllHub-Android-release

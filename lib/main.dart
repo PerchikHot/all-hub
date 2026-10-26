@@ -192,6 +192,24 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                     ),
+                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
+                      Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.exe'))
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.install_desktop),
+                      label: const Text('Установить EXE'),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
+                        try {
+                          await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!);
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Не удалось установить EXE: $e')));
+                        }
+                      },
+                    ),
                   if (tab == 0 && Platform.isWindows)
                     OutlinedButton.icon(
                       icon: const Icon(Icons.folder_open),

@@ -63,11 +63,9 @@ __attribute__((visibility("default"))) int32_t allhub_llama_generate(
         if (!sampler) break;
         int32_t written = 0;
         bool ok = true;
-        int32_t processed = 0;
         for (int i = 0; i < max_tokens && i < 256; ++i) {
             llama_batch batch = llama_batch_get_one(tokens.data(), (int32_t)tokens.size());
             if (llama_decode(ctx, batch) != 0) { ok = false; break; }
-            processed += (int32_t)tokens.size();
             const llama_token next = llama_sampler_sample(sampler, ctx, -1);
             if (llama_vocab_is_eog(vocab, next)) break;
             char piece[1024];

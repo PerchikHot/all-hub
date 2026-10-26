@@ -158,7 +158,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 url, fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined)),
+                errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null
                     ? child : const Center(child: CircularProgressIndicator()),
               ),

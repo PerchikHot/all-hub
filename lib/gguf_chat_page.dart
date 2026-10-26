@@ -109,6 +109,22 @@ class _GgufChatPageState extends State<GgufChatPage> {
           ],
         ),
         IconButton(
+          tooltip: 'Выгрузить модель из памяти',
+          onPressed: generating ? null : () async {
+            try {
+              final ok = await unloadNativeGguf();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(ok ? 'Модель выгружена из оперативной памяти' : 'Не удалось выгрузить модель'),
+              ));
+            } catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка выгрузки: $e')));
+            }
+          },
+          icon: const Icon(Icons.memory_outlined),
+        ),
+        IconButton(
           tooltip: 'Очистить переписку',
           onPressed: generating ? null : clearChat,
           icon: const Icon(Icons.delete_outline),

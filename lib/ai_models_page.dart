@@ -18,6 +18,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
   List<String> paths = [];
   bool busy = true;
   bool importing = false;
+  bool testingNativeModel = false;
   double importProgress = 0;
   String importingName = '';
   int importedCount = 0;
@@ -62,6 +63,34 @@ class _AiModelsPageState extends State<AiModelsPage> {
       await sink.flush();
     } finally {
       await sink.close();
+    }
+  }
+  Future<void> testSelectedModel() async {
+    final path = selectedGguf;
+    if (path == null || testingNativeModel) return;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Проверить загрузку модели?'),
+        content: const Text('llama.cpp попытается загрузить GGUF в память и сразу освободить её. Большая модель может потребовать много ОЗУ. Генерация текста пока не выполняется.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Проверить')),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+    setState(() => testingNativeModel = true);
+    String result;
+    try {
+      final ok = await verifyNativeGgufLoad(path);
+      result = ok ? 'Модель успешно загружена через llama.cpp' : 'llama.cpp не смог загрузить модель';
+    } catch (e) {
+      result = 'Ошибка проверки: $e';
+    }
+    if (mounted) {
+      setState(() => testingNativeModel = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
     }
   }
   Future<void> addModels() async {
@@ -186,6 +215,11 @@ class _AiModelsPageState extends State<AiModelsPage> {
     const SizedBox(height: 16),
     if (busy) const Center(child: CircularProgressIndicator()),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
+    if (selectedGguf != null && Platform.isAndroid) FilledButton.icon(
+      onPressed: testingNativeModel ? null : testSelectedModel,
+      icon: const Icon(Icons.fact_check_outlined),
+      label: Text(testingNativeModel ? 'Проверяем модель…' : 'Проверить загрузку в llama.cpp'),
+    ),
     if (selectedGguf != null) const Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Text('Выбранная модель сохранена для будущего локального движка. Генерация текста пока недоступна.'),

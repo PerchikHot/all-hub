@@ -4,6 +4,7 @@ import 'hub_widgets.dart';
 import 'development_center.dart';
 import 'project_covers.dart';
 import 'ai_models_page.dart';
+import 'media_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -119,7 +120,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))),
-    body: tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? _settings() :
+    body: tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? const MediaSearchPage() : tab == 4 ? _settings() :
       FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
@@ -167,6 +168,7 @@ class _HomePageState extends State<HomePage> {
       NavigationDestination(icon: Icon(Icons.grid_view), label: 'Проекты'),
       NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Разработка'),
       NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'ИИ'),
+      NavigationDestination(icon: Icon(Icons.travel_explore), label: 'Медиа'),
       NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
     ]),
   );

@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'media_browser_page.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -65,6 +67,13 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
     if (!adultConfirmed) return;
     final uri = searchUri();
     try {
+      if (Platform.isAndroid) {
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => MediaBrowserPage(url: uri),
+        ));
+        return;
+      }
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось открыть поиск в браузере')),
@@ -152,7 +161,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
         label: Text('Найти ${media == 'images' ? 'фото' : media == 'gifs' ? 'GIF' : 'видео'} в интернете'),
       ),
       const SizedBox(height: 12),
-      const Text('Для скачивания открой найденное фото, GIF или видео в браузере и используй доступную на сайте кнопку «Скачать» либо сохранение файла через браузер. Не все сайты разрешают загрузку.'),
+      const Text('На Android поиск открывается внутри All Hub. Прямые ссылки на фото, GIF и видео можно сохранить кнопкой загрузки. Файлы хранятся в папке приложения AllHubMedia. Сайты могут ограничивать скачивание.'),
       const SizedBox(height: 8),
       const Text('All Hub не хранит результаты поиска и не обходит ограничения поисковых систем. Фильтрация и доступность зависят от выбранного сервиса.'),
     ],

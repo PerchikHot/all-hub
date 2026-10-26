@@ -77,8 +77,26 @@ class ProjectLauncher {
         if (await temporary.length() < 1024) {
           throw const FormatException('Загруженный EXE слишком мал');
         }
-        if (await target.exists()) await target.delete();
-        await temporary.rename(target.path);
+        final file = await temporary.open();
+        try {
+          final header = await file.read(2);
+          if (header.length != 2 || header[0] != 0x4d || header[1] != 0x5a) {
+            throw const FormatException('Файл не похож на Windows EXE (нет MZ-заголовка)');
+          }
+        } finally {
+          await file.close();
+        }
+        // Preserve the last working version if the replacement fails.
+        final backup = File('${target.path}.backup');
+        if (await backup.exists()) await backup.delete();
+        if (await target.exists()) await target.rename(backup.path);
+        try {
+          await temporary.rename(target.path);
+          if (await backup.exists()) await backup.delete();
+        } catch (_) {
+          if (await backup.exists()) await backup.rename(target.path);
+          rethrow;
+        }
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('exe_$id', target.path);
       } finally {

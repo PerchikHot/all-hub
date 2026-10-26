@@ -19,6 +19,10 @@ jobs:
           channel: stable
       - name: Generate Android platform scaffolding
         run: flutter create --platforms=android --project-name all_hub .
+      - name: Generate branded Android launcher icons
+        run: |
+          python3 -m pip install --quiet Pillow
+          python3 tools/generate_launcher_icon.py
       - name: Configure Android permissions and launcher
         run: |
           rm -f test/widget_test.dart

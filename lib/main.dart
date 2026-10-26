@@ -154,6 +154,22 @@ class _HomePageState extends State<HomePage> {
                 Text('Релиз: ${i.version ?? 'не опубликован'}'),
                 Text('Сборка: ${i.workflowStatus ?? 'нет данных'}'),
                 if (i.error != null) Text(i.error!, style: TextStyle(color: Theme.of(context).colorScheme.tertiary)),
+                if (tab == 0 && ProjectLauncher.canLaunch(project.id))
+                  FutureBuilder<bool>(
+                    future: ProjectLauncher.isAvailable(project.id),
+                    builder: (context, status) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(children: [
+                        Icon(status.data == true ? Icons.check_circle_outline : Icons.info_outline,
+                          size: 16, color: status.data == true ? Colors.greenAccent : Colors.orangeAccent),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(status.data == true
+                          ? 'Готово к запуску'
+                          : Platform.isAndroid ? 'APK не установлен или не обнаружен' : 'EXE ещё не привязан',
+                          style: Theme.of(context).textTheme.bodySmall)),
+                      ]),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),

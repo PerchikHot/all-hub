@@ -113,3 +113,12 @@ String _generateNativeGguf(String path, String prompt, int maxTokens) {
     if (output != null) free(output);
   }
 }
+
+Future<bool> unloadNativeGguf() => Isolate.run(() {
+  if (!Platform.isAndroid) return false;
+  final library = DynamicLibrary.open(NativeLlamaRuntime.libraryName);
+  final unload = library.lookupFunction<Int32 Function(), int Function()>(
+    'allhub_llama_unload_model',
+  );
+  return unload() == 1;
+});

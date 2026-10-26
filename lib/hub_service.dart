@@ -62,7 +62,7 @@ class HubService {
       final responses = await Future.wait([
         http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=5'), headers: _headers)
           .timeout(const Duration(seconds: 12)),
-        http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=1'), headers: _headers)
+        http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
           .timeout(const Duration(seconds: 12)),
       ]);
       final assets = <HubAsset>[];
@@ -90,7 +90,14 @@ class HubService {
         if (runs.isNotEmpty) {
           final run = runs.first as Map<String, dynamic>;
           workflow = '${run['status'] ?? 'unknown'} / ${run['conclusion'] ?? 'pending'}';
-          actionsUrl = run['html_url']?.toString();
+          final successful = runs.cast<Map<String, dynamic>>().where(
+            (item) => item['status'] == 'completed' && item['conclusion'] == 'success',
+          );
+          // GitHub Actions artifacts normally require a logged-in GitHub session.
+          // Open the successful run instead of claiming its API archive URL is public.
+          actionsUrl = successful.isNotEmpty
+              ? successful.first['html_url']?.toString()
+              : run['html_url']?.toString();
         }
       }
       return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,

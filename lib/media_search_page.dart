@@ -1,3 +1,4 @@
+import 'media_gallery_page.dart';
 import 'dart:io';
 import 'media_browser_page.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   String media = 'images';
   String engine = 'bing';
   bool adultConfirmed = false;
+  bool galleryMode = true;
   String character = '';
   static const characters = <String, String>{
     '': 'Без персонажа',
@@ -89,7 +91,16 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => Column(children: [
+    Padding(padding: const EdgeInsets.all(8), child: SegmentedButton<bool>(
+      segments: const [
+        ButtonSegment(value: true, icon: Icon(Icons.grid_view), label: Text('Лента')),
+        ButtonSegment(value: false, icon: Icon(Icons.travel_explore), label: Text('Веб-поиск')),
+      ],
+      selected: {galleryMode},
+      onSelectionChanged: (v) => setState(() => galleryMode = v.first),
+    )),
+    Expanded(child: galleryMode ? const MediaGalleryPage() : ListView(
     padding: const EdgeInsets.all(16),
     children: [
       Text('Поиск фото, GIF и видео', style: Theme.of(context).textTheme.headlineSmall),
@@ -165,5 +176,6 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
       const SizedBox(height: 8),
       const Text('All Hub не хранит результаты поиска и не обходит ограничения поисковых систем. Фильтрация и доступность зависят от выбранного сервиса.'),
     ],
-  );
+  )),
+  ]);
 }

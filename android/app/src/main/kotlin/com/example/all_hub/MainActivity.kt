@@ -14,6 +14,15 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "isPackageInstalled" -> {
+                        val packageName = call.argument<String>("packageName")
+                        if (packageName.isNullOrBlank()) {
+                            result.success(false)
+                        } else {
+                            result.success(packageManager.getLaunchIntentForPackage(packageName) != null)
+                        }
+                    }
+
                     "launchPackage" -> {
                         val packageName = call.argument<String>("packageName")
                         if (packageName.isNullOrBlank()) {

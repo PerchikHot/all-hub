@@ -192,6 +192,22 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                     ),
+                  if (tab == 0 && Platform.isAndroid && i.downloadUrl != null &&
+                      Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.apk'))
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.install_mobile),
+                      label: const Text('Установить APK'),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Скачивание APK...')));
+                        try {
+                          await ProjectLauncher.installAndroidApk(i.downloadUrl!);
+                        } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Ошибка установки APK: $e')));
+                        }
+                      },
+                    ),
                   if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.exe'))
                     OutlinedButton.icon(

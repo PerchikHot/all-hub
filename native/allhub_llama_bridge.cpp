@@ -3,9 +3,16 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <mutex>
 
 // ABI v1: model verification and experimental one-shot token generation.
 // Caller must provide a valid NUL-terminated UTF-8 filesystem path.
+namespace {
+std::mutex model_mutex;
+llama_model * cached_model = nullptr;
+std::string cached_path;
+}
+
 extern "C" {
 __attribute__((visibility("default"))) int32_t allhub_llama_bridge_version(void) {
     return 1;
@@ -34,22 +41,34 @@ __attribute__((visibility("default"))) int32_t allhub_llama_try_load_model(const
     llama_model_free(model);
     return 1;
 }
-// One-shot CPU generation; caller owns output buffer. Returns bytes written or negative error.
+// Reuses a cached model across calls, but creates a fresh context for each prompt.
+// Caller owns output buffer. Returns bytes written or negative error.
 // Designed for short prompts and small quantized models on mobile.
 __attribute__((visibility("default"))) int32_t allhub_llama_generate(
     const char * path, const char * prompt, char * output, int32_t capacity, int32_t max_tokens) {
     if (!path || !prompt || !output || capacity < 2 || max_tokens < 1) return -1;
     output[0] = 0;
     llama_backend_init();
-    llama_model_params mp = llama_model_default_params();
-    mp.n_gpu_layers = 0;
-    llama_model * model = llama_model_load_from_file(path, mp);
-    if (!model) return -2;
+    // Hold the lock throughout generation: model reuse is safe across worker isolates.
+    std::lock_guard<std::mutex> guard(model_mutex);
+    if (!cached_model || cached_path != path) {
+        if (cached_model) {
+            llama_model_free(cached_model);
+            cached_model = nullptr;
+            cached_path.clear();
+        }
+        llama_model_params mp = llama_model_default_params();
+        mp.n_gpu_layers = 0;
+        cached_model = llama_model_load_from_file(path, mp);
+        if (!cached_model) return -2;
+        cached_path = path;
+    }
+    llama_model * model = cached_model;
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = 2048;
     cp.n_batch = 512;
     llama_context * ctx = llama_init_from_model(model, cp);
-    if (!ctx) { llama_model_free(model); return -3; }
+    if (!ctx) return -3;
     int32_t result = -4;
     llama_sampler * sampler = nullptr;
     do {
@@ -80,7 +99,6 @@ __attribute__((visibility("default"))) int32_t allhub_llama_generate(
     } while (false);
     if (sampler) llama_sampler_free(sampler);
     llama_free(ctx);
-    llama_model_free(model);
     return result;
 }
 }

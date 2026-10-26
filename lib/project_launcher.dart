@@ -14,7 +14,7 @@ class ProjectLauncher {
     if (Platform.isAndroid) {
       final packageName = packages[id];
       if (packageName == null) return false;
-      return await _channel.invokeMethod<bool>('launchPackage', {'package': packageName}) ?? false;
+      return await _channel.invokeMethod<bool>('launchPackage', {'packageName': packageName}) ?? false;
     }
     if (Platform.isWindows) {
       final prefs = await SharedPreferences.getInstance();

@@ -247,8 +247,10 @@ class _HomePageState extends State<HomePage> {
                       label: const Text('Выбрать EXE'),
                       onPressed: () async {
                         final ok = await ProjectLauncher.configureWindowsExecutable(project.id);
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(ok ? 'EXE привязан' : 'EXE не выбран')));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(ok ? 'EXE привязан' : 'EXE не выбран')));
+                        }
                       },
                     ),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),

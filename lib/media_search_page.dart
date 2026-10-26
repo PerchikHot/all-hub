@@ -100,7 +100,15 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
       selected: {galleryMode},
       onSelectionChanged: (v) => setState(() => galleryMode = v.first),
     )),
-    Expanded(child: galleryMode ? const MediaGalleryPage() : ListView(
+    Expanded(child: galleryMode ? (adultConfirmed ? const MediaGalleryPage() : Center(child: Padding(
+      padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.visibility_outlined, size: 44),
+        const SizedBox(height: 16),
+        const Text('Лента может содержать изображения 18+. Подтверди возраст, чтобы продолжить.', textAlign: TextAlign.center),
+        const SizedBox(height: 16),
+        FilledButton(onPressed: () => setState(() => adultConfirmed = true), child: const Text('Мне есть 18 лет')),
+      ]),
+    ))) : ListView(
     padding: const EdgeInsets.all(16),
     children: [
       Text('Поиск фото, GIF и видео', style: Theme.of(context).textTheme.headlineSmall),

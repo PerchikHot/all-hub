@@ -44,7 +44,7 @@ jobs:
             -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
             -DLLAMA_BUILD_SERVER=OFF -DGGML_OPENMP=OFF \
             -DGGML_NATIVE=OFF
-          cmake --build /tmp/allhub-llama-build --config Release -j 2
+          cmake --build /tmp/allhub-llama-build --config Release --target llama -j 2
           mkdir -p android/app/src/main/jniLibs/arm64-v8a
           find /tmp/allhub-llama-build -type f -name '*.so' -exec cp -v {} android/app/src/main/jniLibs/arm64-v8a/ \;
           test -s android/app/src/main/jniLibs/arm64-v8a/libllama.so

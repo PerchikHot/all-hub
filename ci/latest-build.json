@@ -1,22 +1,22 @@
 {
-  "run_id": 40283985077,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40283985077",
-  "conclusion": "failure",
-  "head_sha": "64f3ab97c6fd4e8000acbd99f04e2011b15de1a1",
+  "run_id": 40284484218,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40284484218",
+  "conclusion": "cancelled",
+  "head_sha": "ff1b45cb4af2f119dfc62a07406ac11a02e700aa",
   "jobs": [
-    {
-      "name": "windows",
-      "status": "completed",
-      "conclusion": "failure",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40283985077/job/121443628806",
-      "id": 121443628806
-    },
     {
       "name": "android",
       "status": "completed",
-      "conclusion": "failure",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40283985077/job/121443628923",
-      "id": 121443628923
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40284484218/job/121444841048",
+      "id": 121444841048
+    },
+    {
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40284484218/job/121444841267",
+      "id": 121444841267
     }
   ],
   "artifacts": []

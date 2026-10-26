@@ -1,4 +1,6 @@
 import 'dart:ffi';
+import 'dart:convert';
+import 'dart:isolate';
 import 'dart:io';
 
 /// Native runtime detection for the future llama.cpp integration.
@@ -38,5 +40,34 @@ class NativeLlamaRuntime {
     } on Object catch (_) {
       return 'Не удалось проверить нативный GGUF-движок';
     }
+  }
+}
+
+
+/// Loads and releases the model in a worker isolate; this does not generate text.
+/// This may take time and consume as much RAM as the model itself.
+Future<bool> verifyNativeGgufLoad(String path) {
+  return Isolate.run(() => _verifyNativeGgufLoad(path));
+}
+
+bool _verifyNativeGgufLoad(String path) {
+  if (!Platform.isAndroid) return false;
+  final bytes = utf8.encode(path);
+  final libc = DynamicLibrary.open('libc.so');
+  final malloc = libc.lookupFunction<Pointer<Void> Function(IntPtr), Pointer<Void> Function(int)>('malloc');
+  final free = libc.lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>('free');
+  final pointer = malloc(bytes.length + 1);
+  if (pointer == nullptr) return false;
+  try {
+    final buffer = pointer.cast<Uint8>().asTypedList(bytes.length + 1);
+    buffer.setRange(0, bytes.length, bytes);
+    buffer[bytes.length] = 0;
+    final bridge = DynamicLibrary.open(NativeLlamaRuntime.libraryName);
+    final load = bridge.lookupFunction<Int32 Function(Pointer<Uint8>), int Function(Pointer<Uint8>)>(
+      'allhub_llama_try_load_model',
+    );
+    return load(pointer.cast<Uint8>()) == 1;
+  } finally {
+    free(pointer);
   }
 }

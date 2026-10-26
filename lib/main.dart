@@ -22,9 +22,9 @@ class Project {
 }
 
 class GithubInfo {
-  final String? version, downloadUrl, workflowStatus;
+  final String? version, downloadUrl, workflowStatus, actionsUrl;
   final String? error;
-  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.error});
+  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.actionsUrl, this.error});
 }
 
 class GithubApi {
@@ -35,6 +35,7 @@ class GithubApi {
       version: result.version,
       downloadUrl: available.isEmpty ? null : available.first.url,
       workflowStatus: result.workflow,
+      actionsUrl: result.actionsUrl,
       error: result.error,
     );
   }
@@ -173,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
-                  if (tab == 0) FilledButton.icon(onPressed: () => open(i.downloadUrl ?? 'https://github.com/${project.repo}/actions'), icon: const Icon(Icons.download), label: Text(i.downloadUrl != null ? (Platform.isAndroid ? 'Скачать APK' : 'Скачать Windows') : 'Сборки и загрузки')),
+                  if (tab == 0) FilledButton.icon(onPressed: () => open(i.downloadUrl ?? i.actionsUrl ?? 'https://github.com/${project.repo}/actions'), icon: const Icon(Icons.download), label: Text(i.downloadUrl != null ? (Platform.isAndroid ? 'Скачать APK' : 'Скачать Windows') : i.actionsUrl != null ? 'Получить сборку' : 'Сборки и загрузки')),
                   if (tab == 0 && ProjectLauncher.canLaunch(project.id))
                     FilledButton.icon(
                       icon: const Icon(Icons.play_arrow),

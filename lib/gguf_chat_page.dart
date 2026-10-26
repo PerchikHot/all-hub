@@ -22,9 +22,9 @@ class _GgufChatPageState extends State<GgufChatPage> {
     input.clear();
     setState(() { messages.add((true, text)); generating = true; });
     final history = messages.takeLast(8).map((m) =>
-      '<|im_start|>${m.$1 ? "user" : "assistant"}\\n${m.$2}\\n<|im_end|>').join('\\n');
-    final prompt = '<|im_start|>system\\nТы полезный ассистент. Отвечай по-русски.\\n<|im_end|>\\n'
-        '$history\\n<|im_start|>assistant\\n';
+      '<|im_start|>${m.$1 ? "user" : "assistant"}\n${m.$2}\n<|im_end|>').join('\n');
+    final prompt = '<|im_start|>system\nТы полезный ассистент. Отвечай по-русски.\n<|im_end|>\n'
+        '$history\n<|im_start|>assistant\n';
     try {
       final reply = await generateNativeGguf(widget.modelPath, prompt);
       if (mounted) setState(() => messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply)));

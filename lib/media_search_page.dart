@@ -1,3 +1,4 @@
+import 'media_characters.dart';
 import 'multi_engine_search_page.dart';
 import 'media_gallery_page.dart';
 import 'dart:io';
@@ -21,19 +22,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   bool adultConfirmed = false;
   bool galleryMode = true;
   String character = '';
-  static const characters = <String, String>{
-    '': 'Без персонажа',
-    'Alpha The Eminence in Shadow': 'Альфа — Восхождение в тени',
-    'Erza Scarlet Fairy Tail': 'Эрза Скарлет — Fairy Tail',
-    'Rias Gremory High School DxD': 'Риас Гремори — DxD',
-    'Yamato One Piece': 'Ямато — One Piece',
-    'Boa Hancock One Piece': 'Боа Хэнкок — One Piece',
-    'Nami One Piece': 'Нами — One Piece',
-    'Aqua Konosuba': 'Аква — Konosuba',
-    'Darkness Konosuba': 'Даркнесс — Konosuba',
-    'Esdeath Akame ga Kill': 'Эсдес — Akame ga Kill',
-    'Tsunade Naruto': 'Цунаде — Naruto',
-  };
+
 
   @override
   void dispose() {
@@ -44,7 +33,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   Future<void> openSearch() async {
     if (!adultConfirmed || !mounted) return;
     final custom = controller.text.trim();
-    final query = [topic, if (character.isNotEmpty) character,
+    final query = [if (character.isEmpty) topic, if (character.isNotEmpty) character,
       if (custom.isNotEmpty) custom, if (media == 'gifs') 'animated gif'].join(' ');
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => MultiEngineSearchPage(query: query, media: media),
@@ -99,7 +88,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
         initialValue: character,
         isExpanded: true,
         decoration: const InputDecoration(labelText: 'Персонаж из списка', border: OutlineInputBorder()),
-        items: characters.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
+        items: mediaCharacters.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
         onChanged: (v) { if (v != null) setState(() => character = v); },
       ),
       const SizedBox(height: 12),

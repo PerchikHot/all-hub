@@ -195,11 +195,12 @@ class _HomePageState extends State<HomePage> {
                           final ok = await ProjectLauncher.launch(project.id);
                           if (!ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Приложение не найдено или EXE не выбран'))); } }
+                              const SnackBar(content: Text('Приложение не найдено или EXE не выбран')));
                           }
                         } catch (e) {
-                          if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Ошибка запуска: $e'))); }
+                          if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка запуска: $e')));
+                           }
                         }
                       },
                     ),
@@ -210,12 +211,13 @@ class _HomePageState extends State<HomePage> {
                       label: const Text('Установить APK'),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скачивание APK...'))); } }
+                          const SnackBar(content: Text('Скачивание APK...')));
                         try {
                           await ProjectLauncher.installAndroidApk(i.downloadUrl!);
                         } catch (e) {
-                          if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Ошибка установки APK: $e'))); }
+                          if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));
+                           }
                         }
                       },
                     ),
@@ -226,14 +228,16 @@ class _HomePageState extends State<HomePage> {
                       label: const Text('Установить EXE'),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скачивание EXE из GitHub Releases...'))); } }
+                          const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
                         try {
                           await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!);
-                          if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».'))); } }
+                          if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
+                           }
                         } catch (e) {
-                          if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Не удалось установить EXE: $e'))); }
+                          if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось установить EXE: $e')));
+                           }
                         }
                       },
                     ),
@@ -243,8 +247,8 @@ class _HomePageState extends State<HomePage> {
                       label: const Text('Выбрать EXE'),
                       onPressed: () async {
                         final ok = await ProjectLauncher.configureWindowsExecutable(project.id);
-                        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(ok ? 'EXE привязан' : 'EXE не выбран'))); }
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ok ? 'EXE привязан' : 'EXE не выбран')));
                       },
                     ),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),

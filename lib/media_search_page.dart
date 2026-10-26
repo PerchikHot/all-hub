@@ -1,3 +1,4 @@
+import 'multi_engine_search_page.dart';
 import 'media_gallery_page.dart';
 import 'dart:io';
 import 'media_browser_page.dart';
@@ -17,7 +18,6 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   final controller = TextEditingController();
   String topic = 'futanari';
   String media = 'images';
-  String engine = 'bing';
   bool adultConfirmed = false;
   bool galleryMode = true;
   String character = '';
@@ -41,53 +41,14 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
     super.dispose();
   }
 
-  Uri searchUri() {
-    final custom = controller.text.trim();
-    final query = [topic, if (character.isNotEmpty) character, if (custom.isNotEmpty) custom, if (media == 'gifs') 'animated gif'].join(' ');
-    if (engine == 'google') {
-      return Uri.https('www.google.com', '/search', {
-        'q': query,
-        'tbm': media == 'videos' ? 'vid' : 'isch',
-        if (media == 'gifs') 'tbs': 'itp:animated',
-        'safe': 'off',
-      });
-    }
-    if (engine == 'duckduckgo') {
-      return Uri.https('duckduckgo.com', '/', {
-        'q': query,
-        'ia': media == 'videos' ? 'videos' : 'images',
-        'kp': '-2',
-      });
-    }
-    return Uri.https('www.bing.com', media == 'videos' ? '/videos/search' : '/images/search', {
-      'q': query,
-      'adlt': 'off',
-    });
-  }
-
   Future<void> openSearch() async {
-    if (!adultConfirmed) return;
-    final uri = searchUri();
-    try {
-      if (Platform.isAndroid) {
-        if (!mounted) return;
-        await Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => MediaBrowserPage(url: uri),
-        ));
-        return;
-      }
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось открыть поиск в браузере')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Браузер недоступен')),
-        );
-      }
-    }
+    if (!adultConfirmed || !mounted) return;
+    final custom = controller.text.trim();
+    final query = [topic, if (character.isNotEmpty) character,
+      if (custom.isNotEmpty) custom, if (media == 'gifs') 'animated gif'].join(' ');
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MultiEngineSearchPage(query: query, media: media),
+    ));
   }
 
   @override
@@ -113,7 +74,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
     children: [
       Text('Поиск фото, GIF и видео', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 8),
-      const Text('Поиск по интернету через Google, Bing или DuckDuckGo. Результаты открываются во внешнем браузере. Некоторые результаты могут содержать материалы 18+.'),
+      const Text('Один запрос для Яндекса, Google, Bing и DuckDuckGo. Переключение источников внутри приложения. Некоторые результаты могут содержать материалы 18+.'),
       const SizedBox(height: 16),
       SegmentedButton<String>(
         segments: const [
@@ -152,17 +113,6 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
         ),
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => openSearch(),
-      ),
-      const SizedBox(height: 12),
-      DropdownButtonFormField<String>(
-        initialValue: engine,
-        decoration: const InputDecoration(labelText: 'Поисковик', border: OutlineInputBorder()),
-        items: const [
-          DropdownMenuItem(value: 'bing', child: Text('Bing')),
-          DropdownMenuItem(value: 'google', child: Text('Google')),
-          DropdownMenuItem(value: 'duckduckgo', child: Text('DuckDuckGo')),
-        ],
-        onChanged: (v) { if (v != null) setState(() => engine = v); },
       ),
       const SizedBox(height: 12),
       CheckboxListTile(

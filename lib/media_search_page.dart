@@ -1,10 +1,7 @@
 import 'media_characters.dart';
 import 'multi_engine_search_page.dart';
 import 'media_gallery_page.dart';
-import 'dart:io';
-import 'media_browser_page.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Searches the open web through external search engines.
 /// No images or videos are stored, scraped or proxied by All Hub.

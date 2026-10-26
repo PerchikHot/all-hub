@@ -19,6 +19,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String kind = 'all';
   String error = '';
   String activeQuery = '';
+  bool highQuality = true;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     setState(() => loading = true);
     final requestedPage = page;
     final requestedQuery = activeQuery;
+    final requestedKind = kind;
     try {
       final tags = [requestedQuery, if (kind == 'gif') 'animated_gif'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
@@ -68,9 +70,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
-      if (!mounted || requestedQuery != activeQuery) return;
+      if (!mounted || requestedQuery != activeQuery || requestedKind != kind) return;
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
-        final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
+        final preview = p['large_file_url'] ?? p['file_url'] ?? p['preview_file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
         if (kind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
@@ -127,6 +129,11 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             search();
           }),
           const Spacer(),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            const Text('HD'),
+            Switch.adaptive(value: highQuality,
+              onChanged: (v) => setState(() => highQuality = v)),
+          ]),
           IconButton(tooltip: 'Обновить', onPressed: search, icon: const Icon(Icons.refresh)),
         ]),
       ]),
@@ -151,13 +158,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
-          final url = (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url']).toString();
+          final url = (highQuality
+              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
+              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 url, fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+                gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null
                     ? child : const Center(child: CircularProgressIndicator()),

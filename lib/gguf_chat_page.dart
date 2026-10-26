@@ -22,7 +22,19 @@ class _GgufChatPageState extends State<GgufChatPage> {
     if (text.isEmpty || generating) return;
     input.clear();
     setState(() { messages.add((true, text)); generating = true; });
-    final history = messages.takeLast(8).map((m) =>
+    // Limit conversation length to avoid exceeding the native 2048-token context.
+    final recent = messages.takeLast(8).toList();
+    var remaining = 3000;
+    final clipped = <(bool, String)>[];
+    for (final message in recent.reversed) {
+      if (remaining <= 0) break;
+      final value = message.$2.length > remaining
+          ? message.$2.substring(message.$2.length - remaining)
+          : message.$2;
+      clipped.insert(0, (message.$1, value));
+      remaining -= value.length;
+    }
+    final history = clipped.map((m) =>
       '<|im_start|>${m.$1 ? "user" : "assistant"}\n${m.$2}\n<|im_end|>').join('\n');
     final prompt = '<|im_start|>system\nТы полезный ассистент. Отвечай по-русски.\n<|im_end|>\n'
         '$history\n<|im_start|>assistant\n';
@@ -30,7 +42,9 @@ class _GgufChatPageState extends State<GgufChatPage> {
       final reply = await generateNativeGguf(widget.modelPath, prompt, maxTokens: maxTokens);
       if (mounted) setState(() => messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply)));
     } catch (e) {
-      if (mounted) setState(() => messages.add((false, 'Ошибка генерации: $e')));
+      if (mounted) {
+        setState(() => messages.add((false, 'Ошибка генерации: $e')));
+      }
     } finally {
       if (mounted) setState(() => generating = false);
     }

@@ -2,6 +2,9 @@ package com.example.all_hub
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.core.content.FileProvider
+import java.io.File
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -14,6 +17,26 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "installApk" -> {
+                        val apkPath = call.argument<String>("path")
+                        try {
+                            val apk = if (apkPath == null) null else File(apkPath)
+                            if (apk == null || !apk.isFile || !apk.name.endsWith(".apk")) {
+                                result.error("APK", "APK file is missing", null)
+                            } else {
+                                val uri = FileProvider.getUriForFile(
+                                    this, "${applicationContext.packageName}.fileprovider", apk)
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "application/vnd.android.package-archive")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(intent)
+                                result.success(true)
+                            }
+                        } catch (e: Exception) {
+                            result.error("APK_INSTALL", e.message, null)
+                        }
+                    }
                     "isPackageInstalled" -> {
                         val packageName = call.argument<String>("packageName")
                         if (packageName.isNullOrBlank()) {

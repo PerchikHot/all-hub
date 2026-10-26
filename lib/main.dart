@@ -48,7 +48,18 @@ class AllHub extends StatelessWidget {
     title: 'All Hub', debugShowCheckedModeBanner: false,
     theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(seedColor: hubPurple, brightness: Brightness.dark),
-      scaffoldBackgroundColor: hubBackground),
+      scaffoldBackgroundColor: hubBackground,
+      cardTheme: CardThemeData(color: hubPanel, elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22),
+          side: const BorderSide(color: Color(0xFF263956)))),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true, fillColor: const Color(0xFF15223A),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none)),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: Color(0xFF101B30), indicatorColor: Color(0xFF234A88)),
+      appBarTheme: const AppBarTheme(backgroundColor: hubBackground,
+        centerTitle: false, surfaceTintColor: Colors.transparent)),
     home: const HomePage());
 }
 
@@ -121,7 +132,7 @@ class _HomePageState extends State<HomePage> {
         ]);
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))),
+    appBar: AppBar(title: const Row(children: [HubAvatar(size: 32), SizedBox(width: 10), Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))]), actions: [IconButton(tooltip: 'Обновить каталог', onPressed: refresh, icon: const Icon(Icons.refresh_rounded))]),
     body: tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? const MediaSearchPage() : tab == 4 ? _settings() :
       FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
@@ -137,9 +148,9 @@ class _HomePageState extends State<HomePage> {
           Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'Все' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
           const SizedBox(height: 16),
         ],
-        Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall),
+        Row(children: [Expanded(child: Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), Text('${(tab == 0 ? filtered : items).length} ПРОЕКТА', style: const TextStyle(color: hubAccent, fontSize: 11, fontWeight: FontWeight.w700))]),
         const SizedBox(height: 16),
-        for (final project in (tab == 0 ? filtered : items)) Card(color: hubPanel, clipBehavior: Clip.antiAlias, child: Column(children: [ProjectCover(id: project.id, title: project.name, type: project.type), Padding(
+        for (final project in (tab == 0 ? filtered : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [ProjectCover(id: project.id, title: project.name, type: project.type), Padding(
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(project.name, style: Theme.of(context).textTheme.titleLarge),

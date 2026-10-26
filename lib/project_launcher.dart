@@ -48,6 +48,54 @@ class ProjectLauncher {
     return false;
   }
 
+  /// Downloads a published APK directly, then asks Android to install it.
+  /// Android always requires user confirmation; this cannot silently install apps.
+  static Future<void> installAndroidApk(String url) async {
+    if (!Platform.isAndroid) throw UnsupportedError('Android only');
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' || uri.host != 'github.com' ||
+        !uri.path.toLowerCase().endsWith('.apk')) {
+      throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
+    }
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('HTTP ${response.statusCode}');
+      }
+      final cache = await getTemporaryDirectory();
+      final apk = File('${cache.path}${Platform.pathSeparator}allhub-install.apk');
+      final temporary = File('${apk.path}.download');
+      try {
+        final sink = temporary.openWrite();
+        await sink.addStream(response.stream);
+        await sink.flush();
+        await sink.close();
+        if (await temporary.length() < 1024) {
+          throw const FormatException('APK слишком мал');
+        }
+        final file = await temporary.open();
+        try {
+          final header = await file.read(4);
+          if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
+              header[2] != 0x03 || header[3] != 0x04) {
+            throw const FormatException('Скачан не APK (не ZIP-контейнер)');
+          }
+        } finally {
+          await file.close();
+        }
+        if (await apk.exists()) await apk.delete();
+        await temporary.rename(apk.path);
+        await _channel.invokeMethod<bool>('installApk', {'path': apk.path});
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   // Installs a standalone Windows EXE from a published GitHub release.
   // Portable ZIP distributions require their full folder and are not handled here.
   static Future<void> installWindowsExe(String id, String url) async {

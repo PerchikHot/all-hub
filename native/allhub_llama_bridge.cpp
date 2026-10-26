@@ -20,6 +20,16 @@ __attribute__((visibility("default"))) int32_t allhub_llama_bridge_version(void)
 __attribute__((visibility("default"))) int32_t allhub_llama_inference_ready(void) {
     return 1;
 }
+// Explicitly release the cached GGUF model when the user leaves the chat.
+__attribute__((visibility("default"))) int32_t allhub_llama_unload_model(void) {
+    std::lock_guard<std::mutex> guard(model_mutex);
+    if (cached_model) {
+        llama_model_free(cached_model);
+        cached_model = nullptr;
+    }
+    cached_path.clear();
+    return 1;
+}
 // Returns 1 if the GGUF model and a small context can be initialized, 0 otherwise.
 // Loading a large model may require substantial RAM and time.
 __attribute__((visibility("default"))) int32_t allhub_llama_try_load_model(const char * path) {

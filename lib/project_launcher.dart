@@ -10,6 +10,25 @@ class ProjectLauncher {
     'eclipse-arena': 'org.eclipsearena.prototype',
   };
 
+  static Future<bool> isAvailable(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id];
+      if (packageName == null) return false;
+      try {
+        return await _channel.invokeMethod<bool>(
+          'isPackageInstalled', {'packageName': packageName}) ?? false;
+      } catch (_) {
+        return false;
+      }
+    }
+    if (Platform.isWindows) {
+      final prefs = await SharedPreferences.getInstance();
+      final executable = prefs.getString('exe_$id');
+      return executable != null && await File(executable).exists();
+    }
+    return false;
+  }
+
   static Future<bool> launch(String id) async {
     if (Platform.isAndroid) {
       final packageName = packages[id];

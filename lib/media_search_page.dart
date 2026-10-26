@@ -16,6 +16,20 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   String media = 'images';
   String engine = 'bing';
   bool adultConfirmed = false;
+  String character = '';
+  static const characters = <String, String>{
+    '': 'Без персонажа',
+    'Alpha The Eminence in Shadow': 'Альфа — Восхождение в тени',
+    'Erza Scarlet Fairy Tail': 'Эрза Скарлет — Fairy Tail',
+    'Rias Gremory High School DxD': 'Риас Гремори — DxD',
+    'Yamato One Piece': 'Ямато — One Piece',
+    'Boa Hancock One Piece': 'Боа Хэнкок — One Piece',
+    'Nami One Piece': 'Нами — One Piece',
+    'Aqua Konosuba': 'Аква — Konosuba',
+    'Darkness Konosuba': 'Даркнесс — Konosuba',
+    'Esdeath Akame ga Kill': 'Эсдес — Akame ga Kill',
+    'Tsunade Naruto': 'Цунаде — Naruto',
+  };
 
   @override
   void dispose() {
@@ -25,22 +39,23 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
 
   Uri searchUri() {
     final custom = controller.text.trim();
-    final query = custom.isEmpty ? topic : '$topic $custom';
+    final query = [topic, if (character.isNotEmpty) character, if (custom.isNotEmpty) custom, if (media == 'gifs') 'animated gif'].join(' ');
     if (engine == 'google') {
       return Uri.https('www.google.com', '/search', {
         'q': query,
-        'tbm': media == 'images' ? 'isch' : 'vid',
+        'tbm': media == 'videos' ? 'vid' : 'isch',
+        if (media == 'gifs') 'tbs': 'itp:animated',
         'safe': 'off',
       });
     }
     if (engine == 'duckduckgo') {
       return Uri.https('duckduckgo.com', '/', {
         'q': query,
-        'ia': media == 'images' ? 'images' : 'videos',
+        'ia': media == 'videos' ? 'videos' : 'images',
         'kp': '-2',
       });
     }
-    return Uri.https('www.bing.com', media == 'images' ? '/images/search' : '/videos/search', {
+    return Uri.https('www.bing.com', media == 'videos' ? '/videos/search' : '/images/search', {
       'q': query,
       'adlt': 'off',
     });
@@ -68,7 +83,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
-      Text('Поиск фото и видео', style: Theme.of(context).textTheme.headlineSmall),
+      Text('Поиск фото, GIF и видео', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 8),
       const Text('Поиск по интернету через Google, Bing или DuckDuckGo. Результаты открываются во внешнем браузере. Некоторые результаты могут содержать материалы 18+.'),
       const SizedBox(height: 16),
@@ -84,12 +99,21 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
       SegmentedButton<String>(
         segments: const [
           ButtonSegment(value: 'images', icon: Icon(Icons.image_outlined), label: Text('Фото')),
+          ButtonSegment(value: 'gifs', icon: Icon(Icons.gif_box_outlined), label: Text('GIF')),
           ButtonSegment(value: 'videos', icon: Icon(Icons.video_library_outlined), label: Text('Видео')),
         ],
         selected: {media},
         onSelectionChanged: (v) => setState(() => media = v.first),
       ),
       const SizedBox(height: 16),
+      DropdownButtonFormField<String>(
+        initialValue: character,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'Персонаж из списка', border: OutlineInputBorder()),
+        items: characters.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis))).toList(),
+        onChanged: (v) { if (v != null) setState(() => character = v); },
+      ),
+      const SizedBox(height: 12),
       TextField(
         controller: controller,
         decoration: const InputDecoration(
@@ -125,9 +149,11 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
       FilledButton.icon(
         onPressed: adultConfirmed ? openSearch : null,
         icon: const Icon(Icons.open_in_browser),
-        label: Text('Найти ${media == 'images' ? 'фото' : 'видео'} в интернете'),
+        label: Text('Найти ${media == 'images' ? 'фото' : media == 'gifs' ? 'GIF' : 'видео'} в интернете'),
       ),
       const SizedBox(height: 12),
+      const Text('Для скачивания открой найденное фото, GIF или видео в браузере и используй доступную на сайте кнопку «Скачать» либо сохранение файла через браузер. Не все сайты разрешают загрузку.'),
+      const SizedBox(height: 8),
       const Text('All Hub не хранит результаты поиска и не обходит ограничения поисковых систем. Фильтрация и доступность зависят от выбранного сервиса.'),
     ],
   );

@@ -29,6 +29,57 @@ jobs:
           s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1)
           p.write_text(s)
           PY
+      - name: Enable launching installed Android projects
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          source = manifest.read_text()
+          source = source.replace('<application', '''<queries>
+              <package android:name="com.shadowrp.app"/>
+              <package android:name="org.eclipsearena.prototype"/>
+            </queries>
+            <application''', 1)
+          manifest.write_text(source)
+          main = next(Path('android/app/src/main/kotlin').rglob('MainActivity.kt'))
+          main.write_text("""package com.example.all_hub
+
+          import android.content.Intent
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity: FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "allhub/launcher")
+                      .setMethodCallHandler { call, result ->
+                          if (call.method != "launchPackage") {
+                              result.notImplemented()
+                          } else {
+                              val packageName = call.argument<String>("package")
+                              if (packageName !in setOf("com.shadowrp.app", "org.eclipsearena.prototype")) {
+                                  result.success(false)
+                              } else {
+                                  try {
+                                      val intent = packageManager.getLaunchIntentForPackage(packageName!!)
+                                      if (intent == null) {
+                                          result.success(false)
+                                      } else {
+                                          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                          startActivity(intent)
+                                          result.success(true)
+                                      }
+                                  } catch (e: Exception) {
+                                      result.error("LAUNCH_FAILED", e.message, null)
+                                  }
+                              }
+                          }
+                      }
+              }
+          }
+          """)
+          PY
       - name: Build llama.cpp CPU runtime for Android ARM64
         run: |
           set -euo pipefail

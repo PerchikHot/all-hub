@@ -71,3 +71,45 @@ bool _verifyNativeGgufLoad(String path) {
     free(pointer);
   }
 }
+
+typedef _GenerateNative = Int32 Function(
+  Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, Int32, Int32);
+typedef _GenerateDart = int Function(
+  Pointer<Uint8>, Pointer<Uint8>, Pointer<Uint8>, int, int);
+
+/// Generate a short response in a worker isolate to keep the UI responsive.
+Future<String> generateNativeGguf(String path, String prompt, {int maxTokens = 128}) =>
+    Isolate.run(() => _generateNativeGguf(path, prompt, maxTokens));
+
+String _generateNativeGguf(String path, String prompt, int maxTokens) {
+  if (!Platform.isAndroid) throw UnsupportedError('Only Android ARM64 is supported');
+  final libc = DynamicLibrary.open('libc.so');
+  final malloc = libc.lookupFunction<Pointer<Void> Function(IntPtr), Pointer<Void> Function(int)>('malloc');
+  final free = libc.lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>('free');
+  Pointer<Uint8> allocateUtf8(String value) {
+    final bytes = utf8.encode(value);
+    final ptr = malloc(bytes.length + 1).cast<Uint8>();
+    if (ptr == nullptr) throw StateError('Out of memory');
+    ptr.asTypedList(bytes.length + 1)
+      ..setRange(0, bytes.length, bytes)
+      ..[bytes.length] = 0;
+    return ptr;
+  }
+  final model = allocateUtf8(path);
+  Pointer<Uint8>? input;
+  Pointer<Uint8>? output;
+  try {
+    input = allocateUtf8(prompt);
+    output = malloc(32768).cast<Uint8>();
+    if (output == nullptr) throw StateError('Out of memory');
+    final bridge = DynamicLibrary.open(NativeLlamaRuntime.libraryName);
+    final generate = bridge.lookupFunction<_GenerateNative, _GenerateDart>('allhub_llama_generate');
+    final length = generate(model, input, output, 32768, maxTokens);
+    if (length < 0) throw StateError('llama.cpp error $length');
+    return utf8.decode(output.asTypedList(length), allowMalformed: true);
+  } finally {
+    free(model);
+    if (input != null) free(input);
+    if (output != null) free(output);
+  }
+}

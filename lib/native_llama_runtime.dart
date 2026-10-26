@@ -108,9 +108,9 @@ String _generateNativeGguf(String path, String prompt, int maxTokens) {
     if (length < 0) throw StateError('llama.cpp error $length');
     return utf8.decode(output.asTypedList(length), allowMalformed: true);
   } finally {
-    free(model);
-    if (input != null) free(input);
-    if (output != null) free(output);
+    free(model.cast<Void>());
+    if (input != null) free(input.cast<Void>());
+    if (output != null) free(output.cast<Void>());
   }
 }
 

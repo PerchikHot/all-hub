@@ -71,8 +71,8 @@ class _AiModelsPageState extends State<AiModelsPage> {
     final proceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Проверить загрузку модели?'),
-        content: const Text('llama.cpp попытается загрузить GGUF в память и сразу освободить её. Большая модель может потребовать много ОЗУ. Генерация текста пока не выполняется.'),
+        title: const Text('Проверить модель и контекст?'),
+        content: const Text('llama.cpp попытается загрузить GGUF, создать небольшой контекст и затем освободить память. Большая модель может потребовать много ОЗУ. Генерация текста пока не выполняется.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Проверить')),
@@ -84,7 +84,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     String result;
     try {
       final ok = await verifyNativeGgufLoad(path);
-      result = ok ? 'Модель успешно загружена через llama.cpp' : 'llama.cpp не смог загрузить модель';
+      result = ok ? 'Модель и контекст успешно созданы через llama.cpp' : 'llama.cpp не смог загрузить модель или создать контекст';
     } catch (e) {
       result = 'Ошибка проверки: $e';
     }
@@ -218,7 +218,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (selectedGguf != null && Platform.isAndroid) FilledButton.icon(
       onPressed: testingNativeModel ? null : testSelectedModel,
       icon: const Icon(Icons.fact_check_outlined),
-      label: Text(testingNativeModel ? 'Проверяем модель…' : 'Проверить загрузку в llama.cpp'),
+      label: Text(testingNativeModel ? 'Проверяем модель…' : 'Проверить модель и контекст'),
     ),
     if (selectedGguf != null) const Padding(
       padding: EdgeInsets.symmetric(vertical: 8),

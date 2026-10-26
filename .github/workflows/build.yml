@@ -61,7 +61,6 @@ jobs:
           "$CLANG" -shared -fPIC -O2 -Wall -Wextra \
             -I/tmp/allhub-llama/include native/allhub_llama_bridge.cpp \
             -Landroid/app/src/main/jniLibs/arm64-v8a -lllama \
-            -Wl,-rpath,\\$ORIGIN \
             -o android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
           test -s android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
       - run: flutter pub get

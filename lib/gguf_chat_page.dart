@@ -12,6 +12,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
   final input = TextEditingController();
   final messages = <(bool, String)>[];
   bool generating = false;
+  int maxTokens = 128;
 
   @override
   void dispose() { input.dispose(); super.dispose(); }
@@ -26,7 +27,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
     final prompt = '<|im_start|>system\nТы полезный ассистент. Отвечай по-русски.\n<|im_end|>\n'
         '$history\n<|im_start|>assistant\n';
     try {
-      final reply = await generateNativeGguf(widget.modelPath, prompt);
+      final reply = await generateNativeGguf(widget.modelPath, prompt, maxTokens: maxTokens);
       if (mounted) setState(() => messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply)));
     } catch (e) {
       if (mounted) setState(() => messages.add((false, 'Ошибка генерации: $e')));
@@ -37,7 +38,26 @@ class _GgufChatPageState extends State<GgufChatPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('GGUF • офлайн-чат')),
+    appBar: AppBar(
+      title: const Text('GGUF • офлайн-чат'),
+      actions: [
+        PopupMenuButton<int>(
+          tooltip: 'Максимальная длина ответа',
+          initialValue: maxTokens,
+          onSelected: (value) => setState(() => maxTokens = value),
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 64, child: Text('Коротко · 64 токена')),
+            PopupMenuItem(value: 128, child: Text('Обычно · 128 токенов')),
+            PopupMenuItem(value: 256, child: Text('Подробно · 256 токенов')),
+          ],
+        ),
+        IconButton(
+          tooltip: 'Очистить переписку',
+          onPressed: generating ? null : () => setState(messages.clear),
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
+    ),
     body: Column(children: [
       Expanded(child: ListView.builder(
         padding: const EdgeInsets.all(12),

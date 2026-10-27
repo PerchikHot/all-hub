@@ -20,7 +20,7 @@ class HubBanner extends StatelessWidget {
     ),
     child: Row(children: [
       const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('ТВОЯ ЭКОСИСТЕМА', style: TextStyle(fontSize: 11,
+        Text('VEYRION  /  ТВОЯ ЭКОСИСТЕМА', style: TextStyle(fontSize: 11,
           color: hubAccent, fontWeight: FontWeight.w800, letterSpacing: 2)),
         SizedBox(height: 8),
         Text('ALL HUB', style: TextStyle(fontSize: 30,

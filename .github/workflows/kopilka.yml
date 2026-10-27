@@ -1,0 +1,39 @@
+name: Kopilka standalone APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/kopilka_page.dart'
+      - 'lib/kopilka_main.dart'
+      - '.github/workflows/kopilka.yml'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create standalone Flutter app
+        run: |
+          mkdir -p /tmp/kopilka_build
+          cd /tmp/kopilka_build
+          flutter create --platforms=android --project-name kopilka_app --org com.veyrion .
+          cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
+          cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
+          flutter pub add shared_preferences
+          flutter analyze
+          flutter build apk --release
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kopilka-Android-APK
+          path: dist/Kopilka-Android.apk
+          if-no-files-found: error

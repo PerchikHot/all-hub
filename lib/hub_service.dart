@@ -21,7 +21,9 @@ class HubProject {
 class HubAsset {
   final String name, url, platform, version;
   final bool fromActions;
-  const HubAsset(this.name, this.url, this.platform, this.version, {this.fromActions = false});
+  final String? releaseNotes;
+  const HubAsset(this.name, this.url, this.platform, this.version,
+      {this.fromActions = false, this.releaseNotes});
 }
 
 class ProjectStatus {
@@ -73,6 +75,7 @@ class HubService {
           final release = raw as Map<String, dynamic>;
           if (release['draft'] == true || release['prerelease'] == true) continue;
           final tag = (release['tag_name'] ?? 'latest').toString();
+          final notes = release['body']?.toString().trim();
           version ??= tag;
           for (final a in (release['assets'] as List? ?? [])) {
             final file = a as Map<String, dynamic>;
@@ -80,7 +83,7 @@ class HubService {
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();
             if (platform != null && url.startsWith('https://')) {
-              assets.add(HubAsset(name, url, platform, tag));
+              assets.add(HubAsset(name, url, platform, tag, releaseNotes: notes));
             }
           }
         }

@@ -68,6 +68,28 @@ String suggestNotificationKind(String text) {
       : 'expense';
 }
 
+/// Keep login codes, promotions and balance-only bank alerts out of the
+/// transaction review screen. The native Android listener applies the same
+/// conservative gate before persisting new notifications.
+bool isBankTransactionNotification(String title, String body) {
+  final text = '$title\n$body';
+  final transaction = RegExp(
+    r'покупк|оплат|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw',
+    caseSensitive: false,
+  );
+  final currency = RegExp(
+    r'₽|руб(?:\\.|ля|лей)?|\\bRUB\\b',
+    caseSensitive: false,
+  );
+  final sensitive = RegExp(
+    r'код\\s+(?:подтверждения|входа|для\\s+входа)|одноразов(?:ый|ого)\\s+код|никому\\s+не\\s+сообщайте|verification\\s+code|one[- ]time\\s+(?:password|code)|\\bOTP\\b',
+    caseSensitive: false,
+  );
+  return transaction.hasMatch(text) &&
+      currency.hasMatch(text) &&
+      !sensitive.hasMatch(text);
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -125,6 +147,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       final data = (jsonDecode(raw) as List).whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .where((e) => !reviewed.contains((e['key'] ?? '').toString()))
+          .where((e) => isBankTransactionNotification(
+              (e['title'] ?? '').toString(), (e['body'] ?? '').toString()))
           .toList();
       if (mounted) {
         setState(() {

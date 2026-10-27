@@ -1,4 +1,5 @@
 import 'project_launcher.dart';
+import 'media_browser_page.dart';
 import 'kopilka_page.dart';
 import 'dart:io';
 import 'hub_service.dart';
@@ -82,6 +83,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     CoverSettings.load();
+    MediaBrowserPage.migrateLegacyMedia();
   }
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {

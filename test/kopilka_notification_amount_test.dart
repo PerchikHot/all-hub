@@ -2,6 +2,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  group('Kopilka transaction notification privacy filter', () {
+    test('keeps purchase, transfer and incoming money notifications', () {
+      expect(isBankTransactionNotification('Т-Банк', 'Оплата 250 ₽. Остаток 5 000 ₽'), isTrue);
+      expect(isBankTransactionNotification('Ozon Банк', 'Перевод 2 000 RUB'), isTrue);
+      expect(isBankTransactionNotification('Газпромбанк', 'Зачисление 500 рублей'), isTrue);
+    });
+
+    test('does not offer balance-only or promotional alerts', () {
+      expect(isBankTransactionNotification('Т-Банк', 'Остаток 5 000 ₽'), isFalse);
+      expect(isBankTransactionNotification('Акция', 'Скидка 100 ₽'), isFalse);
+    });
+
+    test('never offers login and transaction confirmation codes', () {
+      expect(isBankTransactionNotification('Т-Банк', 'Код подтверждения перевода 1 000 ₽: 1234'), isFalse);
+      expect(isBankTransactionNotification('Ozon', 'Никому не сообщайте код. Оплата 200 ₽'), isFalse);
+      expect(isBankTransactionNotification('Bank', 'Verification code for payment 200 RUB'), isFalse);
+    });
+  });
+
   group('Kopilka notification operation type suggestions', () {
     test('incoming credit suggests income', () {
       expect(suggestNotificationKind('Зачисление 2 500 ₽'), 'income');

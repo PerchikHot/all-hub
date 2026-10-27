@@ -12,7 +12,7 @@ jobs:
   android:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -38,3 +38,15 @@ jobs:
           name: Kopilka-Android-APK
           path: dist/Kopilka-Android.apk
           if-no-files-found: error
+      - name: Publish standalone APK to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create kopilka-latest dist/Kopilka-Android.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Копилка — Android APK" \
+            --notes "Отдельная сборка Копилки из общего репозитория All Hub." \
+            --latest=false 2>/dev/null || \
+          gh release upload kopilka-latest dist/Kopilka-Android.apk \
+            --repo "$GITHUB_REPOSITORY" --clobber

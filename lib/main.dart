@@ -36,7 +36,7 @@ class GithubApi {
       (projectId == 'kopilka' ? a.name.toLowerCase().contains('kopilka') :
        projectId == 'all-hub' ? !a.name.toLowerCase().contains('kopilka') : true));
     return GithubInfo(
-      version: result.version,
+      version: available.isEmpty ? result.version : available.first.version,
       downloadUrl: available.isEmpty ? null : available.first.url,
       workflowStatus: result.workflow,
       actionsUrl: result.actionsUrl,
@@ -236,7 +236,7 @@ class _HomePageState extends State<HomePage> {
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.apk'))
                     OutlinedButton.icon(
                       icon: const Icon(Icons.install_mobile),
-                      label: const Text('Скачать и установить'),
+                      label: const Text('Установить / обновить'),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание APK...')));

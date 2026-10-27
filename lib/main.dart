@@ -29,9 +29,11 @@ class GithubInfo {
 }
 
 class GithubApi {
-  static Future<GithubInfo> inspect(String repo) async {
+  static Future<GithubInfo> inspect(String repo, {String? projectId}) async {
     final result = await HubService.inspect(repo);
-    final available = result.assets.where((a) => a.platform == currentPlatform);
+    final available = result.assets.where((a) => a.platform == currentPlatform &&
+      (projectId == 'kopilka' ? a.name.toLowerCase().contains('kopilka') :
+       projectId == 'all-hub' ? !a.name.toLowerCase().contains('kopilka') : true));
     return GithubInfo(
       version: result.version,
       downloadUrl: available.isEmpty ? null : available.first.url,
@@ -93,7 +95,7 @@ class _HomePageState extends State<HomePage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open link')));
     }
   }
-  Future<GithubInfo> getInfo(String repo) => info.putIfAbsent(repo, () => GithubApi.inspect(repo));
+  Future<GithubInfo> getInfo(String repo, String id) => info.putIfAbsent(id, () => GithubApi.inspect(repo, projectId: id));
   Future<void> refresh() async {
     setState(() { info.clear(); projects = _loadProjects(); });
     await projects;
@@ -167,8 +169,8 @@ class _HomePageState extends State<HomePage> {
                   builder: (_) => const KopilkaPage())),
               ),
             )
-            else if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
-            else FutureBuilder<GithubInfo>(future: getInfo(project.repo!), builder: (context, s) {
+            if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
+            else FutureBuilder<GithubInfo>(future: getInfo(project.repo!, project.id), builder: (context, s) {
               if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

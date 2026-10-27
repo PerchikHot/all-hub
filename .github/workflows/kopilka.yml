@@ -89,6 +89,19 @@ jobs:
                   val expandedText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
                   val body = if (expandedText.isNotBlank()) expandedText else normalText
                   if (body.isBlank()) return
+                  // Store transaction alerts only. Never retain OTP/login codes,
+                  // promotions or balance-only notifications in the local queue.
+                  val combined = title + " " + body
+                  val transaction = Regex(
+                      """покупк|оплат|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw""",
+                      RegexOption.IGNORE_CASE)
+                  val currency = Regex("""₽|руб(?:\.|ля|лей)?|\bRUB\b""", RegexOption.IGNORE_CASE)
+                  val sensitive = Regex(
+                      """код\s+(?:подтверждения|входа|для\s+входа)|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
+                      RegexOption.IGNORE_CASE)
+                  if (!transaction.containsMatchIn(combined) ||
+                      !currency.containsMatchIn(combined) ||
+                      sensitive.containsMatchIn(combined)) return
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                   val current = JSONArray(prefs.getString("queue", "[]"))
                   val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}:${body.hashCode()}"

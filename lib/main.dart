@@ -168,7 +168,7 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => const KopilkaPage())),
               ),
-            )
+            ),
             if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!, project.id), builder: (context, s) {
               if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());

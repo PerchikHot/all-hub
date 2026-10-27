@@ -27,7 +27,7 @@ class MainActivity : FlutterActivity() {
                         try {
                             val source = path?.let { File(it) }
                             if (source == null || !source.isFile || filename.isNullOrBlank() ||
-                                filename.contains('/') || filename.contains('\\\\') ||
+                                filename.contains('/') || filename.contains(92.toChar()) ||
                                 !Regex("^[A-Za-z0-9._-]+$").matches(filename)) {
                                 result.error("MEDIA", "Invalid media file", null)
                             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

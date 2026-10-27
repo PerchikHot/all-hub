@@ -83,7 +83,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     CoverSettings.load();
-    MediaBrowserPage.migrateLegacyMedia();
+    migrateAllHubMedia();
   }
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {

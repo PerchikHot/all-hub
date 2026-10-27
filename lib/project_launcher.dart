@@ -9,6 +9,7 @@ class ProjectLauncher {
   static const _channel = MethodChannel('allhub/launcher');
   static const packages = <String, String>{
     'shadow-rp': 'com.shadowrp.app',
+    'kopilka': 'com.veyrion.kopilka_app',
     'eclipse-arena': 'org.eclipsearena.prototype',
   };
 

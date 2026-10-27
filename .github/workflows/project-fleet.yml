@@ -1,0 +1,61 @@
+name: Project fleet status
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/projects.json'
+      - '.github/workflows/project-fleet.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fleet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check project repositories and recent builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          projects = json.load(open('assets/projects.json', encoding='utf-8'))
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'User-Agent': 'AllHub-Fleet',
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+          }
+          def get(url):
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=15) as r:
+                      return json.load(r), None
+              except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+                  return None, str(e)
+          lines = ['# All Hub — состояние проектов', '',
+                   '| Проект | Репозиторий | Последняя сборка |',
+                   '|---|---|---|']
+          for p in projects:
+              repo = p.get('repo')
+              if not repo:
+                  lines.append(f"| {p['name']} | Встроен / не подключён | — |")
+                  continue
+              data, err = get(f'https://api.github.com/repos/{repo}/actions/runs?per_page=10')
+              if err:
+                  state = f'Не удалось проверить: {err}'
+              else:
+                  runs = data.get('workflow_runs', [])
+                  if not runs:
+                      state = 'Нет запусков'
+                  else:
+                      run = runs[0]
+                      state = f"[{run['status']} / {run.get('conclusion') or 'pending'}]({run['html_url']})"
+              lines.append(f"| {p['name']} | [{repo}](https://github.com/{repo}) | {state} |")
+          summary = '\n'.join(lines) + '\n'
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+              f.write(summary)
+          PY

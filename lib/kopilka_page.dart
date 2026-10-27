@@ -18,18 +18,29 @@ String suggestNotificationAmount(String body) {
     r'остаток|доступно|баланс|available|balance',
     caseSensitive: false,
   );
+  final matches = amountPattern.allMatches(body).toList();
   String result = '';
-  var bestScore = -100;
-  for (final match in amountPattern.allMatches(body)) {
-    final start = match.start > 45 ? match.start - 45 : 0;
-    final end = match.end + 18 < body.length ? match.end + 18 : body.length;
-    final before = body.substring(start, match.start);
-    final after = body.substring(match.end, end);
-    final transaction = transactionWords.hasMatch(before) || transactionWords.hasMatch(after);
-    final balance = balanceWords.hasMatch(before) || balanceWords.hasMatch(after);
-    // Never guess from a message that only reports a remaining balance.
-    if (balance && !transaction) continue;
-    final score = (transaction ? 10 : 0) - (balance ? 5 : 0);
+  var bestScore = -1;
+  for (var i = 0; i < matches.length; i++) {
+    final match = matches[i];
+    final beforeStart = i == 0
+        ? (match.start > 80 ? match.start - 80 : 0)
+        : matches[i - 1].end;
+    final afterEnd = i + 1 < matches.length
+        ? matches[i + 1].start
+        : (match.end + 60 < body.length ? match.end + 60 : body.length);
+    final before = body.substring(beforeStart, match.start)
+        .split(RegExp(r'[\n;]|[.!?]\s+')).last;
+    final after = body.substring(match.end, afterEnd)
+        .split(RegExp(r'[\n;]|[.!?]\s+')).first;
+    final beforeTransaction = transactionWords.hasMatch(before);
+    final beforeBalance = balanceWords.hasMatch(before);
+    final afterTransaction = transactionWords.hasMatch(after);
+    final afterBalance = balanceWords.hasMatch(after);
+    // The nearest transaction/balance label takes precedence.
+    if (beforeBalance && !beforeTransaction) continue;
+    if (!beforeTransaction && afterBalance && !afterTransaction) continue;
+    final score = beforeTransaction ? 10 : afterTransaction ? 5 : 0;
     if (score > bestScore) {
       bestScore = score;
       final whole = match.group(1)!.replaceAll(RegExp(r'[ \u00a0\u202f]'), '');

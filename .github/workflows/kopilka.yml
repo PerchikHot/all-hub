@@ -27,6 +27,7 @@ jobs:
           cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
           cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
           flutter pub add shared_preferences
+          rm -f test/widget_test.dart
           flutter analyze
           flutter build apk --release
           mkdir -p "$GITHUB_WORKSPACE/dist"

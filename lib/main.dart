@@ -1,4 +1,5 @@
 import 'project_launcher.dart';
+import 'version_status.dart';
 import 'media_browser_page.dart';
 import 'kopilka_page.dart';
 import 'dart:io';
@@ -25,8 +26,8 @@ class Project {
 
 class GithubInfo {
   final String? version, downloadUrl, workflowStatus, actionsUrl;
-  final String? error;
-  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.actionsUrl, this.error});
+  final String? error, releaseNotes;
+  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.actionsUrl, this.error, this.releaseNotes});
 }
 
 class GithubApi {
@@ -45,6 +46,7 @@ class GithubApi {
       workflowStatus: result.workflow,
       actionsUrl: result.actionsUrl,
       error: result.error,
+      releaseNotes: available.isEmpty ? null : available.first.releaseNotes,
     );
   }
 }
@@ -185,8 +187,8 @@ class _HomePageState extends State<HomePage> {
                   const Icon(Icons.system_update_alt_rounded, size: 17, color: hubAccent),
                   const SizedBox(width: 7),
                   Expanded(child: Text(i.downloadUrl != null
-                    ? 'Сборка доступна'
-                    : 'Сборка пока недоступна',
+                    ? 'Опубликован установочный файл'
+                    : 'Файл для этой платформы не опубликован',
                     style: const TextStyle(fontWeight: FontWeight.w600))),
                 ]),
                 if (project.id == ProjectLauncher.activeDownloadProject.value)
@@ -199,21 +201,33 @@ class _HomePageState extends State<HomePage> {
                             Text('Загрузка: ${(progress * 100).toStringAsFixed(0)}%'),
                             LinearProgressIndicator(value: progress),
                           ]))),
+                FutureBuilder<String?>(
+                  future: ProjectLauncher.installedVersion(project.id),
+                  builder: (context, installed) => Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Установлено: ${installed.data ?? 'версия неизвестна'}',
+                        style: Theme.of(context).textTheme.bodySmall),
+                      Text('Опубликовано: ${i.version ?? 'нет релиза'}',
+                        style: Theme.of(context).textTheme.bodySmall),
+                      Text(describeUpdateStatus(installed.data, i.version),
+                        style: TextStyle(color: comparePublishedVersions(
+                          installed.data ?? '', i.version ?? '') == -1
+                          ? Colors.greenAccent : hubAccent)),
+                    ]),
+                  ),
+                ),
                 ExpansionTile(
                   tilePadding: EdgeInsets.zero,
                   childrenPadding: EdgeInsets.zero,
                   dense: true,
-                  title: const Text('Версии и диагностика', style: TextStyle(fontSize: 13)),
+                  title: const Text('Что нового и диагностика', style: TextStyle(fontSize: 13)),
                   children: [
-                    Align(alignment: Alignment.centerLeft, child: Text('Релиз: ${i.version ?? 'не опубликован'}')),
-                    FutureBuilder<String?>(future: ProjectLauncher.installedVersion(project.id),
-                      builder: (context, installed) => Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(installed.data == null
-                          ? 'Версия установки: неизвестна'
-                          : installed.data == i.version ? 'Версия: актуальная (${installed.data})'
-                          : 'Доступно обновление: ${installed.data} → ${i.version ?? '?'}'))),
-                    Align(alignment: Alignment.centerLeft, child: Text('Сборка: ${i.workflowStatus ?? 'нет данных'}')),
+                    if (i.releaseNotes != null && i.releaseNotes!.isNotEmpty)
+                      Align(alignment: Alignment.centerLeft,
+                        child: Text('Описание релиза: ${i.releaseNotes}')),
+                    Align(alignment: Alignment.centerLeft,
+                      child: Text('Состояние сборки: ${i.workflowStatus ?? 'нет данных'}')),
                     if (i.error != null)
                       Align(alignment: Alignment.centerLeft, child: Text(i.error!,
                         style: TextStyle(color: Theme.of(context).colorScheme.tertiary))),
@@ -262,7 +276,7 @@ class _HomePageState extends State<HomePage> {
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.apk'))
                     OutlinedButton.icon(
                       icon: const Icon(Icons.install_mobile),
-                      label: const Text('Установить / обновить'),
+                      label: const Text('Скачать APK и установить'),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание APK...')));

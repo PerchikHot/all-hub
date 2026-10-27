@@ -35,8 +35,12 @@ class _KopilkaPageState extends State<KopilkaPage> {
     try {
       final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
+      final prefs = await SharedPreferences.getInstance();
+      final reviewed = (prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[]).toSet();
       final data = (jsonDecode(raw) as List).whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e)).toList();
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((e) => !reviewed.contains((e['key'] ?? '').toString()))
+          .toList();
       if (mounted) {
         setState(() {
           notificationsEnabled = enabled;
@@ -66,6 +70,30 @@ class _KopilkaPageState extends State<KopilkaPage> {
     }
   }
 
+  String _suggestAmount(String body) {
+    // This is only a hint: the user confirms the amount and type manually.
+    final match = RegExp(r'(\d[\d \u00a0]*[.,]?\d{0,2})\s*(?:₽|руб\.?|RUB)',
+        caseSensitive: false).firstMatch(body);
+    return match?.group(1)?.replaceAll(RegExp(r'\s'), '').replaceAll(',', '.') ?? '';
+  }
+
+  Future<void> _reviewNotification(Map<String, dynamic> event) async {
+    final title = (event['title'] ?? '').toString();
+    final body = (event['body'] ?? '').toString();
+    final add = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text((event['bank'] ?? 'Банк').toString()),
+      content: SingleChildScrollView(child: SelectableText(
+        title.isEmpty ? body : '$title\n$body')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Закрыть')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Создать операцию')),
+      ],
+    ));
+    if (add == true && mounted) await _add(notification: event);
+  }
+
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
@@ -82,9 +110,14 @@ class _KopilkaPageState extends State<KopilkaPage> {
     return sum + (e['bank'] == bank ? (e['kind'] == 'income' ? amount : -amount) : 0);
   });
 
-  Future<void> _add() async {
+  Future<void> _add({Map<String, dynamic>? notification}) async {
     String kind = 'expense', bank = banks.first, destination = banks[1];
-    final amount = TextEditingController(), note = TextEditingController();
+    final notificationBank = notification?['bank']?.toString();
+    if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
+    final amount = TextEditingController(
+      text: notification == null ? '' : _suggestAmount((notification['body'] ?? '').toString()));
+    final note = TextEditingController(
+      text: notification == null ? '' : (notification['title'] ?? '').toString());
     final saved = await showDialog<bool>(context: context, builder: (dialogContext) =>
       StatefulBuilder(builder: (dialogContext, update) => AlertDialog(
         title: const Text('Новая операция'),
@@ -127,6 +160,20 @@ class _KopilkaPageState extends State<KopilkaPage> {
         'note': note.text.trim(), 'date': DateTime.now().toIso8601String(),
       }));
       await _save();
+      if (notification != null) {
+        final key = (notification['key'] ?? '').toString();
+        if (key.isNotEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          final reviewed = prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[];
+          reviewed.remove(key);
+          reviewed.add(key);
+          if (reviewed.length > 500) reviewed.removeRange(0, reviewed.length - 500);
+          await prefs.setStringList('kopilka_reviewed_notifications_v1', reviewed);
+          if (mounted) {
+            setState(() => pendingNotifications.removeWhere((e) => e['key'] == key));
+          }
+        }
+      }
     }
     amount.dispose(); note.dispose();
   }
@@ -217,9 +264,23 @@ class _KopilkaPageState extends State<KopilkaPage> {
               onPressed: _openNotificationSettings),
           ),
           if (pendingNotifications.isNotEmpty)
-            ListTile(
-              title: Text('Получено уведомлений: ${pendingNotifications.length}'),
-              subtitle: const Text('Пока не включены в баланс: требуется проверка операций, чтобы избежать дублей.'),
+            ExpansionTile(
+              title: Text('На проверке: ${pendingNotifications.length}'),
+              subtitle: const Text('Операции не меняют баланс до подтверждения.'),
+              children: [
+                for (final event in pendingNotifications.reversed.take(10))
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text((event['bank'] ?? 'Банк').toString()),
+                    subtitle: Text((event['title'] ?? 'Уведомление').toString(),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _reviewNotification(event),
+                  ),
+                if (pendingNotifications.length > 10)
+                  const Padding(padding: EdgeInsets.all(8),
+                    child: Text('Показаны 10 последних уведомлений.')),
+              ],
             ),
           TextButton.icon(onPressed: _refreshNotifications,
             icon: const Icon(Icons.refresh), label: const Text('Проверить подключение')),

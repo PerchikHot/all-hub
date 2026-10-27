@@ -294,11 +294,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final tag = requestedQuery.isNotEmpty ? requestedQuery
           : categoryTag.isNotEmpty ? categoryTag
           : favoriteTags[(requestedPage - 1) % favoriteTags.length];
-      final tags = requestedKind == 'gif' ? 'filetype:gif' : tag;
+      // Restrict the feed to explicitly rated posts. Category searches must
+      // be applied server-side rather than filtering unrelated GIF results.
+      final tags = [tag, 'rating:explicit'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
-        'page': '${requestedQuery.isEmpty ? 1 : requestedPage}',
+        'page': '$requestedPage',
       });
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) {
@@ -324,6 +326,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             !(p['tag_string'] ?? '').toString().split(' ').contains('yuri')) {
           return false;
         }
+        if ((p['rating'] ?? '').toString() != 'e') return false;
         if (requestedKind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
           return ext == 'gif';
@@ -339,7 +342,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
         page++;
-        hasMore = data.length >= pageSize || (requestedQuery.isEmpty && requestedCategory == 'characters');
+        hasMore = data.length >= pageSize;
       });
     } catch (e) {
       if (mounted && generation == searchGeneration) {

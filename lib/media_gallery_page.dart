@@ -17,9 +17,18 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool hasMore = true;
   int page = 1;
   String kind = 'all';
+  String category = 'characters';
+  static const categoryTags = <String, String>{
+    'characters': '',
+    'solo': 'solo',
+    'lesbian': 'yuri',
+    'futanari': 'futanari',
+  };
+  static const maxVisiblePosts = 90;
+  static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
   String activeQuery = '';
-  static const int pageSize = 18;
+  static const int pageSize = 24;
   bool highQuality = true;
   int searchGeneration = 0;
   // Curated characters from the user's full list; general character artwork only.
@@ -238,6 +247,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   @override
   void initState() {
     super.initState();
+    PaintingBinding.instance.imageCache.maximumSizeBytes = maxImageCacheBytes;
     scroll.addListener(() {
       if (scroll.hasClients && scroll.position.extentAfter < 700 && !loading && hasMore) {
         loadMore();
@@ -274,11 +284,14 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     final requestedPage = page;
     final requestedQuery = activeQuery;
     final requestedKind = kind;
+    final requestedCategory = category;
     try {
       final tag = requestedQuery.isEmpty
           ? favoriteTags[(requestedPage - 1) % favoriteTags.length]
           : requestedQuery;
-      final tags = [tag, if (requestedKind == 'gif') 'animated_gif'].join(' ');
+      final categoryTag = categoryTags[requestedCategory] ?? '';
+      final tags = [tag, if (categoryTag.isNotEmpty) categoryTag,
+        if (requestedKind == 'gif') 'animated_gif'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -290,7 +303,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
-      if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind) return;
+      if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedCategory != category) return;
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
         final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
@@ -302,6 +315,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }).toList();
       setState(() {
         posts.addAll(newPosts);
+        if (posts.length > maxVisiblePosts) {
+          posts.removeRange(0, posts.length - maxVisiblePosts);
+        }
         page++;
         hasMore = requestedQuery.isEmpty ? true : data.length >= pageSize;
       });
@@ -345,6 +361,28 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           ),
         ),
         const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final option in const [
+              ('characters', 'Персонажи'),
+              ('solo', 'Соло'),
+              ('lesbian', 'Лесби'),
+              ('futanari', 'Футанари'),
+            ]) ...[
+              ChoiceChip(
+                label: Text(option.$2),
+                selected: category == option.$1,
+                onSelected: (_) {
+                  category = option.$1;
+                  search();
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ]),
+        ),
+        const SizedBox(height: 8),
         Row(children: [
           ChoiceChip(label: const Text('Картинки'), selected: kind == 'all', onSelected: (_) {
             setState(() => kind = 'all');
@@ -372,6 +410,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       onRefresh: () async { search(); },
       child: GridView.builder(
         controller: scroll,
+        cacheExtent: 1100,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(6),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -384,17 +423,18 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
-          final url = (highQuality
-              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
-              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
+          // Keep the grid lightweight even when HD is enabled. Full-size
+          // files are fetched only after opening the media viewer.
+          final url = (post['preview_file_url'] ??
+              post['large_file_url'] ?? post['file_url']).toString();
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 url, fit: BoxFit.cover,
-                filterQuality: highQuality ? FilterQuality.high : FilterQuality.low,
-                cacheWidth: highQuality ? 900 : 440,
+                filterQuality: FilterQuality.medium,
+                cacheWidth: 420,
                 gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null

@@ -100,10 +100,8 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           type.startsWith('application/octet-stream'))) {
         throw Exception('Ссылка не ведёт на изображение или видео');
       }
-      final directory = (Platform.isAndroid ? await getExternalStorageDirectory() : null) ??
-          await getApplicationDocumentsDirectory();
-      final folder = Directory('${directory.path}/AllHubMedia');
-      await folder.create(recursive: true);
+      // Temporary private staging only. Final media is written to public Downloads/All Hub.
+      final folder = await getTemporaryDirectory();
       final ext = switch (type.split(';').first) {
         'image/gif' => '.gif',
         'image/png' => '.png',
@@ -116,7 +114,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       final raw = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
       final name = raw.contains('.') ? raw : 'media$ext';
       final safe = name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final destination = File('${folder.path}/${DateTime.now().millisecondsSinceEpoch}_$safe');
+      final destination = File('${folder.path}/${DateTime.now().microsecondsSinceEpoch}_$safe');
       temp = File('${destination.path}.part');
       final sink = temp.openWrite();
       var received = 0;
@@ -134,10 +132,28 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       }
       await temp.rename(destination.path);
       temp = null;
+      String finalPath;
+      try {
+        if (Platform.isAndroid) {
+          finalPath = await const MethodChannel('allhub/launcher').invokeMethod<String>(
+            'saveMediaToDownloads', {'path': destination.path, 'name': destination.uri.pathSegments.last})
+              ?? 'Downloads/All Hub';
+        } else {
+          final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+          if (home == null) throw StateError('Папка пользователя не найдена');
+          final downloads = Directory('$home${Platform.pathSeparator}Downloads${Platform.pathSeparator}All Hub');
+          await downloads.create(recursive: true);
+          final target = File('${downloads.path}${Platform.pathSeparator}${destination.uri.pathSegments.last}');
+          await destination.copy(target.path);
+          finalPath = target.path;
+        }
+      } finally {
+        if (await destination.exists()) await destination.delete();
+      }
       if (mounted) {
-        setState(() => savedFile = destination.path);
+        setState(() => savedFile = finalPath);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено: ${destination.path}')),
+          SnackBar(content: Text('Сохранено: $finalPath')),
         );
       }
     } catch (e) {

@@ -25,6 +25,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     'futanari': 'futanari',
   };
   static const maxVisiblePosts = 90;
+  final seenPostIds = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
   String activeQuery = '';
@@ -269,6 +270,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     setState(() {
       activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
       posts.clear();
+      seenPostIds.clear();
       page = 1;
       hasMore = true;
       error = '';
@@ -286,12 +288,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     final requestedKind = kind;
     final requestedCategory = category;
     try {
-      final tag = requestedQuery.isEmpty
-          ? favoriteTags[(requestedPage - 1) % favoriteTags.length]
-          : requestedQuery;
+      // Public Danbooru searches have a strict tag limit. Do not combine
+      // character + category + animation into an invalid three-tag request.
       final categoryTag = categoryTags[requestedCategory] ?? '';
-      final tags = [tag, if (categoryTag.isNotEmpty) categoryTag,
-        if (requestedKind == 'gif') 'animated_gif'].join(' ');
+      final tag = requestedQuery.isNotEmpty ? requestedQuery
+          : categoryTag.isNotEmpty ? categoryTag
+          : favoriteTags[(requestedPage - 1) % favoriteTags.length];
+      final tags = [tag, if (requestedKind == 'gif') 'filetype:gif'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -307,19 +310,24 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
         final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
-        if (kind == 'gif') {
+        final id = (p['id'] ?? '').toString();
+        if (seenPostIds.contains(id)) return false;
+        if (requestedKind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
           return ext == 'gif';
         }
         return true;
       }).toList();
       setState(() {
+        for (final post in newPosts) {
+          seenPostIds.add((post['id'] ?? '').toString());
+        }
         posts.addAll(newPosts);
         if (posts.length > maxVisiblePosts) {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
         page++;
-        hasMore = requestedQuery.isEmpty ? true : data.length >= pageSize;
+        hasMore = data.length >= pageSize || (requestedQuery.isEmpty && requestedCategory == 'characters');
       });
     } catch (e) {
       if (mounted && generation == searchGeneration) {
@@ -422,10 +430,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
-          // Keep the grid lightweight even when HD is enabled. Full-size
-          // files are fetched only after opening the media viewer.
-          final url = (post['preview_file_url'] ??
-              post['large_file_url'] ?? post['file_url']).toString();
+          // Use a sharper sample for HD; thumbnails are only placeholders.
+          final url = (highQuality
+              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
+              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
@@ -433,7 +441,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
               child: Image.network(
                 url, fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
-                cacheWidth: 420,
+                cacheWidth: highQuality ? 900 : 420,
                 gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null

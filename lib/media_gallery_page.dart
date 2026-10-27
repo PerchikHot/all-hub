@@ -20,6 +20,30 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String error = '';
   String activeQuery = '';
   static const int pageSize = 18;
+  bool highQuality = true;
+  int searchGeneration = 0;
+  static const favoriteTags = <String>[
+    'rias_gremory', 'erza_scarlet', 'yamato_(one_piece)',
+    'aqua_(konosuba)', 'darkness_(konosuba)', 'hinata_hyuga',
+    'nami_(one_piece)', 'rukia_kuchiki', 'orihime_inoue',
+    'noelle_silva', 'mimosa_vermillion', 'zero_two_(darling_in_the_franxx)',
+    'rebecca_(cyberpunk)', 'shion_(tensei_shitara_slime_datta_ken)',
+    'shuna_(tensei_shitara_slime_datta_ken)', 'alpha_(kage_no_jitsuryokusha)',
+    'beta_(kage_no_jitsuryokusha)', 'mitsuri_kanroji', 'shinobu_kocho',
+  ];
+  static const aliases = <String, String>{
+    'риас': 'rias_gremory', 'риас гремори': 'rias_gremory',
+    'эрза': 'erza_scarlet', 'ямато': 'yamato_(one_piece)',
+    'аква': 'aqua_(konosuba)', 'даркнесс': 'darkness_(konosuba)',
+    'хината': 'hinata_hyuga', 'нами': 'nami_(one_piece)',
+    'рукия': 'rukia_kuchiki', 'орихиме': 'orihime_inoue',
+    'ноэль': 'noelle_silva', 'мимоза': 'mimosa_vermillion',
+    'ноль два': 'zero_two_(darling_in_the_franxx)', 'ноль-два': 'zero_two_(darling_in_the_franxx)',
+    'ребекка': 'rebecca_(cyberpunk)', 'шион': 'shion_(tensei_shitara_slime_datta_ken)',
+    'шуна': 'shuna_(tensei_shitara_slime_datta_ken)',
+    'альфа': 'alpha_(kage_no_jitsuryokusha)', 'бета': 'beta_(kage_no_jitsuryokusha)',
+    'мицури': 'mitsuri_kanroji', 'шинобу': 'shinobu_kocho',
+  };
 
   @override
   void initState() {
@@ -41,8 +65,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
 
   void search() {
     final q = queryController.text.trim();
+    searchGeneration++;
     setState(() {
-      activeQuery = q.isEmpty ? 'futanari' : q.replaceAll(RegExp(r'\s+'), '_');
+      activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
       posts.clear();
       page = 1;
       hasMore = true;
@@ -54,11 +79,15 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   Future<void> loadMore() async {
     if (loading || !hasMore) return;
     setState(() => loading = true);
+    final generation = searchGeneration;
     final requestedPage = page;
     final requestedQuery = activeQuery;
     final requestedKind = kind;
     try {
-      final tags = [requestedQuery, if (requestedKind == 'gif') 'animated_gif'].join(' ');
+      final tag = requestedQuery.isEmpty
+          ? favoriteTags[(requestedPage - 1) % favoriteTags.length]
+          : requestedQuery;
+      final tags = [tag, if (requestedKind == 'gif') 'animated_gif'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -70,7 +99,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
-      if (!mounted || requestedQuery != activeQuery || requestedKind != kind) return;
+      if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind) return;
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
         final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
@@ -86,7 +115,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         hasMore = data.length >= pageSize;
       });
     } catch (e) {
-      if (mounted) setState(() => error = 'Не удалось загрузить изображения: $e');
+      if (mounted && generation == searchGeneration) setState(() => error = 'Не удалось загрузить изображения: $e');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -129,7 +158,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             search();
           }),
           const Spacer(),
-          const Text('Превью • экономия трафика'),
+          const Text('HD'),
+          Switch.adaptive(value: highQuality, onChanged: (value) => setState(() => highQuality = value)),
           IconButton(tooltip: 'Обновить', onPressed: search, icon: const Icon(Icons.refresh)),
         ]),
       ]),
@@ -138,6 +168,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       padding: const EdgeInsets.all(8),
       child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
     ),
+    if (!loading && posts.isEmpty && error.isEmpty) const Padding(
+      padding: EdgeInsets.all(12), child: Text('Нет изображений по запросу. Попробуй другое имя или тег.')),
     Expanded(child: RefreshIndicator(
       onRefresh: () async { search(); },
       child: GridView.builder(
@@ -154,15 +186,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
-          final url = (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url']).toString();
+          final url = (highQuality
+              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
+              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 url, fit: BoxFit.cover,
-                filterQuality: FilterQuality.low,
-                cacheWidth: 440,
+                filterQuality: highQuality ? FilterQuality.high : FilterQuality.low,
+                cacheWidth: highQuality ? 900 : 440,
                 gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null

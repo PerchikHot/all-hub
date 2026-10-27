@@ -1,3 +1,11 @@
+/// A rolling GitHub release tag is not a version. CI may include an
+/// explicit published package version in the release description.
+String publishedVersionFromRelease(String tag, String? notes) {
+  final match = RegExp(r'(?m)^Version:\s*(v?\d+\.\d+\.\d+(?:\+\d+)?)\s*$')
+      .firstMatch(notes ?? '');
+  return match?.group(1) ?? tag;
+}
+
 /// Compare only explicit numeric versions. Moving release tags such as
 /// "all-hub-latest" are channels, not version numbers.
 int? comparePublishedVersions(String installed, String published) {

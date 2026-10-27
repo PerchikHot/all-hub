@@ -269,16 +269,23 @@ class _ProjectCoverState extends State<ProjectCover> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
       child: Stack(fit: StackFit.expand, children: [
-        if (localFile != null)
-          Image.file(localFile!, fit: BoxFit.contain, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
-        else if (webCovers.isNotEmpty)
+        // Fill the banner without stretching portrait artwork: a soft backdrop
+        // behind a complete, uncropped foreground image.
+        if (localFile != null) ...[
+          Image.file(localFile!, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          Container(color: const Color(0x99070B1B)),
+          Image.file(localFile!, fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+        ] else if (webCovers.isNotEmpty) ...[
+          Image.network(webCovers[webIndex], fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          Container(color: const Color(0x99070B1B)),
           Image.network(webCovers[webIndex], fit: BoxFit.contain,
             gaplessPlayback: true,
-            headers: const {'User-Agent': 'AllHub/0.5 (cover viewer)'},
             errorBuilder: (context, error, stackTrace) {
               final failed = webCovers[webIndex];
-              if (!failedImages.contains(failed)) {
-                failedImages.add(failed);
+              if (failedImages.add(failed)) {
                 Future.microtask(() {
                   if (!mounted || webCovers.isEmpty) return;
                   final next = List.generate(webCovers.length, (i) => (webIndex + i + 1) % webCovers.length)
@@ -288,6 +295,7 @@ class _ProjectCoverState extends State<ProjectCover> {
               }
               return const SizedBox.shrink();
             }),
+        ],
 
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,

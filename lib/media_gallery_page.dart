@@ -306,10 +306,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         hasMore = requestedQuery.isEmpty ? true : data.length >= pageSize;
       });
     } catch (e) {
-      if (mounted && generation == searchGeneration) setState(() {
-        error = 'Не удалось загрузить изображения: $e';
-        hasMore = false;
-      });
+      if (mounted && generation == searchGeneration) {
+        setState(() {
+          error = 'Не удалось загрузить изображения: $e';
+          hasMore = false;
+        });
+      }
     } finally {
       if (mounted && generation == searchGeneration) {
         setState(() => loading = false);

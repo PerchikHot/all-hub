@@ -19,7 +19,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String kind = 'all';
   String error = '';
   String activeQuery = '';
-  bool highQuality = true;
+  bool highQuality = false;
+  static const int pageSize = 18;
 
   @override
   void initState() {
@@ -42,7 +43,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   void search() {
     final q = queryController.text.trim();
     setState(() {
-      activeQuery = q.isEmpty ? 'futanari' : q.replaceAll(RegExp(r'\\s+'), '_');
+      activeQuery = q.isEmpty ? 'futanari' : q.replaceAll(RegExp(r'\s+'), '_');
       posts.clear();
       page = 1;
       hasMore = true;
@@ -58,13 +59,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     final requestedQuery = activeQuery;
     final requestedKind = kind;
     try {
-      final tags = [requestedQuery, if (kind == 'gif') 'animated_gif'].join(' ');
+      final tags = [requestedQuery, if (requestedKind == 'gif') 'animated_gif'].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
-        'limit': '30',
+        'limit': '$pageSize',
         'page': '$requestedPage',
       });
-      final response = await http.get(uri).timeout(const Duration(seconds: 18));
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -72,7 +73,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (data is! List) throw const FormatException('Неверный ответ сервера');
       if (!mounted || requestedQuery != activeQuery || requestedKind != kind) return;
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
-        final preview = p['large_file_url'] ?? p['file_url'] ?? p['preview_file_url'];
+        final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
         if (kind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
@@ -83,7 +84,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       setState(() {
         posts.addAll(newPosts);
         page++;
-        hasMore = data.length >= 30;
+        hasMore = data.length >= pageSize;
       });
     } catch (e) {
       if (mounted) setState(() => error = 'Не удалось загрузить изображения: $e');
@@ -130,7 +131,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           }),
           const Spacer(),
           Row(mainAxisSize: MainAxisSize.min, children: [
-            const Text('HD'),
+            const Text('HD при открытии'),
             Switch.adaptive(value: highQuality,
               onChanged: (v) => setState(() => highQuality = v)),
           ]),
@@ -158,20 +159,19 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
-          final url = (highQuality
-              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
-              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
+          final url = (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url']).toString();
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 url, fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
+                filterQuality: FilterQuality.low,
+                cacheWidth: 440,
                 gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
                 loadingBuilder: (context, child, progress) => progress == null
-                    ? child : const Center(child: CircularProgressIndicator()),
+                    ? child : const Center(child: Icon(Icons.image_outlined, color: Colors.white24)),
               ),
             ),
           );

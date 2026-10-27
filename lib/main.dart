@@ -181,22 +181,44 @@ class _HomePageState extends State<HomePage> {
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),
-                Text('Релиз: ${i.version ?? 'не опубликован'}'),
-                FutureBuilder<String?>(future: ProjectLauncher.installedVersion(project.id),
-                  builder: (context, installed) => Text(installed.data == null
-                    ? 'Версия установки: неизвестна'
-                    : installed.data == i.version ? 'Версия: актуальная (${installed.data})'
-                    : 'Доступно обновление: ${installed.data} → ${i.version ?? '?'}')),
-                if (project.id == ProjectLauncher.activeDownloadProject.value) ValueListenableBuilder<double?>(valueListenable: ProjectLauncher.downloadProgress,
-                  builder: (context, progress, child) => progress == null
-                    ? const SizedBox.shrink()
-                    : Padding(padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Загрузка: ${(progress * 100).toStringAsFixed(0)}%'),
-                          LinearProgressIndicator(value: progress),
-                        ]))),
-                Text('Сборка: ${i.workflowStatus ?? 'нет данных'}'),
-                if (i.error != null) Text(i.error!, style: TextStyle(color: Theme.of(context).colorScheme.tertiary)),
+                Row(children: [
+                  const Icon(Icons.system_update_alt_rounded, size: 17, color: hubAccent),
+                  const SizedBox(width: 7),
+                  Expanded(child: Text(i.downloadUrl != null
+                    ? 'Сборка доступна'
+                    : 'Сборка пока недоступна',
+                    style: const TextStyle(fontWeight: FontWeight.w600))),
+                ]),
+                if (project.id == ProjectLauncher.activeDownloadProject.value)
+                  ValueListenableBuilder<double?>(
+                    valueListenable: ProjectLauncher.downloadProgress,
+                    builder: (context, progress, child) => progress == null
+                      ? const SizedBox.shrink()
+                      : Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('Загрузка: ${(progress * 100).toStringAsFixed(0)}%'),
+                            LinearProgressIndicator(value: progress),
+                          ]))),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('Версии и диагностика', style: TextStyle(fontSize: 13)),
+                  children: [
+                    Align(alignment: Alignment.centerLeft, child: Text('Релиз: ${i.version ?? 'не опубликован'}')),
+                    FutureBuilder<String?>(future: ProjectLauncher.installedVersion(project.id),
+                      builder: (context, installed) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(installed.data == null
+                          ? 'Версия установки: неизвестна'
+                          : installed.data == i.version ? 'Версия: актуальная (${installed.data})'
+                          : 'Доступно обновление: ${installed.data} → ${i.version ?? '?'}'))),
+                    Align(alignment: Alignment.centerLeft, child: Text('Сборка: ${i.workflowStatus ?? 'нет данных'}')),
+                    if (i.error != null)
+                      Align(alignment: Alignment.centerLeft, child: Text(i.error!,
+                        style: TextStyle(color: Theme.of(context).colorScheme.tertiary))),
+                  ],
+                ),
                 if (tab == 0 && ProjectLauncher.canLaunch(project.id))
                   FutureBuilder<bool>(
                     future: ProjectLauncher.isAvailable(project.id),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'hub_widgets.dart';
 
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
@@ -133,13 +134,41 @@ class _KopilkaPageState extends State<KopilkaPage> {
       return '$digits,${parts.last} ₽';
     }
     return Scaffold(
-      appBar: AppBar(title: const Row(children: [Icon(Icons.savings_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 10), Text('Копилка')]), actions: [
+      appBar: AppBar(title: const Row(children: [Icon(Icons.savings_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 10), Text('КОПИЛКА', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2))]), actions: [
         IconButton(tooltip: 'Цель', icon: const Icon(Icons.flag_outlined), onPressed: _editGoal),
       ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add,
         icon: const Icon(Icons.add), label: const Text('Операция')),
       body: loading ? const Center(child: CircularProgressIndicator()) :
       ListView(padding: const EdgeInsets.all(16), children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF193D82), Color(0xFF0E1D38), Color(0xFF151329)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+            border: Border.all(color: const Color(0xFF406FB7)),
+          ),
+          child: Row(children: [
+            const Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('VEYRION', style: TextStyle(
+                  color: Color(0xFF71D7FF), letterSpacing: 3,
+                  fontSize: 12, fontWeight: FontWeight.w900)),
+                SizedBox(height: 10),
+                Text('МОЯ КОПИЛКА', style: TextStyle(
+                  fontSize: 25, fontWeight: FontWeight.w900)),
+                SizedBox(height: 6),
+                Text('Контроль денег. Свои правила.',
+                  style: TextStyle(color: Color(0xFFC5D9F5))),
+              ],
+            )),
+            const HubAvatar(size: 82),
+          ]),
+        ),
+        const SizedBox(height: 12),
         Card(color: const Color(0xFF162743), child: const ListTile(
           leading: Icon(Icons.notifications_off_outlined, color: Color(0xFFA8C5FF)),
           title: Text('Автоучёт пока не подключён'),

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -19,6 +20,22 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   bool loading = true;
   bool downloading = false;
   String? savedFile;
+
+  static const mediaChannel = MethodChannel('allhub/launcher');
+
+  static Future<String> saveToAllHub(File source, String filename) async {
+    if (Platform.isAndroid) {
+      return (await mediaChannel.invokeMethod<String>('saveMediaToDownloads',
+        {'path': source.path, 'name': filename})) ?? 'Downloads/All Hub/$filename';
+    }
+    final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
+    if (home == null) throw StateError('Не найдена домашняя папка');
+    final folder = Directory('$home${Platform.pathSeparator}Downloads${Platform.pathSeparator}All Hub');
+    await folder.create(recursive: true);
+    final destination = File('${folder.path}${Platform.pathSeparator}$filename');
+    await source.copy(destination.path);
+    return destination.path;
+  }
 
   bool isMedia(Uri uri) {
     final path = uri.path.toLowerCase();
@@ -69,10 +86,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           type.startsWith('application/octet-stream'))) {
         throw Exception('Ссылка не ведёт на изображение или видео');
       }
-      final directory = (Platform.isAndroid ? await getExternalStorageDirectory() : null) ??
-          await getApplicationDocumentsDirectory();
-      final folder = Directory('${directory.path}/AllHubMedia');
-      await folder.create(recursive: true);
+      final directory = await getTemporaryDirectory();
       final ext = switch (type.split(';').first) {
         'image/gif' => '.gif',
         'image/png' => '.png',
@@ -85,7 +99,8 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       final raw = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
       final name = raw.contains('.') ? raw : 'media$ext';
       final safe = name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final destination = File('${folder.path}/${DateTime.now().millisecondsSinceEpoch}_$safe');
+      final filename = '${DateTime.now().microsecondsSinceEpoch}_$safe';
+      final destination = File('${directory.path}${Platform.pathSeparator}$filename');
       temp = File('${destination.path}.part');
       final sink = temp.openWrite();
       var received = 0;
@@ -103,10 +118,12 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       }
       await temp.rename(destination.path);
       temp = null;
+      final savedPath = await saveToAllHub(destination, filename);
+      await destination.delete();
       if (mounted) {
-        setState(() => savedFile = destination.path);
+        setState(() => savedFile = savedPath);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено: ${destination.path}')),
+          SnackBar(content: Text('Сохранено: $savedPath')),
         );
       }
     } catch (e) {

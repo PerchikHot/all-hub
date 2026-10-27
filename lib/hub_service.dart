@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'version_status.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -76,14 +77,15 @@ class HubService {
           if (release['draft'] == true || release['prerelease'] == true) continue;
           final tag = (release['tag_name'] ?? 'latest').toString();
           final notes = release['body']?.toString().trim();
-          version ??= tag;
+          final publishedVersion = publishedVersionFromRelease(tag, notes);
+          version ??= publishedVersion;
           for (final a in (release['assets'] as List? ?? [])) {
             final file = a as Map<String, dynamic>;
             final name = (file['name'] ?? '').toString();
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();
             if (platform != null && url.startsWith('https://')) {
-              assets.add(HubAsset(name, url, platform, tag, releaseNotes: notes));
+              assets.add(HubAsset(name, url, platform, publishedVersion, releaseNotes: notes));
             }
           }
         }

@@ -37,10 +37,12 @@ class _KopilkaPageState extends State<KopilkaPage> {
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
       final data = (jsonDecode(raw) as List).whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e)).toList();
-      if (mounted) setState(() {
-        notificationsEnabled = enabled;
-        pendingNotifications..clear()..addAll(data);
-      });
+      if (mounted) {
+        setState(() {
+          notificationsEnabled = enabled;
+          pendingNotifications..clear()..addAll(data);
+        });
+      }
     } on MissingPluginException {
       // Embedded All Hub builds do not include the standalone listener yet.
     } on PlatformException {
@@ -52,11 +54,15 @@ class _KopilkaPageState extends State<KopilkaPage> {
     try {
       await _notifications.invokeMethod<void>('openSettings');
     } on MissingPluginException {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Установи отдельную APK Копилки для подключения уведомлений.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Установи отдельную APK Копилки для подключения уведомлений.')));
+      }
     } on PlatformException {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось открыть настройки уведомлений.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось открыть настройки уведомлений.')));
+      }
     }
   }
 

@@ -410,7 +410,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       onRefresh: () async { search(); },
       child: GridView.builder(
         controller: scroll,
-        cacheExtent: 1100,
+        scrollCacheExtent: 1100,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(6),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(

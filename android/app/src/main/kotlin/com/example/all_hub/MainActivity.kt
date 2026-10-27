@@ -93,6 +93,21 @@ class MainActivity : FlutterActivity() {
                             result.error("APK_INSTALL", e.message, null)
                         }
                     }
+                    "installedPackageVersion" -> {
+                        val packageName = call.argument<String>("packageName")
+                        if (packageName.isNullOrBlank()) {
+                            result.success(null)
+                        } else {
+                            try {
+                                val info = packageManager.getPackageInfo(packageName, 0)
+                                result.success(info.versionName ?: info.longVersionCode.toString())
+                            } catch (e: PackageManager.NameNotFoundException) {
+                                result.success(null)
+                            } catch (e: Exception) {
+                                result.error("PACKAGE_VERSION", e.message, null)
+                            }
+                        }
+                    }
                     "isPackageInstalled" -> {
                         val packageName = call.argument<String>("packageName")
                         if (packageName.isNullOrBlank()) {

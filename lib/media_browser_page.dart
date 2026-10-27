@@ -10,6 +10,33 @@ class MediaBrowserPage extends StatefulWidget {
   const MediaBrowserPage({super.key, required this.url});
   final Uri url;
 
+  static bool _migrationStarted = false;
+  static Future<void> migrateLegacyMedia() async {
+    if (_migrationStarted || !Platform.isAndroid) return;
+    _migrationStarted = true;
+    try {
+      final external = await getExternalStorageDirectory();
+      final documents = await getApplicationDocumentsDirectory();
+      final folders = <Directory>[
+        if (external != null) Directory('${external.path}/AllHubMedia'),
+        Directory('${documents.path}/AllHubMedia'),
+      ];
+      for (final folder in folders) {
+        if (!await folder.exists()) continue;
+        await for (final entry in folder.list()) {
+          if (entry is! File) continue;
+          final name = entry.uri.pathSegments.last;
+          if (!RegExp(r'\.(jpg|jpeg|png|webp|gif|mp4|webm|mov)$', caseSensitive: false).hasMatch(name)) continue;
+          try {
+            await const MethodChannel('allhub/launcher').invokeMethod<String>(
+              'saveMediaToDownloads', {'path': entry.path, 'name': name});
+            await entry.delete();
+          } catch (_) { /* Preserve file on failure. */ }
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   State<MediaBrowserPage> createState() => _MediaBrowserPageState();
 }
@@ -62,6 +89,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   void initState() {
     super.initState();
     currentUrl = widget.url.toString();
+    MediaBrowserPage.migrateLegacyMedia();
     migrateLegacyMedia();
     if (Platform.isAndroid) {
       browser = WebViewController()

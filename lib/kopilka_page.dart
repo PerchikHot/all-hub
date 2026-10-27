@@ -3,6 +3,43 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Suggests an amount for manual review. Balance-only notifications must
+/// not be prefilled as expenses; the user still confirms every operation.
+String suggestNotificationAmount(String body) {
+  final amountPattern = RegExp(
+    r'(\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:₽|руб(?:\.|ля|лей)?|RUB)',
+    caseSensitive: false,
+  );
+  final transactionWords = RegExp(
+    r'покупк|оплат|списан|перевод|пополнен|зачислен|поступил|сняти|возврат|выдан|purchase|payment|transfer|refund',
+    caseSensitive: false,
+  );
+  final balanceWords = RegExp(
+    r'остаток|доступно|баланс|available|balance',
+    caseSensitive: false,
+  );
+  String result = '';
+  var bestScore = -100;
+  for (final match in amountPattern.allMatches(body)) {
+    final start = match.start > 45 ? match.start - 45 : 0;
+    final end = match.end + 18 < body.length ? match.end + 18 : body.length;
+    final before = body.substring(start, match.start);
+    final after = body.substring(match.end, end);
+    final transaction = transactionWords.hasMatch(before) || transactionWords.hasMatch(after);
+    final balance = balanceWords.hasMatch(before) || balanceWords.hasMatch(after);
+    // Never guess from a message that only reports a remaining balance.
+    if (balance && !transaction) continue;
+    final score = (transaction ? 10 : 0) - (balance ? 5 : 0);
+    if (score > bestScore) {
+      bestScore = score;
+      final whole = match.group(1)!.replaceAll(RegExp(r'[ \u00a0\u202f]'), '');
+      final decimals = match.group(2);
+      result = decimals == null ? whole : '$whole.$decimals';
+    }
+  }
+  return result;
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -94,13 +131,6 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     }
   }
 
-  String _suggestAmount(String body) {
-    // This is only a hint: the user confirms the amount and type manually.
-    final match = RegExp(r'(\d[\d \u00a0]*[.,]?\d{0,2})\s*(?:₽|руб\.?|RUB)',
-        caseSensitive: false).firstMatch(body);
-    return match?.group(1)?.replaceAll(RegExp(r'\s'), '').replaceAll(',', '.') ?? '';
-  }
-
   Future<void> _reviewNotification(Map<String, dynamic> event) async {
     final title = (event['title'] ?? '').toString();
     final body = (event['body'] ?? '').toString();
@@ -139,7 +169,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final notificationBank = notification?['bank']?.toString();
     if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
     final amount = TextEditingController(
-      text: notification == null ? '' : _suggestAmount((notification['body'] ?? '').toString()));
+      text: notification == null ? '' : suggestNotificationAmount((notification['body'] ?? '').toString()));
     final note = TextEditingController(
       text: notification == null ? '' : (notification['title'] ?? '').toString());
     final saved = await showDialog<bool>(context: context, builder: (dialogContext) =>

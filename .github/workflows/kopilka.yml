@@ -140,7 +140,8 @@ jobs:
                                   // another application's package name.
                                   val enabled = listeners.split(':').any { entry ->
                                       val component = ComponentName.unflattenFromString(entry.trim())
-                                      component?.packageName == packageName &&
+                                      component != null &&
+                                          component.packageName == packageName &&
                                           component.className == BankNotificationService::class.java.name
                                   }
                                   result.success(enabled)

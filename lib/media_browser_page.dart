@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+Future<void> migrateAllHubMedia() => _MediaBrowserPageState.migrateLegacyMedia();
+
 class MediaBrowserPage extends StatefulWidget {
   const MediaBrowserPage({super.key, required this.url});
   final Uri url;

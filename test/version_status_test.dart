@@ -8,6 +8,14 @@ void main() {
     expect(comparePublishedVersions('1.2.3+5', '1.2.3+7'), lessThan(0));
     expect(comparePublishedVersions('2.0.0', '1.9.9'), greaterThan(0));
   });
+  test('explicit release notes provide comparable versions', () {
+    expect(publishedVersionFromRelease('shadow-rp-android',
+      'Подписанная сборка.\nVersion: 0.18.4'), '0.18.4');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      'Version: 0.6.0+42'), '0.6.0+42');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      'Автоматическая сборка без версии'), 'all-hub-latest');
+  });
   test('rolling release tags must not trigger false updates', () {
     expect(comparePublishedVersions('0.18.3', 'shadow-rp-android'), isNull);
     expect(describeUpdateStatus('0.18.3', 'shadow-rp-android'),

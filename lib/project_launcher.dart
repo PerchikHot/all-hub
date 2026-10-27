@@ -161,20 +161,7 @@ class ProjectLauncher {
   /// Files are extracted to a staging directory and activated only after validation.
   static Future<void> installWindowsZip(String id, String url) async {
     if (!Platform.isWindows) throw UnsupportedError('Windows only');
-    if (!RegExp(r'^[a-z0-9-]+
-    if (!Platform.isWindows) return false;
-    final selection = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['exe']);
-    final path = selection?.files.single.path;
-    if (path == null || !path.toLowerCase().endsWith('.exe')) return false;
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.setString('exe_$id', path);
-  }
-
-  static bool canLaunch(String id) => Platform.isWindows ||
-      (Platform.isAndroid && packages.containsKey(id));
-}
-).hasMatch(id)) {
+    if (id.isEmpty || !RegExp(r'^[a-z0-9-]+').hasMatch(id)) {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);

@@ -254,6 +254,28 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                     ),
+                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
+                      Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.zip'))
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.inventory_2_outlined),
+                      label: const Text('Скачать и установить'),
+                      onPressed: () async {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Скачиваем игру со всеми файлами...')));
+                        try {
+                          await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Игра установлена. Нажми «Открыть».')));
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Ошибка установки: $e')));
+                          }
+                        }
+                      },
+                    ),
                   if (tab == 0 && Platform.isWindows)
                     OutlinedButton.icon(
                       icon: const Icon(Icons.folder_open),

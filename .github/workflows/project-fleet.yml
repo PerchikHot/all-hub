@@ -44,16 +44,30 @@ jobs:
               if not repo:
                   lines.append(f"| {p['name']} | Встроен / не подключён | — |")
                   continue
-              data, err = get(f'https://api.github.com/repos/{repo}/actions/runs?per_page=10')
+              workflow = 'kopilka.yml' if p['id'] == 'kopilka' else None
+              endpoint = (f'https://api.github.com/repos/{repo}/actions/workflows/{workflow}/runs?per_page=20'
+                          if workflow else f'https://api.github.com/repos/{repo}/actions/runs?per_page=20')
+              data, err = get(endpoint)
               if err:
                   state = f'Не удалось проверить: {err}'
+                  failures.append((p['name'], err))
               else:
                   runs = data.get('workflow_runs', [])
+                  # Skip status-recorder and other bookkeeping jobs: they do not
+                  # prove that an application APK/EXE actually compiled.
+                  if p['id'] == 'all-hub':
+                      runs = [r for r in runs if r.get('name') == 'Build All Hub']
+                  elif p['id'] == 'kopilka':
+                      runs = [r for r in runs if r.get('name') == 'Kopilka standalone APK']
+                  else:
+                      runs = [r for r in runs if r.get('conclusion') not in ('skipped', 'neutral')]
                   if not runs:
-                      state = 'Нет запусков'
+                      state = 'Нет сборок'
                   else:
                       run = runs[0]
                       state = f"[{run['status']} / {run.get('conclusion') or 'pending'}]({run['html_url']})"
+                      if run.get('conclusion') in ('failure', 'timed_out', 'action_required'):
+                          failures.append((p['name'], run['html_url']))
               lines.append(f"| {p['name']} | [{repo}](https://github.com/{repo}) | {state} |")
           summary = '\n'.join(lines) + '\n'
           if failures:

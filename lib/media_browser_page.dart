@@ -50,7 +50,6 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   bool downloading = false;
   String? savedFile;
 
-  static const mediaChannel = MethodChannel('allhub/launcher');
 
   bool isMedia(Uri uri) {
     final path = uri.path.toLowerCase();

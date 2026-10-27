@@ -117,6 +117,16 @@ class _KopilkaPageState extends State<KopilkaPage> {
       .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
     final expenses = entries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
+    final now = DateTime.now();
+    final monthlyEntries = entries.where((e) {
+      final date = DateTime.tryParse((e['date'] ?? '').toString());
+      return date != null && date.year == now.year && date.month == now.month;
+    }).toList();
+    final monthlyIncome = monthlyEntries.where((e) => e['kind'] == 'income')
+      .fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+    final monthlyExpenses = monthlyEntries.where((e) => e['kind'] == 'expense')
+      .fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+    final monthlyBalance = monthlyIncome - monthlyExpenses;
     String money(double value) {
       final parts = value.toStringAsFixed(2).split('.');
       final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\d)(?=(\d{3})+$)'), (_) => ' ');
@@ -151,6 +161,30 @@ class _KopilkaPageState extends State<KopilkaPage> {
           Expanded(child: Card(child: ListTile(title: const Text('Доходы'), subtitle: Text(money(income))))),
           Expanded(child: Card(child: ListTile(title: const Text('Расходы'), subtitle: Text(money(expenses))))),
         ]),
+        const SizedBox(height: 12),
+        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Этот месяц', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Поступило', style: TextStyle(color: Colors.white70)),
+                Text(money(monthlyIncome), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Потрачено', style: TextStyle(color: Colors.white70)),
+                Text(money(monthlyExpenses), style: const TextStyle(fontWeight: FontWeight.w700)),
+              ])),
+            ]),
+            const Divider(height: 24),
+            Text('Разница: ${money(monthlyBalance)}',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text('Операций за месяц: ${monthlyEntries.length}. Переводы между своими счетами не считаются расходами.',
+              style: const TextStyle(color: Colors.white70)),
+          ],
+        ))),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Счета', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
         for (final bank in banks) Card(child: ListTile(leading: Icon(bank == 'Наличные' ? Icons.payments_outlined : Icons.account_balance_outlined, color: const Color(0xFFA8C5FF)),
           title: Text(bank), trailing: Text(money(_sum(bank))))),

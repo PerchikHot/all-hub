@@ -26,22 +26,68 @@ class ProjectLauncher {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('installed_version_$id');
   }
-  static Future<void> _download(http.StreamedResponse response, File file) async {
-    final sink = file.openWrite();
-    var received = 0;
-    downloadProgress.value = 0;
-    try {
-      await for (final bytes in response.stream) {
-        sink.add(bytes);
-        received += bytes.length;
-        if (response.contentLength != null && response.contentLength! > 0) {
-          downloadProgress.value = (received / response.contentLength!).clamp(0.0, 1.0);
+  /// Download with resumable HTTP Range requests. GitHub release asset links
+  /// redirect to short-lived URLs, so each retry starts at the public URL.
+  static Future<void> _downloadResumable(
+    http.Client client, Uri uri, File temporary,
+  ) async {
+    const maxAttempts = 5;
+    int? totalLength;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final existing = await temporary.exists() ? await temporary.length() : 0;
+      final request = http.Request('GET', uri);
+      if (existing > 0) request.headers['Range'] = 'bytes=$existing-';
+      try {
+        final response = await client.send(request)
+            .timeout(const Duration(seconds: 40));
+        if (response.statusCode != 200 && response.statusCode != 206) {
+          throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
         }
+        final isPartial = response.statusCode == 206;
+        if (isPartial) {
+          final range = response.headers['content-range'];
+          if (range == null || !range.startsWith('bytes $existing-')) {
+            throw const FormatException('Сервер вернул неверный диапазон APK');
+          }
+          final slash = range.lastIndexOf('/');
+          if (slash != -1) {
+            totalLength = int.tryParse(range.substring(slash + 1));
+          }
+        } else {
+          totalLength = response.contentLength;
+        }
+        final sink = temporary.openWrite(
+          mode: isPartial ? FileMode.append : FileMode.write,
+        );
+        var received = isPartial ? existing : 0;
+        try {
+          await for (final chunk in response.stream.timeout(
+            const Duration(seconds: 45),
+          )) {
+            sink.add(chunk);
+            received += chunk.length;
+            if (totalLength != null && totalLength! > 0) {
+              downloadProgress.value =
+                  (received / totalLength!).clamp(0.0, 1.0);
+            }
+          }
+          await sink.flush();
+        } finally {
+          await sink.close();
+        }
+        final actual = await temporary.length();
+        if (totalLength != null && actual < totalLength!) {
+          throw const HttpException('Соединение оборвалось до конца APK');
+        }
+        if (totalLength != null && actual > totalLength!) {
+          throw const FormatException('Размер APK превышает ожидаемый');
+        }
+        downloadProgress.value = 1;
+        return;
+      } catch (_) {
+        if (attempt == maxAttempts - 1) rethrow;
+        await Future<void>.delayed(Duration(seconds: attempt + 1));
       }
-      await sink.flush();
-      downloadProgress.value = 1;
-    } finally {
-      await sink.close();
     }
   }
 
@@ -101,16 +147,12 @@ class ProjectLauncher {
     downloadProgress.value = null;
     final client = http.Client();
     try {
-      final response = await client.send(http.Request('GET', uri))
-          .timeout(const Duration(seconds: 30));
-      if (response.statusCode != 200) {
-        throw HttpException('HTTP ${response.statusCode}');
-      }
       final cache = await getTemporaryDirectory();
       final apk = File('${cache.path}${Platform.pathSeparator}allhub-install.apk');
       final temporary = File('${apk.path}.download');
       try {
-        await _download(response, temporary);
+        downloadProgress.value = 0;
+        await _downloadResumable(client, uri, temporary);
         if (await temporary.length() < 1024) {
           throw const FormatException('APK слишком мал');
         }

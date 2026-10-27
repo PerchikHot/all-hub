@@ -313,11 +313,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         final id = (p['id'] ?? '').toString();
         if (seenPostIds.contains(id)) return false;
         if (requestedCategory == 'futanari' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('futanari')) return false;
+            !(p['tag_string'] ?? '').toString().split(' ').contains('futanari')) {
+          return false;
+        }
         if (requestedCategory == 'solo' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('solo')) return false;
+            !(p['tag_string'] ?? '').toString().split(' ').contains('solo')) {
+          return false;
+        }
         if (requestedCategory == 'lesbian' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('yuri')) return false;
+            !(p['tag_string'] ?? '').toString().split(' ').contains('yuri')) {
+          return false;
+        }
         if (requestedKind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
           return ext == 'gif';

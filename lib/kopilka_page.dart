@@ -119,7 +119,7 @@ class _KopilkaPageState extends State<KopilkaPage> {
       .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
     String money(double value) {
       final parts = value.toStringAsFixed(2).split('.');
-      final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\\d)(?=(\\d{3})+\$)'), (_) => ' ');
+      final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\d)(?=(\d{3})+$)'), (_) => ' ');
       return '$digits,${parts.last} ₽';
     }
     return Scaffold(

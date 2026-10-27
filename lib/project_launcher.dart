@@ -26,26 +26,6 @@ class ProjectLauncher {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('installed_version_$id');
   }
-  static Future<void> _download(http.StreamedResponse response, File file) async {
-    final sink = file.openWrite();
-    var received = 0;
-    downloadProgress.value = 0;
-    try {
-      await for (final bytes in response.stream) {
-        sink.add(bytes);
-        received += bytes.length;
-        if (response.contentLength != null && response.contentLength! > 0) {
-          downloadProgress.value =
-              (received / response.contentLength!).clamp(0.0, 1.0);
-        }
-      }
-      await sink.flush();
-      downloadProgress.value = 1;
-    } finally {
-      await sink.close();
-    }
-  }
-
   /// Stream a response to disk for Windows installers and archives.
   static Future<void> _download(http.StreamedResponse response, File file) async {
     final sink = file.openWrite();

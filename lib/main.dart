@@ -32,9 +32,13 @@ class GithubInfo {
 class GithubApi {
   static Future<GithubInfo> inspect(String repo, {String? projectId}) async {
     final result = await HubService.inspect(repo);
-    final available = result.assets.where((a) => a.platform == currentPlatform &&
-      (projectId == 'kopilka' ? a.name.toLowerCase().contains('kopilka') :
-       projectId == 'all-hub' ? a.name.toLowerCase().contains('allhub') || a.name.toLowerCase().contains('all-hub') : true));
+    final available = result.assets.where((a) {
+      if (a.platform != currentPlatform) return false;
+      final name = a.name.toLowerCase();
+      if (projectId == 'kopilka') return name.startsWith('kopilka-');
+      if (projectId == 'all-hub') return name.startsWith('allhub-') || name.startsWith('all-hub-');
+      return true;
+    }).toList();
     return GithubInfo(
       version: available.isEmpty ? null : available.first.version,
       downloadUrl: available.isEmpty ? null : available.first.url,

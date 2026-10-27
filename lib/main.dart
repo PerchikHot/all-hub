@@ -34,9 +34,9 @@ class GithubApi {
     final result = await HubService.inspect(repo);
     final available = result.assets.where((a) => a.platform == currentPlatform &&
       (projectId == 'kopilka' ? a.name.toLowerCase().contains('kopilka') :
-       projectId == 'all-hub' ? !a.name.toLowerCase().contains('kopilka') : true));
+       projectId == 'all-hub' ? a.name.toLowerCase().contains('allhub') || a.name.toLowerCase().contains('all-hub') : true));
     return GithubInfo(
-      version: available.isEmpty ? result.version : available.first.version,
+      version: available.isEmpty ? null : available.first.version,
       downloadUrl: available.isEmpty ? null : available.first.url,
       workflowStatus: result.workflow,
       actionsUrl: result.actionsUrl,
@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage> {
                     ? 'Версия установки: неизвестна'
                     : installed.data == i.version ? 'Версия: актуальная (${installed.data})'
                     : 'Доступно обновление: ${installed.data} → ${i.version ?? '?'}')),
-                ValueListenableBuilder<double?>(valueListenable: ProjectLauncher.downloadProgress,
+                if (project.id == ProjectLauncher.activeDownloadProject.value) ValueListenableBuilder<double?>(valueListenable: ProjectLauncher.downloadProgress,
                   builder: (context, progress, child) => progress == null
                     ? const SizedBox.shrink()
                     : Padding(padding: const EdgeInsets.symmetric(vertical: 6),
@@ -241,7 +241,7 @@ class _HomePageState extends State<HomePage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание APK...')));
                         try {
-                          await ProjectLauncher.installAndroidApk(i.downloadUrl!);
+                          await ProjectLauncher.installAndroidApk(i.downloadUrl!, projectId: project.id);
                         } catch (e) {
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));

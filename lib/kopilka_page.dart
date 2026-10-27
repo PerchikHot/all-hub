@@ -10,7 +10,7 @@ class KopilkaPage extends StatefulWidget {
   State<KopilkaPage> createState() => _KopilkaPageState();
 }
 
-class _KopilkaPageState extends State<KopilkaPage> {
+class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final entries = <Map<String, dynamic>>[];
   bool loading = true;
   static const _notifications = MethodChannel('kopilka/notifications');
@@ -19,7 +19,23 @@ class _KopilkaPageState extends State<KopilkaPage> {
   double goal = 100000;
   final banks = const ['Т-Банк', 'Газпромбанк', 'Ozon Банк', 'Наличные'];
   @override
-  void initState() { super.initState(); _load(); _refreshNotifications(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Load persisted entries before filtering already imported notifications.
+    _load().then((_) { if (mounted) _refreshNotifications(); });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshNotifications();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -37,6 +53,10 @@ class _KopilkaPageState extends State<KopilkaPage> {
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
       final prefs = await SharedPreferences.getInstance();
       final reviewed = (prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[]).toSet();
+      // Also check saved operations: a crash after saving an operation but
+      // before recording the reviewed key must not cause a second import.
+      reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
+          .where((key) => key.isNotEmpty));
       final data = (jsonDecode(raw) as List).whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .where((e) => !reviewed.contains((e['key'] ?? '').toString()))
@@ -51,6 +71,10 @@ class _KopilkaPageState extends State<KopilkaPage> {
       // Embedded All Hub builds do not include the standalone listener yet.
     } on PlatformException {
       // Android settings may be unavailable on some devices.
+    } on FormatException {
+      // Malformed notification data must not crash the finance dashboard.
+    } on TypeError {
+      // Older native queue formats may not match the current schema.
     }
   }
 
@@ -158,6 +182,7 @@ class _KopilkaPageState extends State<KopilkaPage> {
       setState(() => entries.insert(0, {
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
         'note': note.text.trim(), 'date': DateTime.now().toIso8601String(),
+        if (notification != null) 'notificationKey': (notification['key'] ?? '').toString(),
       }));
       await _save();
       if (notification != null) {

@@ -311,7 +311,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         hasMore = false;
       });
     } finally {
-      if (mounted && generation == searchGeneration) setState(() => loading = false);
+      if (mounted && generation == searchGeneration) {
+        setState(() => loading = false);
+      }
     }
   }
 

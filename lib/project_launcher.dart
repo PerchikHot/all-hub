@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:archive/archive_io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,35 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 class ProjectLauncher {
+  static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
+  static Future<void> recordInstalledVersion(String id, String? version) async {
+    if (version == null || version.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('installed_version_$id', version);
+  }
+  static Future<String?> installedVersion(String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('installed_version_$id');
+  }
+  static Future<void> _download(http.StreamedResponse response, File file) async {
+    final sink = file.openWrite();
+    var received = 0;
+    downloadProgress.value = 0;
+    try {
+      await for (final bytes in response.stream) {
+        sink.add(bytes);
+        received += bytes.length;
+        if (response.contentLength != null && response.contentLength! > 0) {
+          downloadProgress.value = (received / response.contentLength!).clamp(0.0, 1.0);
+        }
+      }
+      await sink.flush();
+      downloadProgress.value = 1;
+    } finally {
+      await sink.close();
+    }
+  }
+
   static const _channel = MethodChannel('allhub/launcher');
   static const packages = <String, String>{
     'shadow-rp': 'com.shadowrp.app',
@@ -70,10 +100,7 @@ class ProjectLauncher {
       final apk = File('${cache.path}${Platform.pathSeparator}allhub-install.apk');
       final temporary = File('${apk.path}.download');
       try {
-        final sink = temporary.openWrite();
-        await sink.addStream(response.stream);
-        await sink.flush();
-        await sink.close();
+        await _download(response, temporary);
         if (await temporary.length() < 1024) {
           throw const FormatException('APK слишком мал');
         }
@@ -120,10 +147,7 @@ class ProjectLauncher {
       final target = File('${directory.path}${Platform.pathSeparator}$id.exe');
       final temporary = File('${target.path}.download');
       try {
-        final sink = temporary.openWrite();
-        await sink.addStream(response.stream);
-        await sink.flush();
-        await sink.close();
+        await _download(response, temporary);
         if (await temporary.length() < 1024) {
           throw const FormatException('Загруженный EXE слишком мал');
         }
@@ -185,10 +209,7 @@ class ProjectLauncher {
       if (response.statusCode != 200) {
         throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
       }
-      final sink = zipFile.openWrite();
-      await sink.addStream(response.stream);
-      await sink.flush();
-      await sink.close();
+      await _download(response, zipFile);
       final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
       final rootPath = staging.absolute.path;
       for (final entry in archive) {

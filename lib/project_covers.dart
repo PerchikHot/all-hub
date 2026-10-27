@@ -137,7 +137,7 @@ class _ProjectCoverState extends State<ProjectCover> {
   Future<void> loadWebCovers() async {
     if (loadingWeb) return;
     loadingWeb = true;
-    final adult = CoverSettings.adultCovers;
+    final adult = CoverSettings.adultCovers && widget.id != 'kopilka';
     final id = widget.id;
     final cacheKey = '$id:$adult';
     final saved = CoverSettings.cache[cacheKey];
@@ -147,12 +147,13 @@ class _ProjectCoverState extends State<ProjectCover> {
       return;
     }
     final queries = <String, String>{
-      'all-hub': 'anime_girl rating:general',
+      'all-hub': 'alpha_(kage_no_jitsuryokusha_ni_naritakute!) rating:general',
       'eclipse-arena': 'erza_scarlet rating:general',
-      'shadow-rp': 'boa_hancock rating:general',
-      'shadow-garden': 'alpha_(kage_no_jitsuryokusha_ni_naritakute!) rating:general',
+      'shadow-rp': 'rias_gremory rating:general',
+      'shadow-garden': 'delta_(kage_no_jitsuryokusha_ni_naritakute!) rating:general',
+      'kopilka': 'original rating:general',
     };
-    final search = queries[id] ?? 'anime_girl rating:general';
+    final search = queries[id] ?? 'original rating:general';
     try {
       if (adult) {
         // Only adult-character searches; reject posts marked as young characters.
@@ -160,7 +161,8 @@ class _ProjectCoverState extends State<ProjectCover> {
           'eclipse-arena': 'erza_scarlet futanari',
           'shadow-rp': 'boa_hancock futanari',
           'shadow-garden': 'futanari rating:explicit',
-          'all-hub': 'futanari rating:explicit',
+          'all-hub': 'alpha_(kage_no_jitsuryokusha_ni_naritakute!) futanari',
+          'kopilka': 'original rating:general',
         };
         final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
           'tags': tags[id] ?? tags['all-hub']!, 'limit':'20',
@@ -241,10 +243,11 @@ class _ProjectCoverState extends State<ProjectCover> {
           final files = await dir.list(followLinks: false).where((entry) =>
             entry is File && RegExp(r'\.(png|jpg|jpeg|webp|bmp)$', caseSensitive: false).hasMatch(entry.path)
           ).cast<File>().toList();
-          localCandidates = files;
-          if (files.isNotEmpty) {
-            final alternatives = files.where((f) => f.path != localFile?.path).toList();
-            final candidates = alternatives.isNotEmpty ? alternatives : files;
+          final matching = files.where((f) => f.path.toLowerCase().split(Platform.pathSeparator).last.startsWith('${widget.id.toLowerCase()}_')).toList();
+          localCandidates = matching.isNotEmpty ? matching : files;
+          if (localCandidates.isNotEmpty) {
+            final alternatives = localCandidates.where((f) => f.path != localFile?.path).toList();
+            final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;
             selected = candidates[Random().nextInt(candidates.length)];
           }
         }
@@ -267,9 +270,9 @@ class _ProjectCoverState extends State<ProjectCover> {
       decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
       child: Stack(fit: StackFit.expand, children: [
         if (localFile != null)
-          Image.file(localFile!, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
+          Image.file(localFile!, fit: BoxFit.contain, errorBuilder: (context, error, stackTrace) => const SizedBox.shrink())
         else if (webCovers.isNotEmpty)
-          Image.network(webCovers[webIndex], fit: BoxFit.cover,
+          Image.network(webCovers[webIndex], fit: BoxFit.contain,
             gaplessPlayback: true,
             headers: const {'User-Agent': 'AllHub/0.5 (cover viewer)'},
             errorBuilder: (context, error, stackTrace) {

@@ -117,15 +117,25 @@ class _KopilkaPageState extends State<KopilkaPage> {
       .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
     final expenses = entries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
-    String money(double value) => '${value.toStringAsFixed(2)} ₽';
+    String money(double value) {
+      final parts = value.toStringAsFixed(2).split('.');
+      final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\\d)(?=(\\d{3})+\$)'), (_) => ' ');
+      return '$digits,${parts.last} ₽';
+    }
     return Scaffold(
-      appBar: AppBar(title: const Text('Копилка'), actions: [
+      appBar: AppBar(title: const Row(children: [Icon(Icons.savings_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 10), Text('Копилка')]), actions: [
         IconButton(tooltip: 'Цель', icon: const Icon(Icons.flag_outlined), onPressed: _editGoal),
       ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add,
         icon: const Icon(Icons.add), label: const Text('Операция')),
       body: loading ? const Center(child: CircularProgressIndicator()) :
       ListView(padding: const EdgeInsets.all(16), children: [
+        Card(color: const Color(0xFF162743), child: const ListTile(
+          leading: Icon(Icons.notifications_off_outlined, color: Color(0xFFA8C5FF)),
+          title: Text('Автоучёт пока не подключён'),
+          subtitle: Text('Уведомления Т-Банка, Газпромбанка и Ozon Банка ещё не считываются. Операции сейчас добавляются вручную.'),
+        )),
+        const SizedBox(height: 12),
         Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Общий баланс', style: TextStyle(color: Colors.white70)),
@@ -142,11 +152,11 @@ class _KopilkaPageState extends State<KopilkaPage> {
           Expanded(child: Card(child: ListTile(title: const Text('Расходы'), subtitle: Text(money(expenses))))),
         ]),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Счета', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-        for (final bank in banks) Card(child: ListTile(leading: const Icon(Icons.account_balance_wallet_outlined),
+        for (final bank in banks) Card(child: ListTile(leading: Icon(bank == 'Наличные' ? Icons.payments_outlined : Icons.account_balance_outlined, color: const Color(0xFFA8C5FF)),
           title: Text(bank), trailing: Text(money(_sum(bank))))),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('История операций', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
         if (entries.isEmpty) const ListTile(title: Text('Пока нет операций'),
-          subtitle: Text('Добавь начальные остатки как доходы, затем учитывай покупки и переводы.')),
+          subtitle: Text('Нажми «Операция», чтобы внести начальные остатки, расходы или перевод между своими счетами.')),
         for (final e in entries) Card(child: ListTile(
           leading: Icon(e['kind'] == 'transfer' ? Icons.swap_horiz :
             e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward),

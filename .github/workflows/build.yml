@@ -8,7 +8,7 @@ concurrency:
   group: all-hub-build-${{ github.ref }}
   cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -180,6 +180,17 @@ jobs:
           name: AllHub-Android-release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+      - name: Publish Android APK for in-app All Hub updates
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk AllHub-Android.apk
+          gh release view all-hub-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create all-hub-latest --repo "$GITHUB_REPOSITORY" \
+              --title "All Hub — Android and Windows" \
+              --notes "Актуальные установочные файлы All Hub." --latest=false
+          gh release upload all-hub-latest AllHub-Android.apk --repo "$GITHUB_REPOSITORY" --clobber
   windows:
     runs-on: windows-latest
     steps:
@@ -208,3 +219,14 @@ jobs:
           name: AllHub-Windows
           path: AllHub-Windows-portable.zip
           if-no-files-found: error
+      - name: Publish Windows portable ZIP for All Hub
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view all-hub-latest --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create all-hub-latest --repo "$env:GITHUB_REPOSITORY" --title "All Hub — Android and Windows" --notes "Актуальные установочные файлы All Hub." --latest=false
+          }
+          gh release upload all-hub-latest AllHub-Windows-portable.zip --repo "$env:GITHUB_REPOSITORY" --clobber

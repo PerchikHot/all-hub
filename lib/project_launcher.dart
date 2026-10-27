@@ -46,6 +46,27 @@ class ProjectLauncher {
     }
   }
 
+  /// Stream a response to disk for Windows installers and archives.
+  static Future<void> _download(http.StreamedResponse response, File file) async {
+    final sink = file.openWrite();
+    var received = 0;
+    downloadProgress.value = 0;
+    try {
+      await for (final bytes in response.stream) {
+        sink.add(bytes);
+        received += bytes.length;
+        if (response.contentLength != null && response.contentLength! > 0) {
+          downloadProgress.value =
+              (received / response.contentLength!).clamp(0.0, 1.0);
+        }
+      }
+      await sink.flush();
+      downloadProgress.value = 1;
+    } finally {
+      await sink.close();
+    }
+  }
+
   /// Download with resumable HTTP Range requests. GitHub release asset links
   /// redirect to short-lived URLs, so each retry starts at the public URL.
   static Future<void> _downloadResumable(

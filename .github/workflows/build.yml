@@ -166,7 +166,7 @@ jobs:
           ALLHUB_STORE_PASSWORD: ${{ secrets.ALLHUB_STORE_PASSWORD }}
           ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
           ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
-        run: flutter build apk --release
+        run: flutter build apk --release --build-number "$GITHUB_RUN_NUMBER"
       - name: Verify Android package and native dependencies
         run: |
           set -euo pipefail
@@ -191,6 +191,10 @@ jobs:
               --title "All Hub — Android and Windows" \
               --notes "Актуальные установочные файлы All Hub." --latest=false
           gh release upload all-hub-latest AllHub-Android.apk --repo "$GITHUB_REPOSITORY" --clobber
+          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
+          test -n "$VERSION"
+          gh release edit all-hub-latest --repo "$GITHUB_REPOSITORY" \
+            --notes "$(printf 'Актуальные установочные файлы All Hub.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")"
   windows:
     runs-on: windows-latest
     steps:
@@ -230,3 +234,6 @@ jobs:
             gh release create all-hub-latest --repo "$env:GITHUB_REPOSITORY" --title "All Hub — Android and Windows" --notes "Актуальные установочные файлы All Hub." --latest=false
           }
           gh release upload all-hub-latest AllHub-Windows-portable.zip --repo "$env:GITHUB_REPOSITORY" --clobber
+          $versionLine = (Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
+          $version = "$versionLine+$env:GITHUB_RUN_NUMBER"
+          gh release edit all-hub-latest --repo "$env:GITHUB_REPOSITORY" --notes "Актуальные установочные файлы All Hub.`nVersion: $version"

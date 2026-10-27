@@ -78,11 +78,11 @@ bool isBankTransactionNotification(String title, String body) {
     caseSensitive: false,
   );
   final currency = RegExp(
-    r'₽|руб(?:\\.|ля|лей)?|\\bRUB\\b',
+    r'₽|руб(?:\.|ля|лей)?|\bRUB\b',
     caseSensitive: false,
   );
   final sensitive = RegExp(
-    r'код\\s+(?:подтверждения|входа|для\\s+входа)|одноразов(?:ый|ого)\\s+код|никому\\s+не\\s+сообщайте|verification\\s+code|one[- ]time\\s+(?:password|code)|\\bOTP\\b',
+    r'код\s+(?:подтверждения|входа|для\s+входа)|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b',
     caseSensitive: false,
   );
   return transaction.hasMatch(text) &&

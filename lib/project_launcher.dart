@@ -17,7 +17,9 @@ class ProjectLauncher {
   }
   static Future<String?> installedVersion(String id) async {
     if (Platform.isAndroid) {
-      final packageName = packages[id];
+      // The launcher itself is not an external launchable project, but its
+      // installed Android version must still be shown in the update catalog.
+      final packageName = id == 'all-hub' ? 'com.example.all_hub' : packages[id];
       if (packageName == null) return null;
       try {
         return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});

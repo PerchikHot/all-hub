@@ -1,4 +1,5 @@
 import 'project_launcher.dart';
+import 'kopilka_page.dart';
 import 'dart:io';
 import 'hub_service.dart';
 import 'hub_widgets.dart';
@@ -157,7 +158,16 @@ class _HomePageState extends State<HomePage> {
               Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
-            if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
+            if (project.id == 'kopilka') Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: FilledButton.icon(
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Открыть Копилку'),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const KopilkaPage())),
+              ),
+            )
+            else if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!), builder: (context, s) {
               if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
               final i = s.data!;

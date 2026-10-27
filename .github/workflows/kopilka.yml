@@ -231,3 +231,5 @@ jobs:
             --latest=false 2>/dev/null || \
           gh release upload kopilka-latest dist/Kopilka-Android.apk \
             --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit kopilka-latest --repo "$GITHUB_REPOSITORY" \
+            --notes "$(printf 'Отдельная сборка Копилки из общего репозитория All Hub.\nVersion: 1.0.%s\n' "$GITHUB_RUN_NUMBER")"

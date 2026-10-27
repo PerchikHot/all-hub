@@ -89,7 +89,7 @@ jobs:
           PY
           rm -f test/widget_test.dart
           flutter analyze
-          flutter build apk --release
+          flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
       - name: Upload standalone APK

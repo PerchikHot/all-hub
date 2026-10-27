@@ -52,20 +52,6 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
 
   static const mediaChannel = MethodChannel('allhub/launcher');
 
-  static Future<String> saveMedia(File file, String name) async {
-    if (Platform.isAndroid) {
-      return await mediaChannel.invokeMethod<String>('saveMediaToDownloads',
-        {'path': file.path, 'name': name}) ?? 'Downloads/All Hub/$name';
-    }
-    final home = Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'];
-    if (home == null) throw StateError('Не найдена домашняя папка');
-    final folder = Directory('$home${Platform.pathSeparator}Downloads${Platform.pathSeparator}All Hub');
-    await folder.create(recursive: true);
-    final target = File('${folder.path}${Platform.pathSeparator}$name');
-    await file.copy(target.path);
-    return target.path;
-  }
-
   bool isMedia(Uri uri) {
     final path = uri.path.toLowerCase();
     return ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.mov']

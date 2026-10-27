@@ -1,23 +1,36 @@
 {
-  "run_id": 40492242839,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40492242839",
-  "conclusion": "failure",
-  "head_sha": "223108f820c89ec4ad638118af88a2578252243d",
+  "run_id": 40493039986,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40493039986",
+  "conclusion": "success",
+  "head_sha": "af052e7dd5855cce032d930661c838b525aacf0f",
   "jobs": [
     {
       "name": "windows",
       "status": "completed",
-      "conclusion": "failure",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40492242839/job/122148777882",
-      "id": 122148777882
+      "conclusion": "success",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40493039986/job/122151463625",
+      "id": 122151463625
     },
     {
       "name": "android",
       "status": "completed",
-      "conclusion": "failure",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40492242839/job/122148778243",
-      "id": 122148778243
+      "conclusion": "success",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/40493039986/job/122151464025",
+      "id": 122151464025
     }
   ],
-  "artifacts": []
+  "artifacts": [
+    {
+      "name": "AllHub-Windows",
+      "size_in_bytes": 12490907,
+      "expired": false,
+      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12730515499/zip"
+    },
+    {
+      "name": "AllHub-Android-release",
+      "size_in_bytes": 28699393,
+      "expired": false,
+      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/12729781481/zip"
+    }
+  ]
 }

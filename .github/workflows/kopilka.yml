@@ -1,4 +1,8 @@
 name: Kopilka standalone APK
+# Avoid older builds overwriting a newer standalone APK in the same release.
+concurrency:
+  group: kopilka-android-${{ github.ref }}
+  cancel-in-progress: true
 on:
   workflow_dispatch:
   push:

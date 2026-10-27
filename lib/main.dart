@@ -178,6 +178,19 @@ class _HomePageState extends State<HomePage> {
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),
                 Text('Релиз: ${i.version ?? 'не опубликован'}'),
+                FutureBuilder<String?>(future: ProjectLauncher.installedVersion(project.id),
+                  builder: (context, installed) => Text(installed.data == null
+                    ? 'Версия установки: неизвестна'
+                    : installed.data == i.version ? 'Версия: актуальная (${installed.data})'
+                    : 'Доступно обновление: ${installed.data} → ${i.version ?? '?'}')),
+                ValueListenableBuilder<double?>(valueListenable: ProjectLauncher.downloadProgress,
+                  builder: (context, progress, child) => progress == null
+                    ? const SizedBox.shrink()
+                    : Padding(padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Загрузка: ${(progress * 100).toStringAsFixed(0)}%'),
+                          LinearProgressIndicator(value: progress),
+                        ]))),
                 Text('Сборка: ${i.workflowStatus ?? 'нет данных'}'),
                 if (i.error != null) Text(i.error!, style: TextStyle(color: Theme.of(context).colorScheme.tertiary)),
                 if (tab == 0 && ProjectLauncher.canLaunch(project.id))
@@ -246,6 +259,7 @@ class _HomePageState extends State<HomePage> {
                           const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
                         try {
                           await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!);
+                          await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
                            }
@@ -266,6 +280,7 @@ class _HomePageState extends State<HomePage> {
                           const SnackBar(content: Text('Скачиваем игру со всеми файлами...')));
                         try {
                           await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!);
+                          await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Игра установлена. Нажми «Открыть».')));

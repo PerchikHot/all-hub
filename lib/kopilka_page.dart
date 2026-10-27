@@ -170,15 +170,17 @@ class _KopilkaPageState extends State<KopilkaPage> {
         const SizedBox(height: 12),
         Card(color: const Color(0xFF162743), child: const ListTile(
           leading: Icon(Icons.notifications_off_outlined, color: Color(0xFFA8C5FF)),
-          title: Text('Автоучёт пока не подключён'),
-          subtitle: Text('Уведомления Т-Банка, Газпромбанка и Ozon Банка ещё не считываются. Операции сейчас добавляются вручную.'),
+          title: Text('Автоматический учёт не настроен'),
+          subtitle: Text('Эта версия не имеет доступа к уведомлениям Android. Данные Т-Банка, Газпромбанка и Ozon Банка не импортируются. Сейчас доступны ручные операции.'),
         )),
         const SizedBox(height: 12),
         Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Общий баланс', style: TextStyle(color: Colors.white70)),
+            const Row(children: [Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 8), Text('Деньги на счетах', style: TextStyle(color: Colors.white70))]),
             const SizedBox(height: 8),
-            Text(money(total), style: Theme.of(context).textTheme.headlineMedium),
+            Text(money(total), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            const Text('Расчёт по внесённым операциям, не баланс банков', style: TextStyle(color: Colors.white54, fontSize: 12)),
             const SizedBox(height: 16),
             LinearProgressIndicator(value: (total / goal).clamp(0.0, 1.0)),
             const SizedBox(height: 8),
@@ -186,8 +188,8 @@ class _KopilkaPageState extends State<KopilkaPage> {
           ]))),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: Card(child: ListTile(title: const Text('Доходы'), subtitle: Text(money(income))))),
-          Expanded(child: Card(child: ListTile(title: const Text('Расходы'), subtitle: Text(money(expenses))))),
+          Expanded(child: Card(child: ListTile(title: const Text('Доходы за всё время'), subtitle: Text(money(income))))),
+          Expanded(child: Card(child: ListTile(title: const Text('Расходы за всё время'), subtitle: Text(money(expenses))))),
         ]),
         const SizedBox(height: 12),
         Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(

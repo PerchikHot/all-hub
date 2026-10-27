@@ -51,6 +51,23 @@ String suggestNotificationAmount(String body) {
   return result;
 }
 
+/// Conservative default for the review dialog, never an automatic posting.
+/// Ambiguous transfers and notifications mentioning both directions remain
+/// expenses until the user explicitly selects another operation type.
+String suggestNotificationKind(String text) {
+  final incoming = RegExp(
+    r'поступлен|поступил|зачислен|пополнен|пополнение|возврат|кэшбэк|кешбэк|refund|credited|deposit',
+    caseSensitive: false,
+  );
+  final outgoing = RegExp(
+    r'списан|списание|покупк|оплат|перевод|сняти|withdraw|payment|purchase|debited',
+    caseSensitive: false,
+  );
+  return incoming.hasMatch(text) && !outgoing.hasMatch(text)
+      ? 'income'
+      : 'expense';
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -176,7 +193,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   });
 
   Future<void> _add({Map<String, dynamic>? notification}) async {
-    String kind = 'expense', bank = banks.first, destination = banks[1];
+    final notificationText = notification == null ? '' :
+        '${notification['title'] ?? ''}\n${notification['body'] ?? ''}';
+    String kind = notification == null
+        ? 'expense' : suggestNotificationKind(notificationText);
+    String bank = banks.first, destination = banks[1];
     final notificationBank = notification?['bank']?.toString();
     if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
     final amount = TextEditingController(

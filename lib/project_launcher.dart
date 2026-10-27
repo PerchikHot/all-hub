@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:archive/archive_io.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -153,6 +154,102 @@ class ProjectLauncher {
       }
     } finally {
       client.close();
+    }
+  }
+
+  /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
+  /// Files are extracted to a staging directory and activated only after validation.
+  static Future<void> installWindowsZip(String id, String url) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!RegExp(r'^[a-z0-9-]+
+    if (!Platform.isWindows) return false;
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['exe']);
+    final path = selection?.files.single.path;
+    if (path == null || !path.toLowerCase().endsWith('.exe')) return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString('exe_$id', path);
+  }
+
+  static bool canLaunch(String id) => Platform.isWindows ||
+      (Platform.isAndroid && packages.containsKey(id));
+}
+).hasMatch(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https' || uri.host != 'github.com' ||
+        !uri.path.toLowerCase().endsWith('.zip')) {
+      throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
+    }
+    final root = await getApplicationSupportDirectory();
+    final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+    await projects.create(recursive: true);
+    final target = Directory('${projects.path}${Platform.pathSeparator}$id');
+    final staging = Directory('${projects.path}${Platform.pathSeparator}$id.staging');
+    final backup = Directory('${projects.path}${Platform.pathSeparator}$id.backup');
+    final zipFile = File('${projects.path}${Platform.pathSeparator}$id.download.zip');
+    if (await staging.exists()) await staging.delete(recursive: true);
+    await staging.create(recursive: true);
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      final sink = zipFile.openWrite();
+      await sink.addStream(response.stream);
+      await sink.flush();
+      await sink.close();
+      final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
+      final rootPath = staging.absolute.path;
+      for (final entry in archive) {
+        final name = entry.name.replaceAll('\\', '/');
+        if (name.startsWith('/') || name.contains(':') ||
+            name.split('/').contains('..')) {
+          throw const FormatException('Недопустимый путь в ZIP');
+        }
+        if (name.isEmpty) continue;
+        final destination = '$rootPath${Platform.pathSeparator}${name.replaceAll('/', Platform.pathSeparator)}';
+        if (entry.isFile) {
+          final file = File(destination);
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.content as List<int>, flush: true);
+        } else {
+          await Directory(destination).create(recursive: true);
+        }
+      }
+      final executables = await staging.list(recursive: true).where(
+        (entity) => entity is File && entity.path.toLowerCase().endsWith('.exe'),
+      ).cast<File>().toList();
+      if (executables.isEmpty) {
+        throw const FormatException('В архиве нет исполняемого EXE');
+      }
+      executables.sort((a, b) {
+        final aName = a.uri.pathSegments.last.toLowerCase();
+        final bName = b.uri.pathSegments.last.toLowerCase();
+        final aRank = aName.contains(id.replaceAll('-', '')) ? 0 : 1;
+        final bRank = bName.contains(id.replaceAll('-', '')) ? 0 : 1;
+        return aRank.compareTo(bRank);
+      });
+      final relativeExe = executables.first.path.substring(staging.path.length);
+      if (await backup.exists()) await backup.delete(recursive: true);
+      if (await target.exists()) await target.rename(backup.path);
+      try {
+        await staging.rename(target.path);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('exe_$id', '${target.path}$relativeExe');
+        if (await backup.exists()) await backup.delete(recursive: true);
+      } catch (_) {
+        if (await target.exists()) await target.delete(recursive: true);
+        if (await backup.exists()) await backup.rename(target.path);
+        rethrow;
+      }
+    } finally {
+      client.close();
+      if (await zipFile.exists()) await zipFile.delete();
+      if (await staging.exists()) await staging.delete(recursive: true);
     }
   }
 

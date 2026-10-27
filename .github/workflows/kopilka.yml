@@ -10,6 +10,7 @@ on:
     paths:
       - 'lib/kopilka_page.dart'
       - 'lib/kopilka_main.dart'
+      - 'test/kopilka_notification_amount_test.dart'
       - '.github/workflows/kopilka.yml'
 
 jobs:
@@ -84,7 +85,9 @@ jobs:
                   }
                   val extras = sbn.notification.extras
                   val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-                  val body = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                  val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                  val expandedText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+                  val body = if (expandedText.isNotBlank()) expandedText else normalText
                   if (body.isBlank()) return
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                   val current = JSONArray(prefs.getString("queue", "[]"))
@@ -179,7 +182,12 @@ jobs:
           p.write_text(s)
           PY
           rm -f test/widget_test.dart
+          # Run the same finance parsing regression tests in the standalone
+          # package before an APK can be published.
+          cp "$GITHUB_WORKSPACE/test/kopilka_notification_amount_test.dart" test/kopilka_notification_amount_test.dart
+          sed -i 's#package:all_hub/kopilka_page.dart#package:kopilka_app/kopilka_page.dart#' test/kopilka_notification_amount_test.dart
           flutter analyze
+          flutter test test/kopilka_notification_amount_test.dart
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"

@@ -209,7 +209,6 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     'марин китагава': 'kitagawa_marin',
     'люси сердобольская': 'heartfilia_lucy',
     'мираж анна': 'mirajane_strauss',
-    'шуга': 'shuna_(tensei_shitara_slime_datta_ken)',
   };
 
   @override

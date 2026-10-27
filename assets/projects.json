@@ -36,7 +36,7 @@
     "name": "Копилка",
     "type": "Android app / Windows",
     "description": "Финансы: счета, доходы, расходы, переводы между своими банками и накопления",
-    "repo": null,
+    "repo": "PerchikHot/all-hub",
     "icon": "account_balance_wallet"
   }
 ]

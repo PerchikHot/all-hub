@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,10 +13,13 @@ class KopilkaPage extends StatefulWidget {
 class _KopilkaPageState extends State<KopilkaPage> {
   final entries = <Map<String, dynamic>>[];
   bool loading = true;
+  static const _notifications = MethodChannel('kopilka/notifications');
+  bool notificationsEnabled = false;
+  final pendingNotifications = <Map<String, dynamic>>[];
   double goal = 100000;
   final banks = const ['Т-Банк', 'Газпромбанк', 'Ozon Банк', 'Наличные'];
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() { super.initState(); _load(); _refreshNotifications(); }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -25,6 +29,35 @@ class _KopilkaPageState extends State<KopilkaPage> {
     } catch (_) {}
     if (!mounted) return;
     setState(() { goal = prefs.getDouble('kopilka_goal_v1') ?? 100000; loading = false; });
+  }
+
+  Future<void> _refreshNotifications() async {
+    try {
+      final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
+      final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
+      final data = (jsonDecode(raw) as List).whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e)).toList();
+      if (mounted) setState(() {
+        notificationsEnabled = enabled;
+        pendingNotifications..clear()..addAll(data);
+      });
+    } on MissingPluginException {
+      // Embedded All Hub builds do not include the standalone listener yet.
+    } on PlatformException {
+      // Android settings may be unavailable on some devices.
+    }
+  }
+
+  Future<void> _openNotificationSettings() async {
+    try {
+      await _notifications.invokeMethod<void>('openSettings');
+    } on MissingPluginException {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Установи отдельную APK Копилки для подключения уведомлений.')));
+    } on PlatformException {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось открыть настройки уведомлений.')));
+    }
   }
 
   Future<void> _save() async {
@@ -168,11 +201,23 @@ class _KopilkaPageState extends State<KopilkaPage> {
           ]),
         ),
         const SizedBox(height: 12),
-        Card(color: const Color(0xFF162743), child: const ListTile(
-          leading: Icon(Icons.notifications_off_outlined, color: Color(0xFFA8C5FF)),
-          title: Text('Автоматический учёт не настроен'),
-          subtitle: Text('Эта версия не имеет доступа к уведомлениям Android. Данные Т-Банка, Газпромбанка и Ozon Банка не импортируются. Сейчас доступны ручные операции.'),
-        )),
+        Card(color: const Color(0xFF162743), child: Column(children: [
+          ListTile(
+            leading: Icon(notificationsEnabled ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+              color: const Color(0xFFA8C5FF)),
+            title: Text(notificationsEnabled ? 'Доступ к уведомлениям включён' : 'Подключить уведомления банков'),
+            subtitle: const Text('Т-Банк, Газпромбанк, Ozon Банк. Уведомления остаются на устройстве.'),
+            trailing: IconButton(icon: const Icon(Icons.settings_outlined),
+              onPressed: _openNotificationSettings),
+          ),
+          if (pendingNotifications.isNotEmpty)
+            ListTile(
+              title: Text('Получено уведомлений: ${pendingNotifications.length}'),
+              subtitle: const Text('Пока не включены в баланс: требуется проверка операций, чтобы избежать дублей.'),
+            ),
+          TextButton.icon(onPressed: _refreshNotifications,
+            icon: const Icon(Icons.refresh), label: const Text('Проверить подключение')),
+        ])),
         const SizedBox(height: 12),
         Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [

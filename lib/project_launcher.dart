@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 class ProjectLauncher {
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
+  static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
     if (version == null || version.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
@@ -89,13 +90,15 @@ class ProjectLauncher {
 
   /// Downloads a published APK directly, then asks Android to install it.
   /// Android always requires user confirmation; this cannot silently install apps.
-  static Future<void> installAndroidApk(String url) async {
+  static Future<void> installAndroidApk(String url, {String? projectId}) async {
     if (!Platform.isAndroid) throw UnsupportedError('Android only');
     final uri = Uri.tryParse(url);
     if (uri == null || uri.scheme != 'https' || uri.host != 'github.com' ||
         !uri.path.toLowerCase().endsWith('.apk')) {
       throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
     }
+    activeDownloadProject.value = projectId;
+    downloadProgress.value = null;
     final client = http.Client();
     try {
       final response = await client.send(http.Request('GET', uri))
@@ -129,6 +132,8 @@ class ProjectLauncher {
       }
     } finally {
       client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
     }
   }
 

@@ -294,13 +294,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final tag = requestedQuery.isNotEmpty ? requestedQuery
           : categoryTag.isNotEmpty ? categoryTag
           : favoriteTags[(requestedPage - 1) % favoriteTags.length];
-      final tags = [tag, if (requestedKind == 'gif') 'filetype:gif'].join(' ');
+      final tags = requestedKind == 'gif' ? 'filetype:gif' : tag;
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
         'page': '${requestedQuery.isEmpty ? 1 : requestedPage}',
       });
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(uri).timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -312,6 +312,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         if (preview is! String || !preview.startsWith('https://')) return false;
         final id = (p['id'] ?? '').toString();
         if (seenPostIds.contains(id)) return false;
+        if (requestedCategory == 'futanari' &&
+            !(p['tag_string'] ?? '').toString().split(' ').contains('futanari')) return false;
+        if (requestedCategory == 'solo' &&
+            !(p['tag_string'] ?? '').toString().split(' ').contains('solo')) return false;
+        if (requestedCategory == 'lesbian' &&
+            !(p['tag_string'] ?? '').toString().split(' ').contains('yuri')) return false;
         if (requestedKind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
           return ext == 'gif';

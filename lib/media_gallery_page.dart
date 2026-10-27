@@ -19,7 +19,6 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String kind = 'all';
   String error = '';
   String activeQuery = '';
-  bool highQuality = false;
   static const int pageSize = 18;
 
   @override
@@ -130,11 +129,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             search();
           }),
           const Spacer(),
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            const Text('HD при открытии'),
-            Switch.adaptive(value: highQuality,
-              onChanged: (v) => setState(() => highQuality = v)),
-          ]),
+          const Text('Превью • экономия трафика'),
           IconButton(tooltip: 'Обновить', onPressed: search, icon: const Icon(Icons.refresh)),
         ]),
       ]),

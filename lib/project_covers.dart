@@ -244,7 +244,17 @@ class _ProjectCoverState extends State<ProjectCover> {
             entry is File && RegExp(r'\.(png|jpg|jpeg|webp|bmp)$', caseSensitive: false).hasMatch(entry.path)
           ).cast<File>().toList();
           final matching = files.where((f) => f.path.toLowerCase().split(Platform.pathSeparator).last.startsWith('${widget.id.toLowerCase()}_')).toList();
-          localCandidates = matching.isNotEmpty ? matching : files;
+          // Imported cover files have generic names. Give each project a stable
+          // subset rather than repeating the same random cover everywhere.
+          files.sort((a, b) => a.path.compareTo(b.path));
+          const projectIds = ['all-hub', 'eclipse-arena', 'shadow-rp', 'shadow-garden', 'kopilka'];
+          final projectIndex = projectIds.indexOf(widget.id);
+          final shared = projectIndex < 0 ? files : <File>[
+            for (var i = 0; i < files.length; i++)
+              if (i % projectIds.length == projectIndex) files[i],
+          ];
+          // Explicit project-prefixed filenames always take precedence.
+          localCandidates = matching.isNotEmpty ? matching : shared;
           if (localCandidates.isNotEmpty) {
             final alternatives = localCandidates.where((f) => f.path != localFile?.path).toList();
             final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;

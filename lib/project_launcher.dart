@@ -15,6 +15,13 @@ class ProjectLauncher {
     await prefs.setString('installed_version_$id', version);
   }
   static Future<String?> installedVersion(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id];
+      if (packageName == null) return null;
+      try {
+        return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
+      } catch (_) { return null; }
+    }
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('installed_version_$id');
   }

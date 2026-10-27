@@ -19,7 +19,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Restore permanent Kopilka signing key
+      - name: Restore optional permanent Kopilka signing key
         env:
           KOPILKA_KEYSTORE_BASE64: ${{ secrets.KOPILKA_KEYSTORE_BASE64 }}
           KOPILKA_STORE_PASSWORD: ${{ secrets.KOPILKA_STORE_PASSWORD }}
@@ -31,8 +31,9 @@ jobs:
           keys = ['KOPILKA_KEYSTORE_BASE64','KOPILKA_STORE_PASSWORD','KOPILKA_KEY_PASSWORD','KOPILKA_KEY_ALIAS']
           missing = [k for k in keys if not os.environ.get(k)]
           if missing:
-              raise SystemExit('Missing permanent signing secrets: ' + ', '.join(missing))
-          pathlib.Path('/tmp/kopilka-release.jks').write_bytes(base64.b64decode(os.environ['KOPILKA_KEYSTORE_BASE64'], validate=True))
+              print('No permanent signing key configured; using Android debug signing for test APK. Missing: ' + ', '.join(missing))
+          else:
+              pathlib.Path('/tmp/kopilka-release.jks').write_bytes(base64.b64decode(os.environ['KOPILKA_KEYSTORE_BASE64'], validate=True))
           PY
       - name: Create standalone Flutter app
         env:
@@ -63,13 +64,16 @@ jobs:
               path.parent.mkdir(parents=True, exist_ok=True)
               image.save(path)
           PYICON
-          cp /tmp/kopilka-release.jks android/app/kopilka-release.jks
+          if [ -f /tmp/kopilka-release.jks ]; then cp /tmp/kopilka-release.jks android/app/kopilka-release.jks; fi
           python3 - <<'PY'
           from pathlib import Path
           p = Path('android/app/build.gradle.kts')
           s = p.read_text()
           marker = '    buildTypes {'
           assert marker in s
+          if not Path('android/app/kopilka-release.jks').exists():
+              print('Building test APK with debug signing; updates over differently signed installations will fail.')
+              raise SystemExit(0)
           config = '''    signingConfigs {
               create("kopilkaRelease") {
                   storeFile = file("kopilka-release.jks")
@@ -102,7 +106,7 @@ jobs:
           gh release create kopilka-latest dist/Kopilka-Android.apk \
             --repo "$GITHUB_REPOSITORY" \
             --title "Копилка — Android APK" \
-            --notes "Отдельная сборка Копилки из общего репозитория All Hub." \
+            --notes "Отдельная сборка Копилки из общего репозитория All Hub. Без KOPILKA_* secrets APK имеет тестовую debug-подпись; установка поверх APK с другим сертификатом невозможна." \
             --latest=false 2>/dev/null || \
           gh release upload kopilka-latest dist/Kopilka-Android.apk \
             --repo "$GITHUB_REPOSITORY" --clobber

@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'hub_widgets.dart';
 
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
@@ -165,7 +164,7 @@ class _KopilkaPageState extends State<KopilkaPage> {
                   style: TextStyle(color: Color(0xFFC5D9F5))),
               ],
             )),
-            const HubAvatar(size: 82),
+            const Icon(Icons.savings_rounded, size: 82, color: Color(0xFF71D7FF)),
           ]),
         ),
         const SizedBox(height: 12),

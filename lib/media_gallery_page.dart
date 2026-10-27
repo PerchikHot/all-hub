@@ -73,6 +73,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       hasMore = true;
       error = '';
     });
+    loading = false;
     loadMore();
   }
 
@@ -117,7 +118,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     } catch (e) {
       if (mounted && generation == searchGeneration) setState(() => error = 'Не удалось загрузить изображения: $e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && generation == searchGeneration) setState(() => loading = false);
     }
   }
 

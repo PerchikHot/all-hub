@@ -46,6 +46,93 @@ jobs:
           flutter create --platforms=android --project-name kopilka_app --org com.veyrion .
           cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
           cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
+          # Install a local-only Android notification listener for supported banks.
+          python3 - <<'PYNOTIFY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          m = manifest.read_text()
+          service = '''<service android:name=".BankNotificationService"
+                  android:label="Копилка — уведомления банков"
+                  android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+                  android:exported="false">
+                  <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
+              </service>'''
+          m = m.replace('</application>', service + '</application>')
+          manifest.write_text(m)
+          folder = Path('android/app/src/main/kotlin/com/veyrion/kopilka_app')
+          folder.mkdir(parents=True, exist_ok=True)
+          (folder / 'BankNotificationService.kt').write_text(r'''
+          package com.veyrion.kopilka_app
+          import android.service.notification.NotificationListenerService
+          import android.service.notification.StatusBarNotification
+          import android.app.Notification
+          import org.json.JSONArray
+          import org.json.JSONObject
+
+          class BankNotificationService : NotificationListenerService() {
+              override fun onNotificationPosted(sbn: StatusBarNotification?) {
+                  if (sbn == null) return
+                  val bank = when (sbn.packageName) {
+                      "com.idamob.tinkoff.android" -> "Т-Банк"
+                      "ru.gazprombank.android.mobilebank.app" -> "Газпромбанк"
+                      "ru.ozon.fintech.finance" -> "Ozon Банк"
+                      else -> return
+                  }
+                  val extras = sbn.notification.extras
+                  val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
+                  val body = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+                  if (body.isBlank()) return
+                  val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                  val current = JSONArray(prefs.getString("queue", "[]"))
+                  val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}:${body.hashCode()}"
+                  for (i in 0 until current.length()) {
+                      if (current.getJSONObject(i).optString("key") == key) return
+                  }
+                  current.put(JSONObject().put("key", key).put("bank", bank)
+                      .put("title", title).put("body", body).put("time", sbn.postTime))
+                  while (current.length() > 100) current.remove(0)
+                  prefs.edit().putString("queue", current.toString()).apply()
+              }
+          }
+          ''')
+          (folder / 'MainActivity.kt').write_text(r'''
+          package com.veyrion.kopilka_app
+          import android.content.Intent
+          import android.provider.Settings
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kopilka/notifications")
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "openSettings" -> {
+                                  startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                  result.success(null)
+                              }
+                              "enabled" -> {
+                                  val listeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: ""
+                                  result.success(listeners.contains(packageName))
+                              }
+                              "pending" -> {
+                                  val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                  result.success(prefs.getString("queue", "[]"))
+                              }
+                              "clear" -> {
+                                  getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                      .edit().remove("queue").apply()
+                                  result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+          }
+          ''')
+          PYNOTIFY
           flutter pub add shared_preferences
           python3 -m pip install --quiet Pillow
           python3 - <<'PYICON'

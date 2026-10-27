@@ -19,7 +19,26 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Restore permanent Kopilka signing key
+        env:
+          KOPILKA_KEYSTORE_BASE64: ${{ secrets.KOPILKA_KEYSTORE_BASE64 }}
+          KOPILKA_STORE_PASSWORD: ${{ secrets.KOPILKA_STORE_PASSWORD }}
+          KOPILKA_KEY_PASSWORD: ${{ secrets.KOPILKA_KEY_PASSWORD }}
+          KOPILKA_KEY_ALIAS: ${{ secrets.KOPILKA_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib
+          keys = ['KOPILKA_KEYSTORE_BASE64','KOPILKA_STORE_PASSWORD','KOPILKA_KEY_PASSWORD','KOPILKA_KEY_ALIAS']
+          missing = [k for k in keys if not os.environ.get(k)]
+          if missing:
+              raise SystemExit('Missing permanent signing secrets: ' + ', '.join(missing))
+          pathlib.Path('/tmp/kopilka-release.jks').write_bytes(base64.b64decode(os.environ['KOPILKA_KEYSTORE_BASE64'], validate=True))
+          PY
       - name: Create standalone Flutter app
+        env:
+          KOPILKA_STORE_PASSWORD: ${{ secrets.KOPILKA_STORE_PASSWORD }}
+          KOPILKA_KEY_PASSWORD: ${{ secrets.KOPILKA_KEY_PASSWORD }}
+          KOPILKA_KEY_ALIAS: ${{ secrets.KOPILKA_KEY_ALIAS }}
         run: |
           mkdir -p /tmp/kopilka_build
           cd /tmp/kopilka_build
@@ -27,6 +46,26 @@ jobs:
           cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
           cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
           flutter pub add shared_preferences
+          cp /tmp/kopilka-release.jks android/app/kopilka-release.jks
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle.kts')
+          s = p.read_text()
+          marker = '    buildTypes {'
+          assert marker in s
+          config = '''    signingConfigs {
+              create("kopilkaRelease") {
+                  storeFile = file("kopilka-release.jks")
+                  storePassword = System.getenv("KOPILKA_STORE_PASSWORD")
+                  keyAlias = System.getenv("KOPILKA_KEY_ALIAS")
+                  keyPassword = System.getenv("KOPILKA_KEY_PASSWORD")
+              }
+          }
+          '''
+          s = s.replace(marker, config + marker, 1)
+          s = s.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("kopilkaRelease")')
+          p.write_text(s)
+          PY
           rm -f test/widget_test.dart
           flutter analyze
           flutter build apk --release

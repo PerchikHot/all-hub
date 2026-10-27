@@ -100,7 +100,15 @@ class MainActivity : FlutterActivity() {
                         } else {
                             try {
                                 val info = packageManager.getPackageInfo(packageName, 0)
-                                result.success(info.versionName ?: info.longVersionCode.toString())
+                                val version = info.versionName
+                                // Include the CI build number for All Hub itself.
+                                // Rolling releases share a stable version name,
+                                // so versionName alone cannot detect an update.
+                                if (packageName == "com.example.all_hub" && !version.isNullOrBlank()) {
+                                    result.success("$version+${info.longVersionCode}")
+                                } else {
+                                    result.success(version ?: info.longVersionCode.toString())
+                                }
                             } catch (e: PackageManager.NameNotFoundException) {
                                 result.success(null)
                             } catch (e: Exception) {

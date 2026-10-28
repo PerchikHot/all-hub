@@ -108,6 +108,22 @@ void main() {
       expect(suggestNotificationAmount('1 200 RUB'), '1200');
     });
   });
+  group('Kopilka manual amount validation', () {
+    test('accepts grouped ruble amounts and decimal commas', () {
+      expect(parseKopilkaAmount('1 250,50'), 1250.5);
+      expect(parseKopilkaAmount('12\u202f500.25'), 12500.25);
+      expect(parseKopilkaAmount('1234.5'), 1234.5);
+    });
+    test('rejects ambiguous grouping and invalid amounts', () {
+      expect(parseKopilkaAmount('1 2'), isNull);
+      expect(parseKopilkaAmount('1 23,45'), isNull);
+      expect(parseKopilkaAmount('-100'), isNull);
+      expect(parseKopilkaAmount('0'), isNull);
+      expect(parseKopilkaAmount('100.999'), isNull);
+      expect(parseKopilkaAmount('abc'), isNull);
+    });
+  });
+
   group('Kopilka saved amount safety', () {
     test('valid numeric amounts remain unchanged', () {
       expect(safeKopilkaAmount({'amount': 120.50}), 120.50);

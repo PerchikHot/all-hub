@@ -54,7 +54,8 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
   if (name.isEmpty || name.startsWith('record ')) return false;
   switch (projectId) {
     case 'all-hub':
-      return name == 'build all hub';
+      return name == 'build all hub' &&
+          (platform == 'android' || platform == 'windows');
     case 'kopilka':
       return name.contains('kopilka') && name.contains('apk') && platform == 'android';
     case 'eclipse-arena':
@@ -68,7 +69,8 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
     case 'shadow-rp':
       return platform == 'android' && name.contains('android') && name.contains('apk');
     default:
-      return true;
+      // An unknown project must not inherit an unrelated workflow status.
+      return false;
   }
 }
 

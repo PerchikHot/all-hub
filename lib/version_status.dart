@@ -20,9 +20,13 @@ int? comparePublishedVersions(String installed, String published) {
     final b = int.parse(latest.group(i)!);
     if (a != b) return a.compareTo(b);
   }
-  // Only compare build numbers when both are explicitly available.
-  if (current.group(4) != null && latest.group(4) != null) {
-    return int.parse(current.group(4)!).compareTo(int.parse(latest.group(4)!));
+  // A missing build number cannot prove two same-version packages match.
+  // This matters for rolling releases that publish multiple APK builds.
+  final currentBuild = current.group(4);
+  final latestBuild = latest.group(4);
+  if ((currentBuild == null) != (latestBuild == null)) return null;
+  if (currentBuild != null && latestBuild != null) {
+    return int.parse(currentBuild).compareTo(int.parse(latestBuild));
   }
   return 0;
 }

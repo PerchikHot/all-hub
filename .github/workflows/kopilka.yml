@@ -97,7 +97,7 @@ jobs:
                       RegexOption.IGNORE_CASE)
                   val currency = Regex("""₽|руб(?:\.|ля|лей)?|\bRUB\b""", RegexOption.IGNORE_CASE)
                   val sensitive = Regex(
-                      """код\s+(?:подтверждения|входа|для\s+входа)|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
+                      """код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
                       RegexOption.IGNORE_CASE)
                   if (!transaction.containsMatchIn(combined) ||
                       !currency.containsMatchIn(combined) ||

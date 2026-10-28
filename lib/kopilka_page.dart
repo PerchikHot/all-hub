@@ -90,6 +90,25 @@ bool isBankTransactionNotification(String title, String body) {
       !sensitive.hasMatch(text);
 }
 
+/// Only review a native notification once, even if the listener returns the
+/// same event repeatedly. Events without a stable key cannot be safely imported.
+List<Map<String, dynamic>> filterPendingBankNotifications(
+  List<dynamic> raw, Set<String> reviewed,
+) {
+  final seen = <String>{};
+  return raw.whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .where((e) {
+        final key = (e['key'] ?? '').toString();
+        if (key.isEmpty || reviewed.contains(key)) return false;
+        if (!isBankTransactionNotification(
+            (e['title'] ?? '').toString(), (e['body'] ?? '').toString())) {
+          return false;
+        }
+        return seen.add(key);
+      }).toList();
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -144,12 +163,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       // before recording the reviewed key must not cause a second import.
       reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
           .where((key) => key.isNotEmpty));
-      final data = (jsonDecode(raw) as List).whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .where((e) => !reviewed.contains((e['key'] ?? '').toString()))
-          .where((e) => isBankTransactionNotification(
-              (e['title'] ?? '').toString(), (e['body'] ?? '').toString()))
-          .toList();
+      final data = filterPendingBankNotifications(jsonDecode(raw) as List, reviewed);
       if (mounted) {
         setState(() {
           notificationsEnabled = enabled;

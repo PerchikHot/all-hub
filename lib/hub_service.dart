@@ -79,13 +79,15 @@ class HubService {
           if (!releaseMatchesProject(tag, projectId)) continue;
           final notes = release['body']?.toString().trim();
           final publishedVersion = publishedVersionFromRelease(tag, notes);
-          version ??= publishedVersion;
           for (final a in (release['assets'] as List? ?? [])) {
             final file = a as Map<String, dynamic>;
             final name = (file['name'] ?? '').toString();
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();
             if (platform != null && url.startsWith('https://')) {
+              // A release for another OS must not be shown as an available
+              // update on this device without a matching installer.
+              if (platform == currentPlatform) version ??= publishedVersion;
               assets.add(HubAsset(name, url, platform, publishedVersion, releaseNotes: notes));
             }
           }

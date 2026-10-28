@@ -10,6 +10,7 @@ void main() {
       {'key': 'c', 'title': 'Банк', 'body': 'Код подтверждения оплаты 500 ₽'},
       {'title': 'Банк', 'body': 'Оплата 100 ₽'},
       'malformed',
+      {42: 'invalid native key'},
     ];
     expect(filterPendingBankNotifications(alerts, <String>{}).map((e) => e['key']).toList(),
       ['a', 'b']);

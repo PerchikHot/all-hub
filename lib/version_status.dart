@@ -41,7 +41,7 @@ String describeUpdateStatus(String? installed, String? published) {
   final comparison = comparePublishedVersions(installed, published);
   if (comparison == null) {
     // Distinguish an unknown release channel from an incomplete build number.
-    final numeric = RegExp(r'^v?\d+\.\d+\.\d+(?:\+\d+)?);
+    final numeric = RegExp(r'^v?\d+\.\d+\.\d+(?:\+\d+)?$');
     if (numeric.hasMatch(installed.trim()) && numeric.hasMatch(published.trim())) {
       return 'Статус обновления неизвестен: номер сборки указан только у одной версии';
     }

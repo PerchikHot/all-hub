@@ -22,6 +22,14 @@ void main() {
     expect(publishedVersionFromRelease('all-hub-latest',
       'Автоматическая сборка без версии'), 'all-hub-latest');
   });
+  test('shared repository release channels never cross-contaminate', () {
+    expect(releaseMatchesProject('all-hub-latest', 'all-hub'), isTrue);
+    expect(releaseMatchesProject('kopilka-latest', 'kopilka'), isTrue);
+    expect(releaseMatchesProject('kopilka-latest', 'all-hub'), isFalse);
+    expect(releaseMatchesProject('all-hub-latest', 'kopilka'), isFalse);
+    expect(releaseMatchesProject('eclipse-arena-android', 'eclipse-arena'), isTrue);
+  });
+
   test('rolling release tags must not trigger false updates', () {
     expect(comparePublishedVersions('0.18.3', 'shadow-rp-android'), isNull);
     expect(describeUpdateStatus('0.18.3', 'shadow-rp-android'),

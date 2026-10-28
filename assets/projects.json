@@ -10,8 +10,8 @@
   {
     "id": "eclipse-arena",
     "name": "Eclipse Arena",
-    "type": "Android game",
-    "description": "2D fighting game",
+    "type": "Android game / Windows",
+    "description": "2D-файтинг: Android APK и Windows EXE; установка через All Hub в разработке",
     "repo": "PerchikHot/Eclipse-Arena-",
     "icon": "sports_martial_arts"
   },

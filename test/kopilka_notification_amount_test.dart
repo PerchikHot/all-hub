@@ -18,6 +18,10 @@ void main() {
       expect(isBankTransactionNotification('Т-Банк', 'Код подтверждения перевода 1 000 ₽: 1234'), isFalse);
       expect(isBankTransactionNotification('Ozon', 'Никому не сообщайте код. Оплата 200 ₽'), isFalse);
       expect(isBankTransactionNotification('Bank', 'Verification code for payment 200 RUB'), isFalse);
+      expect(isBankTransactionNotification('Т-Банк', 'Код для подтверждения перевода 1 000 ₽: 1234'), isFalse);
+      expect(isBankTransactionNotification('Газпромбанк', 'СМС-код для оплаты 500 ₽: 1234'), isFalse);
+      expect(isBankTransactionNotification('Ozon Банк', 'Код операции: 1234. Перевод 2 000 ₽'), isFalse);
+      expect(isBankTransactionNotification('Т-Банк', 'Код из СМС для оплаты 300 ₽'), isFalse);
     });
   });
 

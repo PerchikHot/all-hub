@@ -148,7 +148,7 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       .where((word) => word.isNotEmpty);
   final text = [
     entry['note'], entry['bank'], entry['from'], entry['to'],
-    entry['date'], entry['kind'],
+    entry['date'], entry['kind'], entry['amount'],
     entry['kind'] == 'income' ? 'доход поступление' :
       entry['kind'] == 'expense' ? 'расход покупка' : 'перевод',
   ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');

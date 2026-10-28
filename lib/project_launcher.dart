@@ -122,6 +122,7 @@ class ProjectLauncher {
     'shadow-rp': 'com.shadowrp.app',
     'kopilka': 'com.veyrion.kopilka_app',
     'eclipse-arena': 'org.eclipsearena.prototype',
+    'nova-game': 'com.perchikhot.novagame',
   };
 
   static Future<bool> isAvailable(String id) async {

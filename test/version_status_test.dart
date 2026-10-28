@@ -73,6 +73,8 @@ void main() {
     expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'windows'), isFalse);
     expect(workflowMatchesProject('Android APK', 'nova-game', 'android'), isTrue);
     expect(workflowMatchesProject('Android APK', 'nova-game', 'windows'), isFalse);
+    expect(workflowMatchesProject('Nova Windows EXE', 'nova-game', 'windows'), isTrue);
+    expect(workflowMatchesProject('Nova Windows EXE', 'nova-game', 'android'), isFalse);
     expect(workflowMatchesProject('Build All Hub', 'nova-game', 'android'), isFalse);
     expect(workflowMatchesProject('Build All Hub', 'all-hub', 'linux'), isFalse);
     expect(workflowMatchesProject('Build All Hub', 'unknown-project', 'android'), isFalse);

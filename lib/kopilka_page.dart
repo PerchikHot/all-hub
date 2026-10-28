@@ -144,7 +144,7 @@ double? parseKopilkaAmount(String input) {
 
 /// Local search of already saved transactions; never sends finance data online.
 bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
-  final words = query.toLowerCase().trim().split(RegExp(r'\\s+'))
+  final words = query.toLowerCase().trim().split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty);
   final text = [
     entry['note'], entry['bank'], entry['from'], entry['to'],

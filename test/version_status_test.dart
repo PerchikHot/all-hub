@@ -19,6 +19,8 @@ void main() {
       'Подписанная сборка.\nVersion: 0.18.4'), '0.18.4');
     expect(publishedVersionFromRelease('all-hub-latest',
       'Version: 0.6.0+42'), '0.6.0+42');
+    expect(publishedVersionFromRelease('kopilka-latest',
+      'version: v1.4.2'), 'v1.4.2');
     expect(publishedVersionFromRelease('all-hub-latest',
       'Автоматическая сборка без версии'), 'all-hub-latest');
   });

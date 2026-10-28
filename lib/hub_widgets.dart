@@ -81,12 +81,12 @@ class HubAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: size, height: size,
-    child: CustomPaint(painter: _ShadowEmblemPainter()),
+    child: CustomPaint(painter: _VeyrionEmblemPainter()),
   );
 }
 
-/// Temporary original silhouette until the approved character art is supplied.
-class _ShadowEmblemPainter extends CustomPainter {
+/// Temporary blue-eyed Veyrion placeholder; not a replacement for the approved OC art.
+class _VeyrionEmblemPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -100,7 +100,7 @@ class _ShadowEmblemPainter extends CustomPainter {
     canvas.drawPath(hood, Paint()..color = const Color(0xFF050716));
     canvas.drawPath(hood, Paint()..style = PaintingStyle.stroke
       ..strokeWidth = 3..color = const Color(0xFF53C9FF));
-    final eye = Paint()..color = const Color(0xFFFF405B);
+    final eye = Paint()..color = const Color(0xFF53C9FF);
     canvas.drawOval(const Rect.fromLTWH(24, 52, 21, 8), eye);
     canvas.drawOval(const Rect.fromLTWH(55, 52, 21, 8), eye);
     canvas.restore();

@@ -60,7 +60,7 @@ class HubService {
     return null;
   }
 
-  static Future<ProjectStatus> inspect(String repo) async {
+  static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
     try {
       final responses = await Future.wait([
         http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=5'), headers: _headers)
@@ -92,17 +92,17 @@ class HubService {
       }
       if (responses[1].statusCode == 200) {
         final runs = (jsonDecode(responses[1].body) as Map<String, dynamic>)['workflow_runs'] as List? ?? [];
-        if (runs.isNotEmpty) {
-          final run = runs.first as Map<String, dynamic>;
+        final relevantRuns = runs.cast<Map<String, dynamic>>().where(
+          (run) => workflowMatchesProject(
+            run['name']?.toString(), projectId, currentPlatform,
+          ),
+        ).toList();
+        if (relevantRuns.isNotEmpty) {
+          final run = relevantRuns.first;
           workflow = '${run['status'] ?? 'unknown'} / ${run['conclusion'] ?? 'pending'}';
-          final successful = runs.cast<Map<String, dynamic>>().where(
-            (item) => item['status'] == 'completed' && item['conclusion'] == 'success',
-          );
-          // GitHub Actions artifacts normally require a logged-in GitHub session.
-          // Open the successful run instead of claiming its API archive URL is public.
-          actionsUrl = successful.isNotEmpty
-              ? successful.first['html_url']?.toString()
-              : run['html_url']?.toString();
+          // Link the latest relevant run, even if it failed. A previous
+          // successful run must not hide the current build failure.
+          actionsUrl = run['html_url']?.toString();
         }
       }
       return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,

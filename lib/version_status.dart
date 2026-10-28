@@ -42,3 +42,28 @@ String describeUpdateStatus(String? installed, String? published) {
   if (comparison > 0) return 'Установленная версия новее опубликованной';
   return 'Установлена актуальная версия';
 }
+
+/// Match Actions runs to the project and platform displayed in All Hub.
+/// Status-recording workflows do not build installable packages.
+bool workflowMatchesProject(String? workflowName, String? projectId, String platform) {
+  final name = workflowName?.trim().toLowerCase() ?? '';
+  if (name.isEmpty || name.startsWith('record ')) return false;
+  switch (projectId) {
+    case 'all-hub':
+      return name == 'build all hub';
+    case 'kopilka':
+      return name.contains('kopilka') && name.contains('apk') && platform == 'android';
+    case 'eclipse-arena':
+      if (platform == 'android') {
+        return name.contains('android') && name.contains('apk');
+      }
+      if (platform == 'windows') {
+        return name.contains('windows') && name.contains('exe');
+      }
+      return false;
+    case 'shadow-rp':
+      return platform == 'android' && name.contains('android') && name.contains('apk');
+    default:
+      return true;
+  }
+}

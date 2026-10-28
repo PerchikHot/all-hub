@@ -32,7 +32,7 @@ class GithubInfo {
 
 class GithubApi {
   static Future<GithubInfo> inspect(String repo, {String? projectId}) async {
-    final result = await HubService.inspect(repo);
+    final result = await HubService.inspect(repo, projectId: projectId);
     final available = result.assets.where((a) {
       if (a.platform != currentPlatform) return false;
       final name = a.name.toLowerCase();

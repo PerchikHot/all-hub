@@ -28,4 +28,17 @@ void main() {
     expect(describeUpdateStatus('1.3.0', '1.2.0'), contains('новее'));
     expect(describeUpdateStatus('1.3.0', '1.3.0'), contains('актуальная'));
   });
+  test('Actions status refers to the matching app and platform', () {
+    expect(workflowMatchesProject('Record All Hub Build Status', 'all-hub', 'android'), isFalse);
+    expect(workflowMatchesProject('Build All Hub', 'all-hub', 'android'), isTrue);
+    expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'android'), isTrue);
+    expect(workflowMatchesProject('Build All Hub', 'kopilka', 'android'), isFalse);
+    expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'windows'), isFalse);
+    expect(workflowMatchesProject('Android debug APK', 'eclipse-arena', 'android'), isTrue);
+    expect(workflowMatchesProject('Eclipse Arena Windows EXE', 'eclipse-arena', 'android'), isFalse);
+    expect(workflowMatchesProject('Eclipse Arena Windows EXE', 'eclipse-arena', 'windows'), isTrue);
+    expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'android'), isTrue);
+    expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'windows'), isFalse);
+  });
+
 }

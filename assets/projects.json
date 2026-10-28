@@ -18,8 +18,8 @@
   {
     "id": "shadow-rp",
     "name": "Shadow RP",
-    "type": "Android app",
-    "description": "Offline roleplay chats and AI models",
+    "type": "Android app / Windows companion preview",
+    "description": "Android RP и Windows-прототип для проверки локальной установки Forge 1.20.1; сам мод ещё не готов",
     "repo": "PerchikHot/Shadow-rp",
     "icon": "forum"
   },

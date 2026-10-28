@@ -7,6 +7,7 @@ void main() {
     'bank': 'Ozon Банк',
     'note': 'Продукты',
     'date': '2026-10-28T12:00:00',
+    'amount': 1250.50,
   };
   final transfer = <String, dynamic>{
     'kind': 'transfer',

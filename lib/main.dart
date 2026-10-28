@@ -226,6 +226,9 @@ class _HomePageState extends State<HomePage> {
                     if (i.releaseNotes != null && i.releaseNotes!.isNotEmpty)
                       Align(alignment: Alignment.centerLeft,
                         child: Text('Описание релиза: ${i.releaseNotes}')),
+                    if (i.releaseNotes == null || i.releaseNotes!.isEmpty)
+                      const Align(alignment: Alignment.centerLeft,
+                        child: Text('Список изменений пока не опубликован.')),
                     Align(alignment: Alignment.centerLeft,
                       child: Text('Состояние сборки: ${i.workflowStatus ?? 'нет данных'}')),
                     if (i.error != null)

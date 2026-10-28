@@ -11,11 +11,16 @@ void main() {
       {'title': 'Банк', 'body': 'Оплата 100 ₽'},
       'malformed',
       {42: 'invalid native key'},
+      {'key': 123, 'title': 'Т-Банк', 'body': 'Оплата 200 ₽'},
+      {'key': '   ', 'title': 'Т-Банк', 'body': 'Оплата 300 ₽'},
+      {'key': ' b ', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
     ];
     expect(filterPendingBankNotifications(alerts, <String>{}).map((e) => e['key']).toList(),
       ['a', 'b']);
     expect(filterPendingBankNotifications(alerts, <String>{'a'}).map((e) => e['key']).toList(),
       ['b']);
+    expect(filterPendingBankNotifications(alerts, <String>{'b'}).map((e) => e['key']).toList(),
+      ['a']);
   });
 
   group('Kopilka transaction notification privacy filter', () {

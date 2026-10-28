@@ -40,6 +40,14 @@ void main() {
     expect(matchesKopilkaHistory(purchase, '1 250,51'), isFalse);
   });
 
+  test('amount searches accept optional currency suffixes', () {
+    expect(matchesKopilkaHistory(purchase, '1 250,50 ₽'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,50 руб.'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'ozon 1250.5 RUB'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,51 ₽'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'RUB'), isFalse);
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

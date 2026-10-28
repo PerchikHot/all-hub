@@ -182,7 +182,12 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       entries.addAll(saved.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
     } catch (_) {}
     if (!mounted) return;
-    setState(() { goal = prefs.getDouble('kopilka_goal_v1') ?? 100000; loading = false; });
+    // Legacy or corrupted goal values must not freeze the dashboard.
+    // Preserve stored data; use a safe display fallback instead.
+    final storedGoal = prefs.get('kopilka_goal_v1');
+    final safeGoal = storedGoal is num && storedGoal.isFinite && storedGoal > 0
+        ? storedGoal.toDouble() : 100000.0;
+    setState(() { goal = safeGoal; loading = false; });
   }
 
   Future<void> _refreshNotifications() async {
@@ -356,8 +361,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
         FilledButton(onPressed: () {
-          final v = double.tryParse(controller.text.replaceAll(',', '.'));
-          if (v != null && v.isFinite && v > 0) Navigator.pop(ctx, v);
+          final v = parseKopilkaAmount(controller.text);
+          if (v != null) Navigator.pop(ctx, v);
         }, child: const Text('Сохранить')),
       ],
     ));

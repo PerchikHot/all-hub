@@ -247,7 +247,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           // Imported cover files have generic names. Give each project a stable
           // subset rather than repeating the same random cover everywhere.
           files.sort((a, b) => a.path.compareTo(b.path));
-          const projectIds = ['all-hub', 'eclipse-arena', 'shadow-rp', 'shadow-garden', 'kopilka'];
+          const projectIds = ['all-hub', 'eclipse-arena', 'shadow-rp', 'shadow-garden', 'kopilka', 'nova-game'];
           final projectIndex = projectIds.indexOf(widget.id);
           final shared = projectIndex < 0 ? files : <File>[
             for (var i = 0; i < files.length; i++)

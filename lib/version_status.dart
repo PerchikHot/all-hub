@@ -40,66 +40,8 @@ String describeUpdateStatus(String? installed, String? published) {
   }
   final comparison = comparePublishedVersions(installed, published);
   if (comparison == null) {
-    final numeric = RegExp(r'^v?\d+\.\d+\.\d+(?:\+\d+)?
-  if (comparison < 0) return 'Доступно обновление: $installed → $published';
-  if (comparison > 0) return 'Установленная версия новее опубликованной';
-  return 'Установлена актуальная версия';
-}
-
-/// All Hub and Kopilka share one repository but publish separate releases.
-/// Never present one application's APK or version as the other's update.
-bool releaseMatchesProject(String tag, String? projectId) {
-  final normalized = tag.trim().toLowerCase();
-  switch (projectId) {
-    case 'all-hub':
-      return normalized.startsWith('all-hub-');
-    case 'kopilka':
-      return normalized.startsWith('kopilka-');
-    default:
-      return true;
-  }
-}
-
-/// Match Actions runs to the project and platform displayed in All Hub.
-/// Status-recording workflows do not build installable packages.
-bool workflowMatchesProject(String? workflowName, String? projectId, String platform) {
-  final name = workflowName?.trim().toLowerCase() ?? '';
-  if (name.isEmpty || name.startsWith('record ')) return false;
-  switch (projectId) {
-    case 'all-hub':
-      return name == 'build all hub' &&
-          (platform == 'android' || platform == 'windows');
-    case 'kopilka':
-      return name.contains('kopilka') && name.contains('apk') && platform == 'android';
-    case 'eclipse-arena':
-      if (platform == 'android') {
-        return name.contains('android') && name.contains('apk');
-      }
-      if (platform == 'windows') {
-        return name.contains('windows') && name.contains('exe');
-      }
-      return false;
-    case 'shadow-rp':
-      return platform == 'android' && name.contains('android') && name.contains('apk');
-    case 'nova-game':
-      // inspect() already scopes runs to PerchikHot/-, not other games.
-      return platform == 'android' && name == 'android apk';
-    default:
-      // An unknown project must not inherit an unrelated workflow status.
-      return false;
-  }
-}
-
-/// Show an explicit update action only when both versions can be compared.
-/// Unknown/rolling tags must not be advertised as newer installations.
-String installActionLabel(String? installed, String? published, String fallback) {
-  if (installed != null && published != null &&
-      comparePublishedVersions(installed, published) == -1) {
-    return 'Обновить до $published';
-  }
-  return fallback;
-}
-);
+    // Distinguish an unknown release channel from an incomplete build number.
+    final numeric = RegExp(r'^v?\\d+\\.\\d+\\.\\d+(?:\\+\\d+)?$');
     if (numeric.hasMatch(installed.trim()) && numeric.hasMatch(published.trim())) {
       return 'Статус обновления неизвестен: номер сборки указан только у одной версии';
     }

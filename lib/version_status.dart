@@ -4,6 +4,7 @@ String publishedVersionFromRelease(String tag, String? notes) {
   final match = RegExp(
     r'^Version:\s*(v?\d+\.\d+\.\d+(?:\+\d+)?)\s*$',
     multiLine: true,
+    caseSensitive: false,
   ).firstMatch(notes ?? '');
   return match?.group(1) ?? tag;
 }

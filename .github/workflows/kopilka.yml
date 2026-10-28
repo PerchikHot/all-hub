@@ -219,8 +219,19 @@ jobs:
           name: Kopilka-Android-APK
           path: dist/Kopilka-Android.apk
           if-no-files-found: error
+      # A debug-signed test APK must never replace a permanently signed
+      # release, because Android would refuse an in-place update.
+      - name: Verify permanent signing for release
+        id: release_signing
+        run: |
+          if [ -s /tmp/kopilka-release.jks ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping release publication: no permanent signing key."
+          fi
       - name: Publish standalone APK to GitHub Releases
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.release_signing.outputs.signed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

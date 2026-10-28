@@ -82,7 +82,7 @@ bool isBankTransactionNotification(String title, String body) {
     caseSensitive: false,
   );
   final sensitive = RegExp(
-    r'код\s+(?:подтверждения|входа|для\s+входа)|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b',
+    r'код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b',
     caseSensitive: false,
   );
   return transaction.hasMatch(text) &&

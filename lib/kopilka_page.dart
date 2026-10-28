@@ -142,6 +142,19 @@ double? parseKopilkaAmount(String input) {
   return amount != null && amount.isFinite && amount > 0 ? amount : null;
 }
 
+/// Local search of already saved transactions; never sends finance data online.
+bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
+  final words = query.toLowerCase().trim().split(RegExp(r'\\s+'))
+      .where((word) => word.isNotEmpty);
+  final text = [
+    entry['note'], entry['bank'], entry['from'], entry['to'],
+    entry['date'], entry['kind'],
+    entry['kind'] == 'income' ? 'доход поступление' :
+      entry['kind'] == 'expense' ? 'расход покупка' : 'перевод',
+  ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
+  return words.every(text.contains);
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -152,6 +165,7 @@ class KopilkaPage extends StatefulWidget {
 class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final entries = <Map<String, dynamic>>[];
   bool loading = true;
+  String historyQuery = '';
   static const _notifications = MethodChannel('kopilka/notifications');
   bool notificationsEnabled = false;
   final pendingNotifications = <Map<String, dynamic>>[];
@@ -510,9 +524,22 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         for (final bank in banks) Card(child: ListTile(leading: Icon(bank == 'Наличные' ? Icons.payments_outlined : Icons.account_balance_outlined, color: const Color(0xFFA8C5FF)),
           title: Text(bank), trailing: Text(money(_sum(bank))))),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('История операций', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+        if (entries.isNotEmpty) Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Поиск по описанию, счёту или дате',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (value) => setState(() => historyQuery = value),
+          ),
+        ),
+        if (entries.isNotEmpty && !entries.any((e) => matchesKopilkaHistory(e, historyQuery)))
+          const ListTile(title: Text('Операции не найдены')),
         if (entries.isEmpty) const ListTile(title: Text('Пока нет операций'),
           subtitle: Text('Нажми «Операция», чтобы внести начальные остатки, расходы или перевод между своими счетами.')),
-        for (final e in entries) Card(child: ListTile(
+        for (final e in entries.where((e) => matchesKopilkaHistory(e, historyQuery))) Card(child: ListTile(
           leading: Icon(e['kind'] == 'transfer' ? Icons.swap_horiz :
             e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward),
           title: Text(e['kind'] == 'transfer' ? '${e['from']} → ${e['to']}' :

@@ -113,6 +113,9 @@ void main() {
       expect(parseKopilkaAmount('1 250,50'), 1250.5);
       expect(parseKopilkaAmount('12\u202f500.25'), 12500.25);
       expect(parseKopilkaAmount('1234.5'), 1234.5);
+      expect(parseKopilkaAmount('1 250,50 ₽'), 1250.5);
+      expect(parseKopilkaAmount('2 000 руб.'), 2000.0);
+      expect(parseKopilkaAmount('125 RUB'), 125.0);
     });
     test('rejects ambiguous grouping and invalid amounts', () {
       expect(parseKopilkaAmount('1 2'), isNull);

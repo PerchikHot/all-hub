@@ -276,7 +276,11 @@ class _HomePageState extends State<HomePage> {
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.apk'))
                     OutlinedButton.icon(
                       icon: const Icon(Icons.install_mobile),
-                      label: const Text('Скачать APK и установить'),
+                      label: FutureBuilder<String?>(
+                        future: ProjectLauncher.installedVersion(project.id),
+                        builder: (context, installed) => Text(installActionLabel(
+                          installed.data, i.version, 'Скачать APK и установить')),
+                      ),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание APK...')));
@@ -293,7 +297,11 @@ class _HomePageState extends State<HomePage> {
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.exe'))
                     OutlinedButton.icon(
                       icon: const Icon(Icons.install_desktop),
-                      label: const Text('Скачать и установить'),
+                      label: FutureBuilder<String?>(
+                        future: ProjectLauncher.installedVersion(project.id),
+                        builder: (context, installed) => Text(installActionLabel(
+                          installed.data, i.version, 'Скачать и установить')),
+                      ),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
@@ -314,7 +322,11 @@ class _HomePageState extends State<HomePage> {
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.zip'))
                     OutlinedButton.icon(
                       icon: const Icon(Icons.inventory_2_outlined),
-                      label: const Text('Скачать и установить'),
+                      label: FutureBuilder<String?>(
+                        future: ProjectLauncher.installedVersion(project.id),
+                        builder: (context, installed) => Text(installActionLabel(
+                          installed.data, i.version, 'Скачать и установить')),
+                      ),
                       onPressed: () async {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачиваем игру со всеми файлами...')));

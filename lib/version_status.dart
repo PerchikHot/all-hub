@@ -68,6 +68,9 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
       return false;
     case 'shadow-rp':
       return platform == 'android' && name.contains('android') && name.contains('apk');
+    case 'nova-game':
+      // inspect() already scopes runs to PerchikHot/-, not other games.
+      return platform == 'android' && name == 'android apk';
     default:
       // An unknown project must not inherit an unrelated workflow status.
       return false;

@@ -97,6 +97,8 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 ) {
   final seen = <String>{};
   return raw.whereType<Map>()
+      // A single malformed native event must not hide valid bank alerts.
+      .where((e) => e.keys.every((key) => key is String))
       .map((e) => Map<String, dynamic>.from(e))
       .where((e) {
         final key = (e['key'] ?? '').toString();

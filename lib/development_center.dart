@@ -11,17 +11,44 @@ class DevelopmentCenter extends StatefulWidget {
 }
 
 class _DevelopmentCenterState extends State<DevelopmentCenter> {
-  static const repositories = <String>[
-    'PerchikHot/all-hub',
-    'PerchikHot/Eclipse-Arena-',
-    'PerchikHot/Shadow-rp',
-  ];
+  // A single repository may build more than one app.
+  static const projects = <String, String>{
+    'All Hub': 'PerchikHot/all-hub',
+    'Nova Game': 'PerchikHot/-',
+    'Shadow RP': 'PerchikHot/Shadow-rp',
+    'Копилка': 'PerchikHot/all-hub',
+    'Eclipse Arena': 'PerchikHot/Eclipse-Arena-',
+  };
+
+  List<dynamic> runsFor(String project, dynamic raw) {
+    if (raw is! List) return const [];
+    return raw.where((run) {
+      if (run is! Map) return false;
+      final name = (run['name'] ?? '').toString().toLowerCase();
+      // Recording CI status does not produce an installable package.
+      if (name.startsWith('record ')) return false;
+      switch (project) {
+        case 'All Hub':
+          return name == 'build all hub';
+        case 'Копилка':
+          return name.contains('kopilka') && name.contains('apk');
+        case 'Nova Game':
+          return name == 'android apk';
+        case 'Shadow RP':
+          return name == 'build android apk';
+        case 'Eclipse Arena':
+          return name.contains('eclipse arena');
+        default:
+          return false;
+      }
+    }).toList();
+  }
   late Future<Map<String, dynamic>> data = load();
   Future<Map<String, dynamic>> load() async {
-    final entries = await Future.wait(repositories.map((repo) async {
+    final entries = await Future.wait(projects.values.toSet().map((repo) async {
       try {
         final response = await http.get(
-          Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=3'),
+          Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=20'),
           headers: const {'Accept':'application/vnd.github+json', 'User-Agent':'AllHub'},
         ).timeout(const Duration(seconds: 8));
         if (response.statusCode != 200) return MapEntry<String, dynamic>(repo, 'HTTP ${response.statusCode}');
@@ -53,15 +80,15 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
         const SizedBox(height: 8),
         const Text('Реальные данные GitHub. Для анализа ошибок можно скопировать запрос и передать его ИИ.'),
         const SizedBox(height: 12),
-        for (final repo in repositories) Card(child: Padding(padding: const EdgeInsets.all(14), child:
+        for (final project in projects.entries) Card(child: Padding(padding: const EdgeInsets.all(14), child:
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(repo.split('/').last, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(project.key, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            if (snapshot.data![repo] is String)
-              Text('Не удалось получить сборки: ${snapshot.data![repo]}')
-            else if ((snapshot.data![repo] as List).isEmpty)
+            if (snapshot.data![project.value] is String)
+              Text('Не удалось получить сборки: ${snapshot.data![project.value]}')
+            else if (runsFor(project.key, snapshot.data![project.value]).isEmpty)
               const Text('Сборки не найдены')
-            else for (final run in (snapshot.data![repo] as List)) ...[
+            else for (final run in runsFor(project.key, snapshot.data![project.value])) ...[
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(run['conclusion'] == 'success' ? Icons.check_circle :
@@ -78,7 +105,7 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
                   icon: const Icon(Icons.open_in_new), label: const Text('Открыть лог')),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final prompt = 'Помоги разобрать сборку GitHub Actions проекта $repo. '
+                    final prompt = 'Помоги разобрать сборку GitHub Actions проекта ${project.key} (${project.value}). '
                       'Ссылка: ${run['html_url']}. '
                       'Проверь ошибки, предложи исправления и не изменяй код без подтверждения.';
                     await Clipboard.setData(ClipboardData(text: prompt));
@@ -91,7 +118,7 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
               ]),
               const Divider(),
             ],
-            TextButton(onPressed: () => open('https://github.com/$repo/actions'),
+            TextButton(onPressed: () => open('https://github.com/${project.value}/actions'),
               child: const Text('Все сборки →')),
           ]))),
       ]));

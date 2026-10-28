@@ -144,7 +144,20 @@ double? parseKopilkaAmount(String input) {
 
 /// Local search of already saved transactions; never sends finance data online.
 bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
-  final words = query.toLowerCase().trim().split(RegExp(r'\s+'))
+  // Normalize Russian thousands separators and decimal commas for searching.
+  // The saved transaction itself is never modified.
+  final normalizedQuery = query.toLowerCase().trim()
+      .replaceAllMapped(
+        RegExp(r'\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d{1,2})?'),
+        (match) => match.group(0)!.replaceAll(
+          RegExp(r'[ \u00a0\u202f]'), '',
+        ),
+      )
+      .replaceAllMapped(
+        RegExp(r'(\d+),(\d{1,2})(?!\d)'),
+        (match) => match.group(1)! + '.' + match.group(2)!,
+      );
+  final words = normalizedQuery.split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty);
   final text = [
     entry['note'], entry['bank'], entry['from'], entry['to'],

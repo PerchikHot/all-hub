@@ -27,6 +27,11 @@ void main() {
     expect(matchesKopilkaHistory(transfer, 'наличные'), isFalse);
   });
 
+  test('finds transaction by amount without exposing saved data', () {
+    expect(matchesKopilkaHistory(purchase, '1250.5'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '9999'), isFalse);
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

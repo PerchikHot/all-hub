@@ -33,6 +33,8 @@ void main() {
       'C:/Windows/evil.exe', 'C:\\Windows\\evil.exe',
       'CON', 'NUL.txt', 'folder/COM1.dll', 'folder/LPT9',
       'folder/./file.exe', 'file.', 'folder /file.exe',
+      'images/<preview>.png', 'assets/icon?.png', 'data/file*.dll',
+      'data/pipe|name.txt', 'data/quote"name.txt',
     ]) {
       expect(ProjectLauncher.isSafeWindowsArchivePath(path), isFalse,
           reason: path);

@@ -32,6 +32,14 @@ void main() {
     expect(matchesKopilkaHistory(purchase, '9999'), isFalse);
   });
 
+  test('finds Russian formatted sums with bank and note filters', () {
+    expect(matchesKopilkaHistory(purchase, '1 250,50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1\u00a0250,50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'ozon 1 250,50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'продукты 1250,5'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1 250,51'), isFalse);
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

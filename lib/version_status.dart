@@ -102,6 +102,9 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
       }
       return false;
     case 'shadow-rp':
+      // The Windows build is a read-only Minecraft companion preview,
+      // not a completed Forge mod or a port of the Android chat app.
+      if (platform == 'windows') return name == 'shadow rp windows companion';
       return platform == 'android' && name.contains('android') && name.contains('apk');
     case 'nova-game':
       // Windows currently builds a separate preview EXE; do not confuse it

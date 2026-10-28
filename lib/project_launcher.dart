@@ -16,14 +16,14 @@ class ProjectLauncher {
   static bool isSafeWindowsArchivePath(String path) {
     final normalized = path.replaceAll('\\', '/');
     if (normalized.isEmpty || normalized.startsWith('/') ||
-        normalized.contains(':') || RegExp(r'[\\x00-\\x1f]').hasMatch(normalized)) {
+        normalized.contains(':') || RegExp(r'[\x00-\x1f]').hasMatch(normalized)) {
       return false;
     }
     final parts = normalized.split('/');
     if (parts.last.isEmpty) parts.removeLast(); // directory entry
     if (parts.isEmpty) return false;
     final reserved = RegExp(
-      r'^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$)',
+      r'^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)',
       caseSensitive: false,
     );
     return parts.every((part) => part.isNotEmpty && part != '.' &&

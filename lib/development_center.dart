@@ -33,11 +33,11 @@ class _DevelopmentCenterState extends State<DevelopmentCenter> {
         case 'Копилка':
           return name.contains('kopilka') && name.contains('apk');
         case 'Nova Game':
-          return name == 'android apk';
+          return name == 'android apk' || name == 'nova windows exe';
         case 'Shadow RP':
           return name == 'build android apk';
         case 'Eclipse Arena':
-          return name.contains('eclipse arena');
+          return name.contains('eclipse arena') || name == 'android debug apk';
         default:
           return false;
       }

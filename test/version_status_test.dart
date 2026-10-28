@@ -7,6 +7,12 @@ void main() {
     expect(comparePublishedVersions('v1.2.3', '1.2.3'), 0);
     expect(comparePublishedVersions('1.2.3+5', '1.2.3+7'), lessThan(0));
     expect(comparePublishedVersions('2.0.0', '1.9.9'), greaterThan(0));
+    // A release with an explicit CI build must not be marked current
+    // against an installed package that exposes only its semantic version.
+    expect(comparePublishedVersions('0.6.0', '0.6.0+42'), isNull);
+    expect(comparePublishedVersions('0.6.0+41', '0.6.0'), isNull);
+    expect(comparePublishedVersions('0.5.9', '0.6.0+42'), lessThan(0));
+    expect(comparePublishedVersions('0.6.1', '0.6.0+42'), greaterThan(0));
   });
   test('explicit release notes provide comparable versions', () {
     expect(publishedVersionFromRelease('shadow-rp-android',

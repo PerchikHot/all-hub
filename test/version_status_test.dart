@@ -71,6 +71,8 @@ void main() {
     expect(workflowMatchesProject('Eclipse Arena Windows EXE', 'eclipse-arena', 'windows'), isTrue);
     expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'android'), isTrue);
     expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'windows'), isFalse);
+    expect(workflowMatchesProject('Shadow RP Windows Companion', 'shadow-rp', 'windows'), isTrue);
+    expect(workflowMatchesProject('Shadow RP Windows Companion', 'shadow-rp', 'android'), isFalse);
     expect(workflowMatchesProject('Android APK', 'nova-game', 'android'), isTrue);
     expect(workflowMatchesProject('Android APK', 'nova-game', 'windows'), isFalse);
     expect(workflowMatchesProject('Nova Windows EXE', 'nova-game', 'windows'), isTrue);

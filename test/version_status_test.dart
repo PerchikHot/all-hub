@@ -78,6 +78,14 @@ void main() {
     expect(workflowMatchesProject('Build Android APK', null, 'android'), isFalse);
   });
 
+  test('downgrade guard blocks only proven older packages', () {
+    expect(isPublishedDowngrade('2.0.0', '1.9.9'), isTrue);
+    expect(isPublishedDowngrade('2.0.0+10', '2.0.0+9'), isTrue);
+    expect(isPublishedDowngrade('2.0.0', '2.0.0'), isFalse);
+    expect(isPublishedDowngrade('1.9.9', '2.0.0'), isFalse);
+    expect(isPublishedDowngrade('2.0.0', 'all-hub-latest'), isFalse);
+    expect(isPublishedDowngrade(null, '1.0.0'), isFalse);
+  });
   test('install button advertises only confirmed newer versions', () {
     expect(installActionLabel('1.2.0', '1.3.0', 'Скачать APK и установить'),
       'Обновить до 1.3.0');

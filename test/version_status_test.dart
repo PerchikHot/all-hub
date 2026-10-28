@@ -64,7 +64,8 @@ void main() {
     expect(workflowMatchesProject('Build All Hub', 'all-hub', 'android'), isTrue);
     expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'android'), isTrue);
     expect(workflowMatchesProject('Build All Hub', 'kopilka', 'android'), isFalse);
-    expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'windows'), isFalse);
+    expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'windows'), isTrue);
+    expect(workflowMatchesProject('Kopilka standalone APK', 'kopilka', 'linux'), isFalse);
     expect(workflowMatchesProject('Android debug APK', 'eclipse-arena', 'android'), isTrue);
     expect(workflowMatchesProject('Eclipse Arena Windows EXE', 'eclipse-arena', 'android'), isFalse);
     expect(workflowMatchesProject('Eclipse Arena Windows EXE', 'eclipse-arena', 'windows'), isTrue);

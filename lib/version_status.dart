@@ -90,7 +90,9 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
       return name == 'build all hub' &&
           (platform == 'android' || platform == 'windows');
     case 'kopilka':
-      return name.contains('kopilka') && name.contains('apk') && platform == 'android';
+      // The Kopilka standalone workflow builds Android APK and Windows portable ZIP.
+      return name.contains('kopilka') && name.contains('apk') &&
+          (platform == 'android' || platform == 'windows');
     case 'eclipse-arena':
       if (platform == 'android') {
         return name.contains('android') && name.contains('apk');

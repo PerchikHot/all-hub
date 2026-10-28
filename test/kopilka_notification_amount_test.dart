@@ -97,4 +97,17 @@ void main() {
       expect(suggestNotificationAmount('1 200 RUB'), '1200');
     });
   });
+  group('Kopilka saved amount safety', () {
+    test('valid numeric amounts remain unchanged', () {
+      expect(safeKopilkaAmount({'amount': 120.50}), 120.50);
+      expect(safeKopilkaAmount({'amount': 42}), 42.0);
+    });
+    test('corrupt historical amounts cannot crash or distort totals', () {
+      expect(safeKopilkaAmount({'amount': 'not-a-number'}), 0.0);
+      expect(safeKopilkaAmount({'amount': null}), 0.0);
+      expect(safeKopilkaAmount({'amount': double.infinity}), 0.0);
+      expect(safeKopilkaAmount({'amount': double.nan}), 0.0);
+    });
+  });
+
 }

@@ -16,6 +16,12 @@ void main() {
     expect(comparePublishedVersions('1.2.3', '999999999999999999999999999999999.0.0'), isNull);
     expect(comparePublishedVersions('1.2.3+1', '1.2.3+999999999999999999999999999999'), isNull);
     expect(describeUpdateStatus('1.2.3', '999999999999999999999999999999999.0.0'), contains('неизвестен'));
+    expect(describeUpdateStatus('1.2.3', '999999999999999999999999999999999.0.0'),
+      contains('некорректный номер версии'));
+    expect(describeUpdateStatus('1.2.3+1', '1.2.3+999999999999999999999999999999'),
+      contains('некорректный номер версии'));
+    expect(describeUpdateStatus('1.2.3', '1.2.3+4'),
+      contains('номер сборки'));
   });
   test('explicit release notes provide comparable versions', () {
     expect(publishedVersionFromRelease('shadow-rp-android',

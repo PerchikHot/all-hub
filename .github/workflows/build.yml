@@ -34,6 +34,7 @@ jobs:
               <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
               <queries>
                 <package android:name="com.shadowrp.app"/>
+                <package android:name="com.perchikhot.novagame"/>
                 <package android:name="com.veyrion.kopilka_app"/>
                 <package android:name="org.eclipsearena.prototype"/>
               </queries>

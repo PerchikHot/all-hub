@@ -210,7 +210,9 @@ class _HomePageState extends State<HomePage> {
                         style: Theme.of(context).textTheme.bodySmall),
                       Text('Опубликовано: ${i.version ?? 'нет релиза'}',
                         style: Theme.of(context).textTheme.bodySmall),
-                      Text(describeUpdateStatus(installed.data, i.version),
+                      Text(i.downloadUrl == null
+                        ? 'Обновление для этой платформы пока недоступно'
+                        : describeUpdateStatus(installed.data, i.version),
                         style: TextStyle(color: comparePublishedVersions(
                           installed.data ?? '', i.version ?? '') == -1
                           ? Colors.greenAccent : hubAccent)),

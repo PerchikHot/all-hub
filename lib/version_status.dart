@@ -17,8 +17,11 @@ int? comparePublishedVersions(String installed, String published) {
   final latest = pattern.firstMatch(published.trim());
   if (current == null || latest == null) return null;
   for (var i = 1; i <= 3; i++) {
-    final a = int.parse(current.group(i)!);
-    final b = int.parse(latest.group(i)!);
+    // Untrusted release notes can contain integers larger than Dart's int.
+    // A malformed version should mean "unknown", not crash the catalog.
+    final a = int.tryParse(current.group(i)!);
+    final b = int.tryParse(latest.group(i)!);
+    if (a == null || b == null) return null;
     if (a != b) return a.compareTo(b);
   }
   // A missing build number cannot prove two same-version packages match.
@@ -27,7 +30,10 @@ int? comparePublishedVersions(String installed, String published) {
   final latestBuild = latest.group(4);
   if ((currentBuild == null) != (latestBuild == null)) return null;
   if (currentBuild != null && latestBuild != null) {
-    return int.parse(currentBuild).compareTo(int.parse(latestBuild));
+    final a = int.tryParse(currentBuild);
+    final b = int.tryParse(latestBuild);
+    if (a == null || b == null) return null;
+    return a.compareTo(b);
   }
   return 0;
 }

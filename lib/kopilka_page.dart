@@ -189,6 +189,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final entries = <Map<String, dynamic>>[];
   bool loading = true;
   String historyQuery = '';
+  final historySearchController = TextEditingController();
   static const _notifications = MethodChannel('kopilka/notifications');
   bool notificationsEnabled = false;
   final pendingNotifications = <Map<String, dynamic>>[];
@@ -211,6 +212,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    historySearchController.dispose();
     super.dispose();
   }
 
@@ -550,10 +552,19 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         if (entries.isNotEmpty) Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Поиск по описанию, счёту или дате',
-              border: OutlineInputBorder(),
+            controller: historySearchController,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              hintText: 'Поиск по описанию, счёту, дате или сумме',
+              border: const OutlineInputBorder(),
+              suffixIcon: historyQuery.isEmpty ? null : IconButton(
+                tooltip: 'Очистить поиск',
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  historySearchController.clear();
+                  setState(() => historyQuery = '');
+                },
+              ),
             ),
             onChanged: (value) => setState(() => historyQuery = value),
           ),

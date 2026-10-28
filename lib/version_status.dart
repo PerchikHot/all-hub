@@ -47,6 +47,20 @@ String describeUpdateStatus(String? installed, String? published) {
   return 'Установлена актуальная версия';
 }
 
+/// All Hub and Kopilka share one repository but publish separate releases.
+/// Never present one application's APK or version as the other's update.
+bool releaseMatchesProject(String tag, String? projectId) {
+  final normalized = tag.trim().toLowerCase();
+  switch (projectId) {
+    case 'all-hub':
+      return normalized.startsWith('all-hub-');
+    case 'kopilka':
+      return normalized.startsWith('kopilka-');
+    default:
+      return true;
+  }
+}
+
 /// Match Actions runs to the project and platform displayed in All Hub.
 /// Status-recording workflows do not build installable packages.
 bool workflowMatchesProject(String? workflowName, String? projectId, String platform) {

@@ -42,8 +42,8 @@
   {
     "id": "nova-game",
     "name": "Nova (Futa) Game",
-    "type": "Android game",
-    "description": "Nova Game — отдельная Android-игра",
+    "type": "Android game / Windows preview",
+    "description": "Android-игра и отдельный Windows-прототип с игрой на память и локальной галереей",
     "repo": "PerchikHot/-",
     "icon": "videogame_asset"
   }

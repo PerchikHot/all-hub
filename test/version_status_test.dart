@@ -22,6 +22,10 @@ void main() {
     expect(publishedVersionFromRelease('kopilka-latest',
       'version: v1.4.2'), 'v1.4.2');
     expect(publishedVersionFromRelease('all-hub-latest',
+      'Изменения:\r\n  Версия: 1.7.2+18\r\nИсправления'), '1.7.2+18');
+    expect(publishedVersionFromRelease('nova-android',
+      'VERSION: v2.1.0'), 'v2.1.0');
+    expect(publishedVersionFromRelease('all-hub-latest',
       'Автоматическая сборка без версии'), 'all-hub-latest');
   });
   test('shared repository release channels never cross-contaminate', () {

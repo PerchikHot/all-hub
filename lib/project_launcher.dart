@@ -16,7 +16,7 @@ class ProjectLauncher {
   static bool isSafeWindowsArchivePath(String path) {
     final normalized = path.replaceAll('\\', '/');
     if (normalized.isEmpty || normalized.startsWith('/') ||
-        normalized.contains(':') || RegExp(r'[\x00-\x1f]').hasMatch(normalized)) {
+        RegExp(r'[<>:"|?*\x00-\x1f]').hasMatch(normalized)) {
       return false;
     }
     final parts = normalized.split('/');

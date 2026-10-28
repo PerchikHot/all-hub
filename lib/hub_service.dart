@@ -55,8 +55,15 @@ class HubService {
   static String? assetPlatform(String name) {
     final n = name.toLowerCase();
     if (n.endsWith('.apk')) return 'android';
-    if (n.endsWith('.exe') || n.endsWith('.msi')) return 'windows';
-    if (n.endsWith('.zip') && (n.contains('windows') || n.contains('win64') || n.contains('desktop'))) return 'windows';
+    // MSI is not installable by ProjectLauncher yet: never advertise it as
+    // a working update. Recognize common portable Windows ZIP labels.
+    if (n.endsWith('.exe')) return 'windows';
+    if (n.endsWith('.zip') &&
+        (n.contains('windows') || n.contains('win64') ||
+         n.contains('win-x64') || n.contains('win32') ||
+         n.contains('win_amd64') || n.contains('desktop'))) {
+      return 'windows';
+    }
     return null;
   }
 

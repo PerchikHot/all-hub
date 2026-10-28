@@ -11,6 +11,26 @@ class ProjectLauncher {
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
       RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(id);
+  /// Reject Windows-unsafe archive members before extracting portable apps.
+  /// ZIP paths may use either separator, but may not escape the staging root.
+  static bool isSafeWindowsArchivePath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    if (normalized.isEmpty || normalized.startsWith('/') ||
+        normalized.contains(':') || RegExp(r'[\\x00-\\x1f]').hasMatch(normalized)) {
+      return false;
+    }
+    final parts = normalized.split('/');
+    if (parts.last.isEmpty) parts.removeLast(); // directory entry
+    if (parts.isEmpty) return false;
+    final reserved = RegExp(
+      r'^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|$)',
+      caseSensitive: false,
+    );
+    return parts.every((part) => part.isNotEmpty && part != '.' &&
+        part != '..' && part.trim() == part && !part.endsWith('.') &&
+        !reserved.hasMatch(part));
+  }
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
@@ -298,8 +318,7 @@ class ProjectLauncher {
       final rootPath = staging.absolute.path;
       for (final entry in archive) {
         final name = entry.name.replaceAll('\\', '/');
-        if (name.startsWith('/') || name.contains(':') ||
-            name.split('/').contains('..')) {
+        if (!isSafeWindowsArchivePath(name)) {
           throw const FormatException('Недопустимый путь в ZIP');
         }
         if (name.isEmpty) continue;

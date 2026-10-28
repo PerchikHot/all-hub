@@ -96,6 +96,9 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
   List<dynamic> raw, Set<String> reviewed,
 ) {
   final seen = <String>{};
+  // Historical keys may contain padding; compare their normalized form
+  // without rewriting any existing saved operation.
+  final normalizedReviewed = reviewed.map((key) => key.trim()).toSet();
   return raw.whereType<Map>()
       // A single malformed native event must not hide valid bank alerts.
       .where((e) => e.keys.every((key) => key is String))
@@ -106,12 +109,15 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
         final rawKey = e['key'];
         if (rawKey is! String) return false;
         final key = rawKey.trim();
-        if (key.isEmpty || reviewed.contains(key)) return false;
+        if (key.isEmpty || normalizedReviewed.contains(key)) return false;
         if (!isBankTransactionNotification(
             (e['title'] ?? '').toString(), (e['body'] ?? '').toString())) {
           return false;
         }
-        return seen.add(key);
+        if (!seen.add(key)) return false;
+        // Store the canonical ID so later refreshes cannot re-import it.
+        e['key'] = key;
+        return true;
       }).toList();
 }
 

@@ -101,7 +101,11 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
       .where((e) => e.keys.every((key) => key is String))
       .map((e) => Map<String, dynamic>.from(e))
       .where((e) {
-        final key = (e['key'] ?? '').toString();
+        // Native notification IDs must be stable strings, not arbitrary
+        // JSON values that stringify to a misleading deduplication key.
+        final rawKey = e['key'];
+        if (rawKey is! String) return false;
+        final key = rawKey.trim();
         if (key.isEmpty || reviewed.contains(key)) return false;
         if (!isBankTransactionNotification(
             (e['title'] ?? '').toString(), (e['body'] ?? '').toString())) {

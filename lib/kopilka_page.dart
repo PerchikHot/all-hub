@@ -141,6 +141,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   static const _notifications = MethodChannel('kopilka/notifications');
   bool notificationsEnabled = false;
   final pendingNotifications = <Map<String, dynamic>>[];
+  int visiblePendingCount = 10;
   double goal = 100000;
   final banks = const ['Т-Банк', 'Газпромбанк', 'Ozon Банк', 'Наличные'];
   @override
@@ -412,7 +413,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               title: Text('На проверке: ${pendingNotifications.length}'),
               subtitle: const Text('Операции не меняют баланс до подтверждения.'),
               children: [
-                for (final event in pendingNotifications.reversed.take(10))
+                for (final event in pendingNotifications.reversed.take(visiblePendingCount))
                   ListTile(
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: Text((event['bank'] ?? 'Банк').toString()),
@@ -421,9 +422,12 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _reviewNotification(event),
                   ),
-                if (pendingNotifications.length > 10)
-                  const Padding(padding: EdgeInsets.all(8),
-                    child: Text('Показаны 10 последних уведомлений.')),
+                if (pendingNotifications.length > visiblePendingCount)
+                  TextButton(
+                    onPressed: () => setState(() => visiblePendingCount += 10),
+                    child: Text('Показать ещё уведомления '
+                      '(${pendingNotifications.length - visiblePendingCount} осталось)'),
+                  ),
               ],
             ),
           TextButton.icon(onPressed: _refreshNotifications,

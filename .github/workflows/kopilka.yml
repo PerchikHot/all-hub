@@ -1,7 +1,7 @@
 name: Kopilka standalone APK
 # Avoid older builds overwriting a newer standalone APK in the same release.
 concurrency:
-  group: kopilka-android-${{ github.ref }}
+  group: kopilka-build-${{ github.ref }}
   cancel-in-progress: true
 on:
   workflow_dispatch:
@@ -244,3 +244,45 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit kopilka-latest --repo "$GITHUB_REPOSITORY" \
             --notes "$(printf 'Отдельная сборка Копилки из общего репозитория All Hub.\nVersion: 1.0.%s\n' "$GITHUB_RUN_NUMBER")"
+
+  # Windows is a portable desktop build. It deliberately does not request
+  # Android notification permissions or publish an untested auto-update.
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Create isolated Kopilka Windows app
+        shell: pwsh
+        run: |
+          $project = Join-Path $env:RUNNER_TEMP 'kopilka_windows'
+          New-Item -ItemType Directory -Force -Path $project | Out-Null
+          Set-Location $project
+          flutter create --platforms=windows --project-name kopilka_app --org com.veyrion .
+          Copy-Item "$env:GITHUB_WORKSPACE/lib/kopilka_page.dart" "lib/kopilka_page.dart"
+          Copy-Item "$env:GITHUB_WORKSPACE/lib/kopilka_main.dart" "lib/main.dart"
+          flutter pub add shared_preferences
+          Remove-Item "test/widget_test.dart" -ErrorAction SilentlyContinue
+          Copy-Item "$env:GITHUB_WORKSPACE/test/kopilka_notification_amount_test.dart" "test/kopilka_notification_amount_test.dart"
+          $testFile = 'test/kopilka_notification_amount_test.dart'
+          (Get-Content $testFile -Raw).Replace('package:all_hub/kopilka_page.dart', 'package:kopilka_app/kopilka_page.dart') | Set-Content $testFile
+          flutter analyze
+          if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows analysis failed' }
+          flutter test $testFile
+          if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows tests failed' }
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows build failed' }
+          $release = Join-Path $project 'build/windows/x64/runner/Release'
+          if (!(Test-Path "$release/kopilka_app.exe")) { throw 'Kopilka EXE missing' }
+          if (!(Test-Path "$release/flutter_windows.dll")) { throw 'Flutter runtime missing' }
+          if (!(Test-Path "$release/data")) { throw 'Flutter assets missing' }
+          Compress-Archive -Path "$release/*" -DestinationPath "$env:GITHUB_WORKSPACE/Kopilka-Windows-portable.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kopilka-Windows-portable
+          path: Kopilka-Windows-portable.zip
+          if-no-files-found: error

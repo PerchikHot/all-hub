@@ -41,4 +41,17 @@ void main() {
     expect(workflowMatchesProject('Build Android APK', 'shadow-rp', 'windows'), isFalse);
   });
 
+  test('install button advertises only confirmed newer versions', () {
+    expect(installActionLabel('1.2.0', '1.3.0', 'Скачать APK и установить'),
+      'Обновить до 1.3.0');
+    expect(installActionLabel('1.3.0', '1.3.0', 'Скачать APK и установить'),
+      'Скачать APK и установить');
+    expect(installActionLabel('1.3.0', '1.2.0', 'Скачать APK и установить'),
+      'Скачать APK и установить');
+    expect(installActionLabel(null, '1.3.0', 'Скачать APK и установить'),
+      'Скачать APK и установить');
+    expect(installActionLabel('1.2.0', 'eclipse-arena-android', 'Скачать APK и установить'),
+      'Скачать APK и установить');
+  });
+
 }

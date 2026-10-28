@@ -288,6 +288,10 @@ class _HomePageState extends State<HomePage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание APK...')));
                         try {
+                          if (isPublishedDowngrade(
+                              await ProjectLauncher.installedVersion(project.id), i.version)) {
+                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
+                          }
                           await ProjectLauncher.installAndroidApk(i.downloadUrl!, projectId: project.id);
                         } catch (e) {
                           if (context.mounted) {
@@ -309,6 +313,10 @@ class _HomePageState extends State<HomePage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
                         try {
+                          if (isPublishedDowngrade(
+                              await ProjectLauncher.installedVersion(project.id), i.version)) {
+                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
+                          }
                           await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
@@ -334,6 +342,10 @@ class _HomePageState extends State<HomePage> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Скачиваем игру со всеми файлами...')));
                         try {
+                          if (isPublishedDowngrade(
+                              await ProjectLauncher.installedVersion(project.id), i.version)) {
+                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
+                          }
                           await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {

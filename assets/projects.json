@@ -38,5 +38,13 @@
     "description": "Финансы: счета, доходы, расходы, переводы между своими банками и накопления",
     "repo": "PerchikHot/all-hub",
     "icon": "account_balance_wallet"
+  },
+  {
+    "id": "nova-game",
+    "name": "Nova (Futa) Game",
+    "type": "Android game",
+    "description": "Nova Game — отдельная Android-игра",
+    "repo": "PerchikHot/-",
+    "icon": "videogame_asset"
   }
 ]

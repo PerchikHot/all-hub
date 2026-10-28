@@ -110,6 +110,13 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
   }
 }
 
+/// Never silently replace a newer installed package with an older release.
+/// Unknown rolling tags are not treated as proven downgrades.
+bool isPublishedDowngrade(String? installed, String? published) {
+  if (installed == null || published == null) return false;
+  return comparePublishedVersions(installed, published) == 1;
+}
+
 /// Show an explicit update action only when both versions can be compared.
 /// Unknown/rolling tags must not be advertised as newer installations.
 String installActionLabel(String? installed, String? published, String fallback) {

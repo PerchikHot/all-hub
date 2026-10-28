@@ -67,3 +67,13 @@ bool workflowMatchesProject(String? workflowName, String? projectId, String plat
       return true;
   }
 }
+
+/// Show an explicit update action only when both versions can be compared.
+/// Unknown/rolling tags must not be advertised as newer installations.
+String installActionLabel(String? installed, String? published, String fallback) {
+  if (installed != null && published != null &&
+      comparePublishedVersions(installed, published) == -1) {
+    return 'Обновить до $published';
+  }
+  return fallback;
+}

@@ -21,6 +21,12 @@ void main() {
       ['b']);
     expect(filterPendingBankNotifications(alerts, <String>{'b'}).map((e) => e['key']).toList(),
       ['a']);
+    final padded = <dynamic>[
+      {'key': '  tx-42  ', 'title': 'Т-Банк', 'body': 'Оплата 125 ₽'},
+    ];
+    expect(filterPendingBankNotifications(padded, <String>{}).single['key'], 'tx-42');
+    expect(filterPendingBankNotifications(padded, <String>{'tx-42'}), isEmpty);
+    expect(filterPendingBankNotifications(padded, <String>{' tx-42 '}), isEmpty);
   });
 
   group('Kopilka transaction notification privacy filter', () {

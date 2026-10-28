@@ -475,9 +475,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           leading: Icon(e['kind'] == 'transfer' ? Icons.swap_horiz :
             e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward),
           title: Text(e['kind'] == 'transfer' ? '${e['from']} → ${e['to']}' :
-            (e['note'] as String).isEmpty ? (e['kind'] == 'income' ? 'Доход' : 'Расход') : e['note'] as String),
-          subtitle: Text(e['kind'] == 'transfer' ? 'Перевод между своими счетами' : e['bank'] as String),
-          trailing: Text(money((e['amount'] as num).toDouble())),
+            (e['note'] ?? '').toString().isEmpty ? (e['kind'] == 'income' ? 'Доход' : 'Расход') : e['note'].toString()),
+          subtitle: Text(e['kind'] == 'transfer' ? 'Перевод между своими счетами' : (e['bank'] ?? 'Неизвестный счёт').toString()),
+          trailing: Text(money(safeKopilkaAmount(e))),
           onLongPress: () async {
             final remove = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
               title: const Text('Удалить операцию?'),

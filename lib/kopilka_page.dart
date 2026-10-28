@@ -156,6 +156,11 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       .replaceAllMapped(
         RegExp(r'(\d+),(\d{1,2})(?!\d)'),
         (match) => '${match.group(1)}.${match.group(2)}',
+      )
+      .replaceAllMapped(
+        RegExp(r'\d+\.\d{1,2}(?!\d)'),
+        (match) => double.tryParse(match.group(0)!)?.toString() ??
+            match.group(0)!,
       );
   final words = normalizedQuery.split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty);

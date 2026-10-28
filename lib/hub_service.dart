@@ -76,6 +76,7 @@ class HubService {
           final release = raw as Map<String, dynamic>;
           if (release['draft'] == true || release['prerelease'] == true) continue;
           final tag = (release['tag_name'] ?? 'latest').toString();
+          if (!releaseMatchesProject(tag, projectId)) continue;
           final notes = release['body']?.toString().trim();
           final publishedVersion = publishedVersionFromRelease(tag, notes);
           version ??= publishedVersion;

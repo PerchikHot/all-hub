@@ -2,6 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('pending bank notifications require a stable unique unreviewed key', () {
+    final alerts = <dynamic>[
+      {'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'key': 'b', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
+      {'key': 'c', 'title': 'Банк', 'body': 'Код подтверждения оплаты 500 ₽'},
+      {'title': 'Банк', 'body': 'Оплата 100 ₽'},
+      'malformed',
+    ];
+    expect(filterPendingBankNotifications(alerts, <String>{}).map((e) => e['key']).toList(),
+      ['a', 'b']);
+    expect(filterPendingBankNotifications(alerts, <String>{'a'}).map((e) => e['key']).toList(),
+      ['b']);
+  });
+
   group('Kopilka transaction notification privacy filter', () {
     test('keeps purchase, transfer and incoming money notifications', () {
       expect(isBankTransactionNotification('Т-Банк', 'Оплата 250 ₽. Остаток 5 000 ₽'), isTrue);

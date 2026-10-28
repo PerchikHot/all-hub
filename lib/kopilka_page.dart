@@ -111,6 +111,13 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
       }).toList();
 }
 
+
+/// Invalid legacy amounts must never crash totals or contaminate balances.
+double safeKopilkaAmount(Map<String, dynamic> entry) {
+  final value = entry['amount'];
+  return value is num && value.isFinite ? value.toDouble() : 0.0;
+}
+
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
@@ -223,7 +230,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   }
 
   double _sum(String bank) => entries.fold<double>(0, (sum, e) {
-    final amount = (e['amount'] as num?)?.toDouble() ?? 0;
+    final amount = safeKopilkaAmount(e);
     if (e['kind'] == 'transfer') {
       if (e['from'] == bank) return sum - amount;
       if (e['to'] == bank) return sum + amount;
@@ -327,18 +334,18 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final total = banks.fold<double>(0, (s, b) => s + _sum(b));
     final income = entries.where((e) => e['kind'] == 'income')
-      .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
+      .fold<double>(0, (s, e) => s + safeKopilkaAmount(e));
     final expenses = entries.where((e) => e['kind'] == 'expense')
-      .fold<double>(0, (s, e) => s + (e['amount'] as num).toDouble());
+      .fold<double>(0, (s, e) => s + safeKopilkaAmount(e));
     final now = DateTime.now();
     final monthlyEntries = entries.where((e) {
       final date = DateTime.tryParse((e['date'] ?? '').toString());
       return date != null && date.year == now.year && date.month == now.month;
     }).toList();
     final monthlyIncome = monthlyEntries.where((e) => e['kind'] == 'income')
-      .fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+      .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyExpenses = monthlyEntries.where((e) => e['kind'] == 'expense')
-      .fold<double>(0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0));
+      .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyBalance = monthlyIncome - monthlyExpenses;
     String money(double value) {
       final parts = value.toStringAsFixed(2).split('.');

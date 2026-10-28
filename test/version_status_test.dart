@@ -34,6 +34,8 @@ void main() {
     expect(comparePublishedVersions('0.18.3', 'shadow-rp-android'), isNull);
     expect(describeUpdateStatus('0.18.3', 'shadow-rp-android'),
       contains('неизвестен'));
+    expect(describeUpdateStatus('0.6.0', '0.6.0+42'), contains('номер сборки'));
+    expect(describeUpdateStatus('0.6.0+42', '0.6.0'), contains('номер сборки'));
     expect(describeUpdateStatus('0.18.3', null), contains('Нет опубликованного'));
     expect(describeUpdateStatus(null, 'v1.0.0'), contains('неизвестен'));
   });

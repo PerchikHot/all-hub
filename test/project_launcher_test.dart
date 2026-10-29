@@ -27,6 +27,15 @@ void main() {
     }
   });
 
+  test('Windows ZIP extraction rejects excessive unpacked data', () {
+    const mb = 1024 * 1024;
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(10000, 512 * mb, 512 * mb), isTrue);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(10001, 0, 1), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 0, 513 * mb), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 1024 * mb, 1), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 0, -1), isFalse);
+  });
+
   test('Windows ZIP extraction rejects traversal and reserved device names', () {
     for (final path in [
       '', '/', '../outside.exe', 'assets/../../evil.dll', 'a//b.exe',

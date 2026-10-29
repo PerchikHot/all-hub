@@ -122,9 +122,15 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
         final rawKey = e['key'];
         if (rawKey is! String) return false;
         final key = rawKey.trim();
-        if (key.isEmpty || normalizedReviewed.contains(key)) return false;
-        if (!isBankTransactionNotification(
-            (e['title'] ?? '').toString(), (e['body'] ?? '').toString())) {
+        if (key.isEmpty || key.length > 256 ||
+            normalizedReviewed.contains(key)) return false;
+        // Reject malformed or oversized native payloads before parsing.
+        // Never stringify arbitrary objects into a financial notification.
+        final title = e['title'];
+        final body = e['body'];
+        if (title is! String || body is! String ||
+            title.length > 200 || body.length > 2048) return false;
+        if (!isBankTransactionNotification(title, body)) {
           return false;
         }
         if (!seen.add(key)) return false;

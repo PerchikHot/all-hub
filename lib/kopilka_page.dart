@@ -451,6 +451,15 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final monthlyExpenses = monthlyEntries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyBalance = monthlyIncome - monthlyExpenses;
+    // Reuse the same filtered list for display and summary. Transfers between
+    // own accounts do not inflate income or expense totals.
+    final filteredEntries = entries.where(
+      (entry) => matchesKopilkaHistory(entry, historyQuery),
+    ).toList();
+    final filteredIncome = filteredEntries.where((entry) => entry['kind'] == 'income')
+        .fold<double>(0, (sum, entry) => sum + safeKopilkaAmount(entry));
+    final filteredExpenses = filteredEntries.where((entry) => entry['kind'] == 'expense')
+        .fold<double>(0, (sum, entry) => sum + safeKopilkaAmount(entry));
     String money(double value) {
       final parts = value.toStringAsFixed(2).split('.');
       final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\d)(?=(\d{3})+$)'), (_) => ' ');
@@ -592,11 +601,17 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             onChanged: (value) => setState(() => historyQuery = value),
           ),
         ),
-        if (entries.isNotEmpty && !entries.any((e) => matchesKopilkaHistory(e, historyQuery)))
+        if (entries.isNotEmpty && historyQuery.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Найдено: ${filteredEntries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}',
+              style: const TextStyle(color: Colors.white70)),
+          ),
+        if (entries.isNotEmpty && filteredEntries.isEmpty)
           const ListTile(title: Text('Операции не найдены')),
         if (entries.isEmpty) const ListTile(title: Text('Пока нет операций'),
           subtitle: Text('Нажми «Операция», чтобы внести начальные остатки, расходы или перевод между своими счетами.')),
-        for (final e in entries.where((e) => matchesKopilkaHistory(e, historyQuery))) Card(child: ListTile(
+        for (final e in filteredEntries) Card(child: ListTile(
           leading: Icon(e['kind'] == 'transfer' ? Icons.swap_horiz :
             e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward),
           title: Text(e['kind'] == 'transfer' ? '${e['from']} → ${e['to']}' :

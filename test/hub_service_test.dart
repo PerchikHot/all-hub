@@ -79,6 +79,19 @@ void main() {
     }
   });
 
+  test('unsigned and unaligned Android packages are not offered as updates', () {
+    for (final name in [
+      'AllHub-unsigned.apk',
+      'Nova-unaligned.apk',
+      'ShadowRP-androidTest.apk',
+      'Kopilka-testonly.apk',
+    ]) {
+      expect(HubService.assetPlatform(name), isNull, reason: name);
+    }
+    expect(HubService.assetPlatform('AllHub-release.apk'), 'android');
+    expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
+  });
+
   test('Windows portable archives are recognized across common naming schemes', () {
     for (final name in [
       'Kopilka-Windows-portable.zip',

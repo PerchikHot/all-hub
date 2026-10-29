@@ -32,7 +32,7 @@ void main() {
   test('oversized or non-text native bank alerts are not imported', () {
     final valid = {'key': 'ok', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'};
     final alerts = <dynamic>[
-      {'key': 'large-key-' + List.filled(260, 'x').join(),
+      {'key': 'large-key-${List.filled(260, 'x').join()}',
        'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
       {'key': 'bad-title', 'title': {'bank': 'Т-Банк'},
        'body': 'Оплата 250 ₽'},
@@ -40,7 +40,7 @@ void main() {
       {'key': 'long-title', 'title': List.filled(201, 'x').join(),
        'body': 'Оплата 250 ₽'},
       {'key': 'long-body', 'title': 'Т-Банк',
-       'body': 'Оплата 250 ₽' + List.filled(2050, 'x').join()},
+       'body': 'Оплата 250 ₽${List.filled(2050, 'x').join()}'},
       valid,
     ];
     final accepted = filterPendingBankNotifications(alerts, <String>{});

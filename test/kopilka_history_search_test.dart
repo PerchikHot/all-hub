@@ -34,6 +34,19 @@ void main() {
     expect(matchesKopilkaHistory(purchase, '27.10.2026'), isFalse);
   });
 
+  test('single-digit Russian day and month match stored ISO dates', () {
+    final january = <String, dynamic>{
+      'kind': 'income',
+      'bank': 'Т-Банк',
+      'date': '2026-01-08T09:30:00',
+      'amount': 2000,
+    };
+    expect(matchesKopilkaHistory(january, '8.1.2026'), isTrue);
+    expect(matchesKopilkaHistory(january, '08.1.2026 т-банк'), isTrue);
+    expect(matchesKopilkaHistory(january, '9.1.2026'), isFalse);
+    expect(matchesKopilkaHistory(purchase, '28.10.2026'), isTrue);
+  });
+
   test('finds transaction by amount without exposing saved data', () {
     expect(matchesKopilkaHistory(purchase, '1250.5'), isTrue);
     expect(matchesKopilkaHistory(purchase, '9999'), isFalse);

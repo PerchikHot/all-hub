@@ -110,6 +110,12 @@ class HubService {
   }
 
   static String? assetPlatform(String name) {
+    // Release filenames become local downloads: reject path separators,
+    // control characters and unusually long names before displaying them.
+    if (name.isEmpty || name.length > 200 ||
+        RegExp(r'[\\/\x00-\x1f\x7f]').hasMatch(name)) {
+      return null;
+    }
     final n = name.toLowerCase();
     // Reject unsigned or unaligned Android build outputs as updates.
     // Debug APKs remain recognizable for explicitly requested testing.

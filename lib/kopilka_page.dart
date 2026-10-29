@@ -204,6 +204,29 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       final expected = aliases[requested];
       return expected != null && entry['kind'] == expected;
     }
+    // bank:/банк: limits the search to real account fields, never notes.
+    // Transfers match either source or destination account.
+    if (word.startsWith('bank:') || word.startsWith('банк:')) {
+      final requested = word.substring(word.indexOf(':') + 1);
+      if (requested.isEmpty) return false;
+      final accounts = [entry['bank'], entry['from'], entry['to']]
+          .map((value) => (value ?? '').toString().toLowerCase()
+              .replaceAll('ё', 'е')).join(' ');
+      const aliases = <String, List<String>>{
+        'ozon': ['ozon', 'озон'],
+        'озон': ['ozon', 'озон'],
+        'тинькофф': ['тинькофф', 'т-банк', 'тбанк'],
+        'т-банк': ['тинькофф', 'т-банк', 'тбанк'],
+        'тбанк': ['тинькофф', 'т-банк', 'тбанк'],
+        'газпром': ['газпромбанк', 'gazprombank'],
+        'газпромбанк': ['газпромбанк', 'gazprombank'],
+        'gazprombank': ['газпромбанк', 'gazprombank'],
+        'нал': ['наличные', 'cash'],
+        'cash': ['наличные', 'cash'],
+      };
+      final candidates = aliases[requested] ?? [requested];
+      return candidates.any((candidate) => accounts.contains(candidate));
+    }
     // min:/max: filter by the saved amount, not by numbers in a note.
     // Use kopecks to avoid floating point comparison surprises.
     if (word.startsWith('min:') || word.startsWith('max:')) {
@@ -643,8 +666,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод',
-              helperMaxLines: 2,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк',
+              helperMaxLines: 3,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

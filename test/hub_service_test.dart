@@ -106,6 +106,21 @@ void main() {
     expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
   });
 
+  test('Windows diagnostic and removal tools are not installable updates', () {
+    for (final name in [
+      'AllHub-Windows-debug.zip',
+      'Nova-Windows-symbols.zip',
+      'ShadowRP-uninstall.exe',
+      'Kopilka-Windows-crashdump.zip',
+      'Eclipse-Windows-pdb.exe',
+    ]) {
+      expect(HubService.assetPlatform(name), isNull, reason: name);
+    }
+    expect(HubService.assetPlatform('AllHub-Windows-portable.zip'), 'windows');
+    // Android debug artifacts remain identifiable as APKs for testing.
+    expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
+  });
+
   test('release downloads must belong to the inspected GitHub repository', () {
     const repo = 'PerchikHot/all-hub';
     expect(HubService.isTrustedReleaseAssetUrl(repo,

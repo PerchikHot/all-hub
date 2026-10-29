@@ -45,6 +45,20 @@ void main() {
     expect(matchesKopilkaHistory(misleadingNote, 'тип:перевод'), isFalse);
   });
 
+  test('bank: filters only actual accounts and supports legacy aliases', () {
+    expect(matchesKopilkaHistory(purchase, 'bank:ozon тип:расход'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'банк:т-банк'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'bank:gazprombank'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'bank:тинькофф'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'bank:'), isFalse);
+    final misleading = <String, dynamic>{
+      'kind': 'expense', 'bank': 'Т-Банк', 'note': 'Оплата Ozon', 'amount': 300,
+    };
+    expect(matchesKopilkaHistory(misleading, 'bank:ozon'), isFalse);
+    expect(matchesKopilkaHistory(misleading, 'bank:тбанк'), isTrue);
+    expect(misleading['note'], 'Оплата Ozon');
+  });
+
   test('cash aliases match accounts but not unrelated notes', () {
     final cash = <String, dynamic>{
       'kind': 'expense', 'bank': 'Наличные', 'note': 'Обед',

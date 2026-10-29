@@ -16,6 +16,16 @@ int? comparePublishedVersions(String installed, String published) {
   final current = pattern.firstMatch(installed.trim());
   final latest = pattern.firstMatch(published.trim());
   if (current == null || latest == null) return null;
+  // Validate ALL numeric components before comparing the first differing one.
+  // Otherwise 1.0.0 versus 2.0.<overflow> could falsely advertise an update.
+  for (var i = 1; i <= 4; i++) {
+    final installedPart = current.group(i);
+    final publishedPart = latest.group(i);
+    if ((installedPart != null && int.tryParse(installedPart) == null) ||
+        (publishedPart != null && int.tryParse(publishedPart) == null)) {
+      return null;
+    }
+  }
   for (var i = 1; i <= 3; i++) {
     // Untrusted release notes can contain integers larger than Dart's int.
     // A malformed version should mean "unknown", not crash the catalog.

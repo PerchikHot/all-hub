@@ -40,6 +40,10 @@ void main() {
       'VERSION: v2.1.0'), 'v2.1.0');
     expect(publishedVersionFromRelease('all-hub-latest',
       'Автоматическая сборка без версии'), 'all-hub-latest');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      'Version: 1.2.3\nВерсия: 1.2.4'), 'all-hub-latest');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      'Version: 1.2.3\nВерсия: 1.2.3'), '1.2.3');
   });
   test('shared repository release channels never cross-contaminate', () {
     expect(releaseMatchesProject('all-hub-latest', 'all-hub'), isTrue);

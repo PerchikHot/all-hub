@@ -115,7 +115,9 @@ class HubService {
     // Debug APKs remain recognizable for explicitly requested testing.
     if (n.endsWith('.apk')) {
       if (RegExp(r'(^|[-_.])(unsigned|unaligned|androidtest|testonly)([-_.]|$)')
-          .hasMatch(n)) return null;
+          .hasMatch(n)) {
+        return null;
+      }
       return 'android';
     }
     // Never offer uninstallers, debugging tools or source archives as

@@ -1,8 +1,8 @@
 {
-  "run_id": 40802180232,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40802180232",
+  "run_id": 40802189879,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/40802189879",
   "conclusion": "cancelled",
-  "head_sha": "b0204192271f9a2db36b518591f2a217cecb381e",
+  "head_sha": "744e313cd27dd41621185a12f1a1353dbe3d741c",
   "jobs": [],
   "artifacts": []
 }

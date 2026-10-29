@@ -27,6 +27,21 @@ void main() {
     }
   });
 
+  test('Windows ZIP rejects duplicate and file/directory collisions', () {
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['bin/app.exe', 'assets/icon.png'], ['bin/', 'assets/']), isTrue);
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['bin/App.exe', 'BIN/app.EXE'], []), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['data', 'data/file.dll'], []), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['assets'], ['ASSETS/']), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['bin/app.exe'], ['bin/', 'BIN/']), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveLayout(
+      ['../outside.exe'], []), isFalse);
+  });
+
   test('Windows ZIP extraction rejects excessive unpacked data', () {
     const mb = 1024 * 1024;
     expect(ProjectLauncher.isSafeWindowsArchiveBudget(10000, 512 * mb, 512 * mb), isTrue);

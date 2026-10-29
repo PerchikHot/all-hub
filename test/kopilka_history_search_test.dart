@@ -27,6 +27,13 @@ void main() {
     expect(matchesKopilkaHistory(transfer, 'наличные'), isFalse);
   });
 
+  test('finds ISO-stored dates using Russian date format', () {
+    expect(matchesKopilkaHistory(purchase, '28.10.2026'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'ozon 28.10.2026'), isTrue);
+    expect(matchesKopilkaHistory(transfer, '27.10.2026'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '27.10.2026'), isFalse);
+  });
+
   test('finds transaction by amount without exposing saved data', () {
     expect(matchesKopilkaHistory(purchase, '1250.5'), isTrue);
     expect(matchesKopilkaHistory(purchase, '9999'), isFalse);

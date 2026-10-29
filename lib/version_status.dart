@@ -5,9 +5,14 @@ String publishedVersionFromRelease(String tag, String? notes) {
     r'^[ \t]*(?:Version|Версия):[ \t]*(v?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*\r?$',
     multiLine: true,
     caseSensitive: false,
-  ).allMatches(notes ?? '').map((match) => match.group(1)!).toSet();
+  ).allMatches(notes ?? '').map((match) => match.group(1)!).toList();
+  // "v1.2.3" and "1.2.3" describe the same build. Do not suppress
+  // a valid update when release notes contain both notations.
+  final uniqueVersions = matches
+      .map((version) => version.replaceFirst(RegExp(r'^[vV]'), ''))
+      .toSet();
   // Conflicting version lines must not advertise an unverified update.
-  return matches.length == 1 ? matches.single : tag;
+  return uniqueVersions.length == 1 ? matches.first : tag;
 }
 
 /// Compare only explicit numeric versions. Moving release tags such as

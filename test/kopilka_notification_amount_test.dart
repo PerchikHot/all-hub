@@ -34,6 +34,8 @@ void main() {
     final alerts = <dynamic>[
       {'key': 'large-key-${List.filled(260, 'x').join()}',
        'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'key': 'line\nbreak', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'key': 'tab\tkey', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
       {'key': 'bad-title', 'title': {'bank': 'Т-Банк'},
        'body': 'Оплата 250 ₽'},
       {'key': 'bad-body', 'title': 'Т-Банк', 'body': ['Оплата 250 ₽']},

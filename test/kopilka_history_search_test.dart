@@ -85,4 +85,18 @@ void main() {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);
   });
+
+  test('bank aliases work for both old and new stored bank names', () {
+    final oldTinkoff = <String, dynamic>{'bank': 'Тинькофф', 'kind': 'expense'};
+    final oldOzon = <String, dynamic>{'bank': 'Озон Банк', 'kind': 'expense'};
+    final latinGazprom = <String, dynamic>{'bank': 'Gazprombank', 'kind': 'income'};
+    expect(matchesKopilkaHistory(oldTinkoff, 'т-банк'), isTrue);
+    expect(matchesKopilkaHistory(oldTinkoff, 'тбанк'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'тбанк перевод'), isTrue);
+    expect(matchesKopilkaHistory(oldOzon, 'ozon'), isTrue);
+    expect(matchesKopilkaHistory(latinGazprom, 'газпром'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'gazprombank'), isTrue);
+    expect(matchesKopilkaHistory(oldTinkoff, 'ozon'), isFalse);
+    expect(oldTinkoff['bank'], 'Тинькофф');
+  });
 }

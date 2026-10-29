@@ -50,4 +50,16 @@ void main() {
     }
     expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
   });
+
+  test('source and symbols ZIPs are not treated as Windows installers', () {
+    for (final name in [
+      'Nova-Windows-source.zip',
+      'all-hub-win-x64-src.zip',
+      'ShadowRP-desktop-symbols.zip',
+      'windows-pdb.zip',
+    ]) {
+      expect(HubService.assetPlatform(name), isNull, reason: name);
+    }
+    expect(HubService.assetPlatform('Nova-Windows-portable.zip'), 'windows');
+  });
 }

@@ -175,19 +175,28 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
   // Match common Russian bank names without rewriting the saved operation.
   // Aliases apply to complete search words only, not substrings of notes.
   final words = normalizedQuery.split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty)
-      .map((word) {
-        if (word == 'озон') return 'ozon';
-        if (word == 'тинькофф') return 'т-банк';
-        return word;
-      });
+      .where((word) => word.isNotEmpty);
   final text = [
     entry['note'], entry['bank'], entry['from'], entry['to'],
     entry['date'], entry['kind'], entry['amount'],
     entry['kind'] == 'income' ? 'доход поступление' :
       entry['kind'] == 'expense' ? 'расход покупка' : 'перевод',
   ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
-  return words.every(text.contains);
+  // Bank rebrands and transliterations must work in both directions:
+  // a saved legacy 'Тинькофф' entry should match 'Т-Банк' and vice versa.
+  return words.every((word) {
+    if (word == 'озон' || word == 'ozon') {
+      return text.contains('ozon') || text.contains('озон');
+    }
+    if (word == 'тинькофф' || word == 'т-банк' || word == 'тбанк') {
+      return text.contains('тинькофф') || text.contains('т-банк') ||
+          text.contains('тбанк');
+    }
+    if (word == 'газпром' || word == 'газпромбанк' || word == 'gazprombank') {
+      return text.contains('газпромбанк') || text.contains('gazprombank');
+    }
+    return text.contains(word);
+  });
 }
 
 /// Local-first finance notebook. No bank credentials or transactions leave the device.

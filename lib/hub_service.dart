@@ -86,6 +86,12 @@ class HubService {
     // MSI is not installable by ProjectLauncher yet: never advertise it as
     // a working update. Recognize common portable Windows ZIP labels.
     if (n.endsWith('.exe')) return 'windows';
+    // Source archives and debug symbols are not runnable applications, even
+    // when their filenames mention Windows. Never offer them for installation.
+    if (n.endsWith('.zip') &&
+        RegExp(r'(^|[-_.])(source|sources|src|symbols|pdb)([-_.]|$)').hasMatch(n)) {
+      return null;
+    }
     if (n.endsWith('.zip') &&
         (n.contains('windows') || n.contains('win64') ||
          n.contains('win-x64') || n.contains('win32') ||

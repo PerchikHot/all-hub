@@ -115,7 +115,7 @@ class HubService {
     // Never offer uninstallers, debugging tools or source archives as
     // Windows installers just because their filenames contain "Windows".
     if ((n.endsWith('.exe') || n.endsWith('.zip')) &&
-        RegExp(r'(^|[-_.])(source|sources|src|symbols|pdb|debug|uninstall|uninstaller|crashdump)([-_.]|$)')
+        RegExp(r'(^|[-_.])(source|sources|src|symbols|pdb|debug|uninstall|uninstaller|crashdump|crashreporter|helper|benchmark|updater)([-_.]|$)')
             .hasMatch(n)) {
       return null;
     }

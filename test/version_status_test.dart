@@ -14,6 +14,10 @@ void main() {
     expect(comparePublishedVersions('0.5.9', '0.6.0+42'), lessThan(0));
     expect(comparePublishedVersions('0.6.1', '0.6.0+42'), greaterThan(0));
     expect(comparePublishedVersions('1.2.3', '999999999999999999999999999999999.0.0'), isNull);
+    // A later overflow is invalid even when an earlier component differs.
+    expect(comparePublishedVersions('1.0.0', '2.0.999999999999999999999999999999999'), isNull);
+    expect(comparePublishedVersions('9.0.0', '1.0.0+999999999999999999999999999999999'), isNull);
+    expect(isPublishedDowngrade('9.0.0', '1.0.0+999999999999999999999999999999999'), isFalse);
     expect(comparePublishedVersions('1.2.3+1', '1.2.3+999999999999999999999999999999'), isNull);
     expect(describeUpdateStatus('1.2.3', '999999999999999999999999999999999.0.0'), contains('неизвестен'));
     expect(describeUpdateStatus('1.2.3', '999999999999999999999999999999999.0.0'),

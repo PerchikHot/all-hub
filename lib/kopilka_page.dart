@@ -85,8 +85,10 @@ bool isBankTransactionNotification(String title, String body) {
     r'код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b',
     caseSensitive: false,
   );
+  // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
+      suggestNotificationAmount(text).isNotEmpty &&
       !sensitive.hasMatch(text);
 }
 

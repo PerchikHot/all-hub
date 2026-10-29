@@ -153,7 +153,7 @@ double? parseKopilkaAmount(String input) {
 bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
   // Normalize Russian thousands separators and decimal commas for searching.
   // The saved transaction itself is never modified.
-  final normalizedQuery = query.toLowerCase().trim()
+  final normalizedQuery = query.toLowerCase().trim().replaceAll('ё', 'е')
       // Let users search ISO-stored dates as DD.MM.YYYY without changing data.
       .replaceAllMapped(
         RegExp(r'\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b'),
@@ -188,7 +188,7 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
     entry['date'], entry['kind'], entry['amount'],
     entry['kind'] == 'income' ? 'доход поступление' :
       entry['kind'] == 'expense' ? 'расход покупка' : 'перевод',
-  ].map((value) => (value ?? '').toString().toLowerCase()).join(' ');
+  ].map((value) => (value ?? '').toString().toLowerCase().replaceAll('ё', 'е')).join(' ');
   // Bank rebrands and transliterations must work in both directions:
   // a saved legacy 'Тинькофф' entry should match 'Т-Банк' and vice versa.
   return words.every((word) {

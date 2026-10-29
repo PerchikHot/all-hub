@@ -338,6 +338,12 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
     if (word == 'газпром' || word == 'газпромбанк' || word == 'gazprombank') {
       return text.contains('газпромбанк') || text.contains('gazprombank');
     }
+    // A leading minus excludes a matching word from the local history.
+    // This can be combined with date, bank and amount filters, e.g.
+    // "тип:расход -такси". A lone minus is an invalid filter.
+    if (word.startsWith('-')) {
+      return word.length > 1 && !text.contains(word.substring(1));
+    }
     return text.contains(word);
   });
 }
@@ -729,8 +735,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026',
-              helperMaxLines: 5,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nИсключить слово: -такси',
+              helperMaxLines: 6,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

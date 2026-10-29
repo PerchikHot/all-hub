@@ -49,7 +49,7 @@ void main() {
           isNull, reason: '$invalidRepo');
     }
     for (final field in ['id', 'name', 'type', 'description']) {
-      final oversized = project()..[field] = 'x' * 1100;
+      final oversized = project()..[field] = List.filled(1100, 'x').join();
       expect(HubService.parseCatalog(jsonEncode([oversized])),
           isNull, reason: field);
     }

@@ -90,6 +90,12 @@ bool isBankTransactionNotification(String title, String body) {
     r'код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b',
     caseSensitive: false,
   );
+  // Password/PIN/CVV alerts can contain a payment amount but must never
+  // appear in the transaction-import review list.
+  final credentialWords = RegExp(
+    r'парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s+безопасности',
+    caseSensitive: false,
+  );
   // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&

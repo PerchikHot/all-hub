@@ -73,6 +73,22 @@ class ProjectLauncher {
       received >= 0 && nextChunk >= 0 && maxBytes >= 0 &&
       received <= maxBytes && nextChunk <= maxBytes - received;
 
+  /// A resumed APK must start at the exact saved offset and declare a
+  /// bounded total size. Never append a mismatched server response.
+  static bool isSafeApkContentRange(String? header, int existing,
+      {int maxBytes = 256 * 1024 * 1024}) {
+    if (header == null || existing < 0 || maxBytes <= 0) return false;
+    final match = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
+        .firstMatch(header.trim());
+    if (match == null) return false;
+    final start = int.tryParse(match.group(1)!);
+    final end = int.tryParse(match.group(2)!);
+    final total = int.tryParse(match.group(3)!);
+    return start != null && end != null && total != null &&
+        start == existing && end >= start && total > end &&
+        total <= maxBytes;
+  }
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
@@ -142,15 +158,15 @@ class ProjectLauncher {
         final isPartial = response.statusCode == 206;
         if (isPartial) {
           final range = response.headers['content-range'];
-          if (range == null || !range.startsWith('bytes $existing-')) {
+          if (!isSafeApkContentRange(range, existing)) {
             throw const FormatException('Сервер вернул неверный диапазон APK');
           }
-          final slash = range.lastIndexOf('/');
-          if (slash != -1) {
-            totalLength = int.tryParse(range.substring(slash + 1));
-          }
+          totalLength = int.parse(range!.substring(range.lastIndexOf('/') + 1));
         } else {
           totalLength = response.contentLength;
+        }
+        if (totalLength != null && totalLength > 256 * 1024 * 1024) {
+          throw const FormatException('APK превышает ограничение 256 МиБ');
         }
         final sink = temporary.openWrite(
           mode: isPartial ? FileMode.append : FileMode.write,
@@ -160,6 +176,9 @@ class ProjectLauncher {
           await for (final chunk in response.stream.timeout(
             const Duration(seconds: 45),
           )) {
+            if (!isSafeWindowsDownloadBudget(received, chunk.length)) {
+              throw const FormatException('APK превышает ограничение 256 МиБ');
+            }
             sink.add(chunk);
             received += chunk.length;
             if (totalLength != null && totalLength > 0) {

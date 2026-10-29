@@ -34,22 +34,50 @@ class ProjectStatus {
 }
 
 class HubService {
+  /// Reject malformed catalogs before caching them. A broken network response
+  /// must not replace the last working offline catalog or crash startup.
+  static List<HubProject>? parseCatalog(String source) {
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is! List || decoded.isEmpty) return null;
+      final projects = <HubProject>[];
+      final ids = <String>{};
+      for (final item in decoded) {
+        if (item is! Map<String, dynamic>) return null;
+        for (final key in ['id', 'name', 'type', 'description']) {
+          final value = item[key];
+          if (value is! String || value.trim().isEmpty) return null;
+        }
+        if (!ids.add(item['id'] as String)) return null;
+        projects.add(HubProject.fromJson(item));
+      }
+      return projects;
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
   static Future<List<HubProject>> catalog(String bundled) async {
-    var content = bundled;
     final prefs = await SharedPreferences.getInstance();
+    var projects = parseCatalog(bundled) ?? <HubProject>[];
     final cached = prefs.getString('catalog_cache');
-    if (cached != null && cached.trimLeft().startsWith('[')) content = cached;
+    final offline = cached == null ? null : parseCatalog(cached);
+    if (offline != null) projects = offline;
     try {
       final response = await http.get(Uri.parse(
         'https://raw.githubusercontent.com/$repository/main/assets/projects.json'
       ), headers: _headers).timeout(const Duration(seconds: 3));
-      if (response.statusCode == 200 && response.body.trimLeft().startsWith('[')) {
-        content = response.body;
-        await prefs.setString('catalog_cache', content);
+      if (response.statusCode == 200) {
+        final remote = parseCatalog(response.body);
+        if (remote != null) {
+          projects = remote;
+          await prefs.setString('catalog_cache', response.body);
+        }
       }
     } catch (_) {}
-    final list = jsonDecode(content) as List;
-    return list.map((e) => HubProject.fromJson(e as Map<String, dynamic>)).toList();
+    return projects;
   }
 
   static String? assetPlatform(String name) {

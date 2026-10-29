@@ -17,13 +17,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool hasMore = true;
   int page = 1;
   String kind = 'all';
-  String category = 'characters';
-  static const categoryTags = <String, String>{
-    'characters': '',
-    'solo': 'solo',
-    'lesbian': 'yuri',
-    'futanari': 'futanari',
-  };
+  bool showFuta = true;
+  bool showTrans = true;
+  static const feedTags = <String>['futanari', 'transgender'];
   static const maxVisiblePosts = 90;
   final seenPostIds = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
@@ -286,21 +282,27 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     final requestedPage = page;
     final requestedQuery = activeQuery;
     final requestedKind = kind;
-    final requestedCategory = category;
+    final requestedFuta = showFuta;
+    final requestedTrans = showTrans;
+    if (!requestedFuta && !requestedTrans) {
+      setState(() { loading = false; hasMore = false; });
+      return;
+    }
     try {
-      // Public Danbooru searches have a strict tag limit. Do not combine
-      // character + category + animation into an invalid three-tag request.
-      final categoryTag = categoryTags[requestedCategory] ?? '';
-      final tag = requestedQuery.isNotEmpty ? requestedQuery
-          : categoryTag.isNotEmpty ? categoryTag
-          : favoriteTags[(requestedPage - 1) % favoriteTags.length];
-      // Restrict the feed to explicitly rated posts. Category searches must
-      // be applied server-side rather than filtering unrelated GIF results.
-      final tags = [tag, 'rating:explicit'].join(' ');
+      // Combine enabled categories into one feed, alternating their pages.
+      // Keep the public two-tag search limit: category + rating, or
+      // category + the user's query (rating then checked locally).
+      final enabledTags = <String>[
+        if (requestedFuta) feedTags[0],
+        if (requestedTrans) feedTags[1],
+      ];
+      final selectedTag = enabledTags[(requestedPage - 1) % enabledTags.length];
+      final sourcePage = ((requestedPage - 1) ~/ enabledTags.length) + 1;
+      final tags = [selectedTag, requestedQuery.isEmpty ? 'rating:explicit' : requestedQuery].join(' ');
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
-        'page': '$requestedPage',
+        'page': '$sourcePage',
       });
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) {
@@ -308,24 +310,14 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
-      if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedCategory != category) return;
+      if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
       final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
         final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
         if (preview is! String || !preview.startsWith('https://')) return false;
         final id = (p['id'] ?? '').toString();
         if (seenPostIds.contains(id)) return false;
-        if (requestedCategory == 'futanari' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('futanari')) {
-          return false;
-        }
-        if (requestedCategory == 'solo' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('solo')) {
-          return false;
-        }
-        if (requestedCategory == 'lesbian' &&
-            !(p['tag_string'] ?? '').toString().split(' ').contains('yuri')) {
-          return false;
-        }
+        final postTags = (p['tag_string'] ?? '').toString().split(' ');
+        if (!postTags.contains(selectedTag)) return false;
         if ((p['rating'] ?? '').toString() != 'e') return false;
         if (requestedKind == 'gif') {
           final ext = (p['file_ext'] ?? '').toString().toLowerCase();
@@ -384,27 +376,18 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           ),
         ),
         const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            for (final option in const [
-              ('characters', 'Персонажи'),
-              ('solo', 'Соло'),
-              ('lesbian', 'Лесби'),
-              ('futanari', 'Футанари'),
-            ]) ...[
-              ChoiceChip(
-                label: Text(option.$2),
-                selected: category == option.$1,
-                onSelected: (_) {
-                  category = option.$1;
-                  search();
-                },
-              ),
-              const SizedBox(width: 8),
-            ],
-          ]),
-        ),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          FilterChip(
+            label: const Text('Футы'),
+            selected: showFuta,
+            onSelected: (value) { showFuta = value; search(); },
+          ),
+          FilterChip(
+            label: const Text('Трансы'),
+            selected: showTrans,
+            onSelected: (value) { showTrans = value; search(); },
+          ),
+        ]),
         const SizedBox(height: 8),
         Row(children: [
           ChoiceChip(label: const Text('Картинки'), selected: kind == 'all', onSelected: (_) {
@@ -427,7 +410,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       padding: const EdgeInsets.all(8),
       child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
     ),
-    if (!loading && posts.isEmpty && error.isEmpty) const Padding(
+    if (!showFuta && !showTrans) const Padding(
+      padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
+    ),
+    if (!loading && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) const Padding(
       padding: EdgeInsets.all(12), child: Text('Нет изображений по запросу. Попробуй другое имя или тег.')),
     Expanded(child: RefreshIndicator(
       onRefresh: () async { search(); },

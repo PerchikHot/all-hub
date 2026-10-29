@@ -46,6 +46,14 @@ void main() {
     expect(ProjectLauncher.isSafeWindowsDownloadBudget(0, -1), isFalse);
   });
 
+  test('standalone Windows EXE uses the same bounded streaming budget', () {
+    const mb = 1024 * 1024;
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(0, 256 * mb), isTrue);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(250 * mb, 6 * mb), isTrue);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(250 * mb, 7 * mb), isFalse);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(0, 33 * mb, maxBytes: 32 * mb), isFalse);
+  });
+
   test('Windows ZIP extraction rejects traversal and reserved device names', () {
     for (final path in [
       '', '/', '../outside.exe', 'assets/../../evil.dll', 'a//b.exe',

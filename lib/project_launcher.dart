@@ -273,7 +273,9 @@ class ProjectLauncher {
       final target = File('${directory.path}${Platform.pathSeparator}$id.exe');
       final temporary = File('${target.path}.download');
       try {
-        await _download(response, temporary);
+        // Apply the same streaming size limit to standalone EXEs as to ZIPs.
+        // A server with a missing Content-Length must not fill the disk.
+        await _download(response, temporary, maxBytes: 256 * 1024 * 1024);
         if (await temporary.length() < 1024) {
           throw const FormatException('Загруженный EXE слишком мал');
         }

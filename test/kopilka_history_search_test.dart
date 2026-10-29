@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('filtered net excludes own-account transfers and invalid legacy amounts', () {
+    final visible = <Map<String, dynamic>>[
+      {'kind': 'income', 'amount': 2000.0},
+      {'kind': 'expense', 'amount': 500.25},
+      {'kind': 'transfer', 'amount': 9000.0},
+      {'kind': 'income', 'amount': double.nan},
+      {'kind': 'expense', 'amount': 'not a number'},
+    ];
+    expect(kopilkaNetChange(visible), closeTo(1499.75, 0.001));
+    expect(visible[2]['amount'], 9000.0);
+    expect(kopilkaNetChange([]), 0.0);
+  });
   final purchase = <String, dynamic>{
     'kind': 'expense',
     'bank': 'Ozon Банк',

@@ -130,6 +130,30 @@ class HubService {
     return null;
   }
 
+  /// Only install packages from the requested repository's GitHub release.
+  /// The API response is network data, not an authorization to download
+  /// executables from arbitrary domains or another project's release.
+  static bool isTrustedReleaseAssetUrl(String repo, String url) {
+    final repositoryParts = repo.split('/');
+    final uri = Uri.tryParse(url);
+    if (repositoryParts.length != 2 || uri == null ||
+        uri.scheme != 'https' || uri.host.toLowerCase() != 'github.com' ||
+        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
+      return false;
+    }
+    final parts = uri.pathSegments;
+    if (parts.length != 6 ||
+        parts[0].toLowerCase() != repositoryParts[0].toLowerCase() ||
+        parts[1].toLowerCase() != repositoryParts[1].toLowerCase() ||
+        parts[2] != 'releases' || parts[3] != 'download' ||
+        parts.skip(4).any((part) => part.isEmpty ||
+            part == '.' || part == '..' ||
+            part.contains('/') || part.contains('\\'))) {
+      return false;
+    }
+    return true;
+  }
+
   static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
     try {
       final responses = await Future.wait([

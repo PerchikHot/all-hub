@@ -223,7 +223,9 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
         return false;
       }
       final saved = (entry['date'] ?? '').toString();
-      if (saved.length < 10) return false;
+      if (saved.length < 10) {
+        return false;
+      }
       final day = saved.substring(0, 10);
       if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(day)) {
         return false;

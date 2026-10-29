@@ -16,6 +16,15 @@ void main() {
     'date': '2026-10-27',
   };
 
+  test('negative terms exclude local matches without changing transactions', () {
+    expect(matchesKopilkaHistory(purchase, 'ozon -такси'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'тип:расход -продукты'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'bank:ozon -газпром'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'тип:перевод -т-банк'), isFalse);
+    expect(matchesKopilkaHistory(purchase, '-'), isFalse);
+    expect(purchase['note'], 'Продукты');
+  });
+
   test('finds note and bank without case sensitivity', () {
     expect(matchesKopilkaHistory(purchase, '  OZON   продукты '), isTrue);
     expect(matchesKopilkaHistory(purchase, 'другая покупка'), isFalse);

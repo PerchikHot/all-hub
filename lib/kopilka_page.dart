@@ -172,8 +172,15 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
         RegExp(r'(\d)\s*(?:₽|руб(?:\.|ль|ля|лей)?|rub)(?=\s|$)', caseSensitive: false),
         (match) => match.group(1)!,
       );
+  // Match common Russian bank names without rewriting the saved operation.
+  // Aliases apply to complete search words only, not substrings of notes.
   final words = normalizedQuery.split(RegExp(r'\s+'))
-      .where((word) => word.isNotEmpty);
+      .where((word) => word.isNotEmpty)
+      .map((word) {
+        if (word == 'озон') return 'ozon';
+        if (word == 'тинькофф') return 'т-банк';
+        return word;
+      });
   final text = [
     entry['note'], entry['bank'], entry['from'], entry['to'],
     entry['date'], entry['kind'], entry['amount'],

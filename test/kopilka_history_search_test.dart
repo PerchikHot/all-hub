@@ -45,6 +45,21 @@ void main() {
     expect(matchesKopilkaHistory(purchase, 'cash'), isFalse);
   });
 
+  test('Russian е and ё spelling variants find the same local note', () {
+    final coffee = <String, dynamic>{
+      'kind': 'expense', 'bank': 'Т-Банк',
+      'note': 'Кофе и сгущёнка', 'date': '2026-10-29', 'amount': 320,
+    };
+    final breakfast = <String, dynamic>{
+      'kind': 'expense', 'bank': 'Т-Банк',
+      'note': 'Завтрак со сгущенкой', 'date': '2026-10-29', 'amount': 250,
+    };
+    expect(matchesKopilkaHistory(coffee, 'сгущенка'), isTrue);
+    expect(matchesKopilkaHistory(breakfast, 'сгущёнкой'), isTrue);
+    expect(matchesKopilkaHistory(coffee, 'сгущенка ozon'), isFalse);
+    expect(coffee['note'], 'Кофе и сгущёнка');
+  });
+
   test('finds transfers by destination and date', () {
     expect(matchesKopilkaHistory(transfer, 'газпромбанк 2026-10-27'), isTrue);
     expect(matchesKopilkaHistory(transfer, 'перевод т-банк'), isTrue);

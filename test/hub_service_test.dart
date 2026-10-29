@@ -106,6 +106,26 @@ void main() {
     expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
   });
 
+  test('release downloads must belong to the inspected GitHub repository', () {
+    const repo = 'PerchikHot/all-hub';
+    expect(HubService.isTrustedReleaseAssetUrl(repo,
+      'https://github.com/PerchikHot/all-hub/releases/download/all-hub-latest/AllHub.apk'), isTrue);
+    expect(HubService.isTrustedReleaseAssetUrl(repo,
+      'https://github.com/perchikhot/ALL-HUB/releases/download/v1.0.0/AllHub-Windows.zip'), isTrue);
+    for (final url in [
+      'https://evil.example/PerchikHot/all-hub/releases/download/v1/a.apk',
+      'https://github.com/PerchikHot/other/releases/download/v1/a.apk',
+      'https://github.com.evil.example/PerchikHot/all-hub/releases/download/v1/a.apk',
+      'http://github.com/PerchikHot/all-hub/releases/download/v1/a.apk',
+      'https://github.com@evil.example/PerchikHot/all-hub/releases/download/v1/a.apk',
+      'https://github.com/PerchikHot/all-hub/archive/main.zip',
+      'https://github.com/PerchikHot/all-hub/releases/download/v1/a.apk?redirect=1',
+      'https://github.com/PerchikHot/all-hub/releases/download/v1/../a.apk',
+    ]) {
+      expect(HubService.isTrustedReleaseAssetUrl(repo, url), isFalse, reason: url);
+    }
+  });
+
   test('source and symbols ZIPs are not treated as Windows installers', () {
     for (final name in [
       'Nova-Windows-source.zip',

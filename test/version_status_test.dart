@@ -52,7 +52,7 @@ void main() {
   test('blank release metadata does not advertise an update', () {
     expect(describeUpdateStatus('1.0.0', '   '), contains('Нет опубликованного'));
     expect(describeUpdateStatus('  ', '1.0.1'), contains('неизвестен'));
-    expect(describeUpdateStatus('1.0.0', '\\t\\n'), contains('Нет опубликованного'));
+    expect(describeUpdateStatus('1.0.0', '\t\n'), contains('Нет опубликованного'));
     expect(installActionLabel('1.0.0', '  ', 'Скачать APK'), 'Скачать APK');
   });
 

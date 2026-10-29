@@ -145,6 +145,20 @@ void main() {
     }
   });
 
+  test('release asset URL must match advertised filename exactly', () {
+    const repo = 'PerchikHot/all-hub';
+    const url = 'https://github.com/PerchikHot/all-hub/releases/download/v1/AllHub.apk';
+    expect(HubService.isTrustedReleaseAssetUrl(repo, url,
+        expectedName: 'AllHub.apk'), isTrue);
+    expect(HubService.isTrustedReleaseAssetUrl(repo, url,
+        expectedName: 'Other.apk'), isFalse);
+    expect(HubService.isTrustedReleaseAssetUrl(repo, url,
+        expectedName: 'allhub.apk'), isFalse);
+    expect(HubService.isTrustedReleaseAssetUrl(repo,
+        'https://github.com/PerchikHot/all-hub/releases/download/v1/My%20App.apk',
+        expectedName: 'My App.apk'), isTrue);
+  });
+
   test('source and symbols ZIPs are not treated as Windows installers', () {
     for (final name in [
       'Nova-Windows-source.zip',

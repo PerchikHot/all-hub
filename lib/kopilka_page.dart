@@ -100,7 +100,7 @@ bool isBankTransactionNotification(String title, String body) {
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
       suggestNotificationAmount(text).isNotEmpty &&
-      !sensitive.hasMatch(text);
+      !sensitive.hasMatch(text) && !credentialWords.hasMatch(text);
 }
 
 /// Only review a native notification once, even if the listener returns the

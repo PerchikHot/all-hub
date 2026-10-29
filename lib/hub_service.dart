@@ -37,6 +37,9 @@ class HubService {
   /// Reject malformed catalogs before caching them. A broken network response
   /// must not replace the last working offline catalog or crash startup.
   static List<HubProject>? parseCatalog(String source) {
+    // Avoid parsing unbounded remote or cached JSON into application memory.
+    // 100 entries at the allowed field sizes fit well below this limit.
+    if (source.length > 256 * 1024) return null;
     try {
       final decoded = jsonDecode(source);
       // Bound untrusted network catalogs and reject ambiguous project IDs.
@@ -47,7 +50,10 @@ class HubService {
         if (item is! Map<String, dynamic>) return null;
         for (final key in ['id', 'name', 'type', 'description']) {
           final value = item[key];
-          if (value is! String || value.trim().isEmpty) return null;
+          if (value is! String || value.trim().isEmpty ||
+              RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]').hasMatch(value)) {
+            return null;
+          }
         }
         // Limit text from remote catalogs before it reaches UI widgets.
         const maxLengths = <String, int>{

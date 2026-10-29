@@ -158,8 +158,8 @@ double kopilkaNetChange(Iterable<Map<String, dynamic>> visible) {
   var net = 0.0;
   for (final entry in visible) {
     final amount = safeKopilkaAmount(entry);
-    if (entry['kind'] == 'income') net += amount;
-    if (entry['kind'] == 'expense') net -= amount;
+    if (entry['kind'] == 'income') { net += amount; }
+    if (entry['kind'] == 'expense') { net -= amount; }
   }
   return net;
 }

@@ -34,6 +34,7 @@ void main() {
       expect(isBankTransactionNotification('Т-Банк', 'Оплата 250 ₽. Остаток 5 000 ₽'), isTrue);
       expect(isBankTransactionNotification('Ozon Банк', 'Перевод 2 000 RUB'), isTrue);
       expect(isBankTransactionNotification('Газпромбанк', 'Зачисление 500 рублей'), isTrue);
+      expect(isBankTransactionNotification('Т-Банк', 'Оплата 1 рубль'), isTrue);
     });
 
     test('does not offer balance-only or promotional alerts', () {
@@ -98,6 +99,13 @@ void main() {
 
     test('handles rubles spelled out', () {
       expect(suggestNotificationAmount('Поступило 2 500 рублей'), '2500');
+    });
+
+    test('recognizes singular and plural ruble forms in notifications', () {
+      expect(suggestNotificationAmount('Оплата 1 рубль'), '1');
+      expect(suggestNotificationAmount('Оплата 2 рубля'), '2');
+      expect(suggestNotificationAmount('Оплата 5 рублей'), '5');
+      expect(suggestNotificationAmount('Остаток 1 рубль'), isEmpty);
     });
 
     test('uses the nearest label when the amount precedes its action', () {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
@@ -19,9 +20,20 @@ void main() {
       '[{"id":"all-hub","name":" ","type":"app","description":"Launcher"}]',
       '[{"id":"all-hub","name":"All Hub","type":"app","description":"Launcher"},'
           '{"id":"all-hub","name":"Duplicate","type":"app","description":"Duplicate"}]',
+      '[{"id":"all-hub ","name":"All Hub","type":"app","description":"Launcher"}]',
+      '[{"id":"All-Hub","name":"All Hub","type":"app","description":"Launcher"}]',
+      '[{"id":"all--hub","name":"All Hub","type":"app","description":"Launcher"}]',
     ]) {
       expect(HubService.parseCatalog(invalid), isNull, reason: invalid);
     }
+  });
+
+  test('rejects oversized remote catalogs before caching', () {
+    final oversized = List.generate(101, (i) => {
+      'id': 'project-$i', 'name': 'Project $i',
+      'type': 'app', 'description': 'Test',
+    });
+    expect(HubService.parseCatalog(jsonEncode(oversized)), isNull);
   });
 
   test('Windows portable archives are recognized across common naming schemes', () {

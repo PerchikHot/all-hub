@@ -73,6 +73,9 @@ void main() {
         'PIN для перевода 500 ₽',
         'CVV для оплаты 300 ₽',
         'Код безопасности: 456. Оплата 100 ₽',
+        'Ваш код: 1234. Оплата 250 ₽',
+        'Payment 250 RUB. Your code: 9999',
+        'Код: 4321. Перевод 2 000 ₽',
       ]) {
         expect(isBankTransactionNotification('Банк', body), isFalse,
             reason: body);

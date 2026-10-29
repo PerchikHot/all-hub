@@ -170,6 +170,17 @@ class HubService {
     return true;
   }
 
+  /// Report release and Actions failures independently. A healthy release
+  /// response does not imply that CI status was fetched successfully.
+  static String? apiStatusError(int releaseStatus, int actionsStatus) {
+    if (releaseStatus == 403) return 'GitHub API: ограничение запросов (релизы)';
+    if (releaseStatus == 404) return 'Релизы недоступны или репозиторий закрыт';
+    if (releaseStatus != 200) return 'GitHub API: HTTP $releaseStatus';
+    if (actionsStatus == 403) return 'GitHub API: ограничение запросов (сборки)';
+    if (actionsStatus != 200) return 'GitHub Actions: HTTP $actionsStatus';
+    return null;
+  }
+
   static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
     try {
       final responses = await Future.wait([
@@ -220,9 +231,8 @@ class HubService {
         }
       }
       return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,
-        assets: assets, error: responses[0].statusCode == 403 ? 'GitHub API: ограничение запросов' :
-          responses[0].statusCode == 404 ? 'Релизы недоступны или репозиторий закрыт' :
-          responses[0].statusCode != 200 ? 'GitHub API: HTTP ${responses[0].statusCode}' : null);
+        assets: assets, error: apiStatusError(
+          responses[0].statusCode, responses[1].statusCode));
     } catch (e) {
       return ProjectStatus(error: 'Ошибка сети: $e');
     }

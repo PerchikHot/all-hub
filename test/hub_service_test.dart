@@ -3,6 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('release and CI HTTP errors are shown separately', () {
+    expect(HubService.apiStatusError(200, 200), isNull);
+    expect(HubService.apiStatusError(403, 200), contains('релизы'));
+    expect(HubService.apiStatusError(200, 403), contains('сборки'));
+    expect(HubService.apiStatusError(200, 500), contains('HTTP 500'));
+    expect(HubService.apiStatusError(404, 200), contains('Релизы'));
+    expect(HubService.apiStatusError(502, 403), contains('HTTP 502'));
+  });
+
   test('malformed remote catalogs cannot replace the offline project list', () {
     const valid = '[{"id":"all-hub","name":"All Hub","type":"app","description":"Launcher"},'
         '{"id":"kopilka","name":"Копилка","type":"app","description":"Finance"}]';

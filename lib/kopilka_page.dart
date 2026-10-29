@@ -149,8 +149,8 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
   final normalizedQuery = query.toLowerCase().trim()
       // Let users search ISO-stored dates as DD.MM.YYYY without changing data.
       .replaceAllMapped(
-        RegExp(r'\b(\d{2})\.(\d{2})\.(\d{4})\b'),
-        (match) => '${match.group(3)}-${match.group(2)}-${match.group(1)}',
+        RegExp(r'\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b'),
+        (match) => '${match.group(3)}-${match.group(2)!.padLeft(2, '0')}-${match.group(1)!.padLeft(2, '0')}',
       )
       .replaceAllMapped(
         RegExp(r'\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d{1,2})?'),

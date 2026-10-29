@@ -113,6 +113,10 @@ void main() {
       'ShadowRP-uninstall.exe',
       'Kopilka-Windows-crashdump.zip',
       'Eclipse-Windows-pdb.exe',
+      'AllHub-Windows-updater.exe',
+      'Nova-desktop-helper.exe',
+      'ShadowRP-Windows-benchmark.zip',
+      'Kopilka-Windows-crashreporter.exe',
     ]) {
       expect(HubService.assetPlatform(name), isNull, reason: name);
     }

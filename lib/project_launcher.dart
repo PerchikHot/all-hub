@@ -31,6 +31,15 @@ class ProjectLauncher {
         !reserved.hasMatch(part));
   }
 
+  /// Cap archive entries and unpacked size to avoid exhausting disk space.
+  /// These checks apply before writing each entry to the staging directory.
+  static bool isSafeWindowsArchiveBudget(
+    int entryCount, int totalBytes, int nextEntryBytes,
+  ) => entryCount >= 0 && entryCount <= 10000 &&
+      totalBytes >= 0 && nextEntryBytes >= 0 &&
+      nextEntryBytes <= 512 * 1024 * 1024 &&
+      totalBytes + nextEntryBytes <= 1024 * 1024 * 1024;
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
@@ -314,9 +323,19 @@ class ProjectLauncher {
         throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
       }
       await _download(response, zipFile);
+      if (await zipFile.length() > 256 * 1024 * 1024) {
+        throw const FormatException('Windows ZIP слишком большой');
+      }
       final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
       final rootPath = staging.absolute.path;
+      var unpackedBytes = 0;
+      var entriesSeen = 0;
       for (final entry in archive) {
+        entriesSeen++;
+        if (!isSafeWindowsArchiveBudget(entriesSeen, unpackedBytes, entry.size)) {
+          throw const FormatException('ZIP превышает безопасный размер распаковки');
+        }
+        unpackedBytes += entry.size;
         final name = entry.name.replaceAll('\\', '/');
         if (!isSafeWindowsArchivePath(name)) {
           throw const FormatException('Недопустимый путь в ZIP');

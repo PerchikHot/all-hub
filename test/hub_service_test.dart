@@ -5,7 +5,9 @@ import 'package:all_hub/hub_service.dart';
 void main() {
   test('release and CI HTTP errors are shown separately', () {
     expect(HubService.apiStatusError(200, 200), isNull);
-    expect(HubService.apiStatusError(403, 200), contains('релизы'));
+    expect(HubService.apiStatusError(403, 200), contains('релизам'));
+    expect(HubService.apiStatusError(429, 200), contains('HTTP 429'));
+    expect(HubService.apiStatusError(200, 429), contains('сборки'));
     expect(HubService.apiStatusError(200, 403), contains('сборки'));
     expect(HubService.apiStatusError(200, 500), contains('HTTP 500'));
     expect(HubService.apiStatusError(404, 200), contains('Релизы'));

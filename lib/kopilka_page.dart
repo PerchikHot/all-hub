@@ -42,10 +42,15 @@ String suggestNotificationAmount(String body) {
     if (!beforeTransaction && afterBalance && !afterTransaction) continue;
     final score = beforeTransaction ? 10 : afterTransaction ? 5 : 0;
     if (score > bestScore) {
-      bestScore = score;
       final whole = match.group(1)!.replaceAll(RegExp(r'[ \u00a0\u202f]'), '');
       final decimals = match.group(2);
-      result = decimals == null ? whole : '$whole.$decimals';
+      final candidate = decimals == null ? whole : '$whole.$decimals';
+      // Zero-value bank alerts are not transactions. Ignore them rather
+      // than prefill an invalid amount or hide a later valid purchase.
+      final numeric = double.tryParse(candidate);
+      if (numeric == null || !numeric.isFinite || numeric <= 0) continue;
+      bestScore = score;
+      result = candidate;
     }
   }
   return result;

@@ -612,7 +612,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             controller: historySearchController,
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
-              hintText: 'Поиск по описанию, счёту, дате или сумме',
+              hintText: 'Описание, счёт, дата или сумма',
+              helperText: 'Точная сумма: sum:1250.50',
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

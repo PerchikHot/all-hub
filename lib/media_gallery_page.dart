@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 
 class MediaGalleryPage extends StatefulWidget {
@@ -25,6 +26,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final seenPostIds = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
+  bool accessDenied = false;
   String activeQuery = '';
   static const int pageSize = 24;
   bool highQuality = true;
@@ -176,6 +178,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       emptyPageRetries = 0;
       hasMore = true;
       error = '';
+      accessDenied = false;
     });
     loading = false;
     loadMore();
@@ -211,6 +214,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         'page': '$sourcePage',
       });
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
+      if (response.statusCode == 403) {
+        throw const _FeedAccessDenied();
+      }
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -246,7 +252,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     } catch (e) {
       if (mounted && generation == searchGeneration) {
         setState(() {
-          error = 'Не удалось загрузить изображения: $e';
+          accessDenied = e is _FeedAccessDenied;
+          error = accessDenied
+              ? 'Danbooru отклонил запрос (HTTP 403). Это ограничение доступа к API на стороне сервера или сети.'
+              : 'Не удалось загрузить изображения: $e';
           hasMore = false;
         });
       }
@@ -260,6 +269,20 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           Future.microtask(() => loadMore());
         }
       }
+    }
+  }
+
+  Future<void> openSourceSearch() async {
+    final tags = <String>[
+      if (showFuta) feedTags[0],
+      if (showTrans && !showFuta) feedTags[1],
+      if (activeQuery.isNotEmpty) activeQuery,
+    ].join(' ');
+    final uri = Uri.https('danbooru.donmai.us', '/posts', {'tags': tags});
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось открыть сайт источника')),
+      );
     }
   }
 
@@ -321,7 +344,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     ),
     if (error.isNotEmpty) Padding(
       padding: const EdgeInsets.all(8),
-      child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          OutlinedButton.icon(onPressed: search, icon: const Icon(Icons.refresh), label: const Text('Повторить')),
+          if (accessDenied) OutlinedButton.icon(
+            onPressed: openSourceSearch,
+            icon: const Icon(Icons.open_in_browser),
+            label: const Text('Открыть поиск на сайте')),
+        ]),
+      ]),
     ),
     if (!showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
@@ -367,4 +400,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ),
     )),
   ]);
+}
+
+class _FeedAccessDenied implements Exception {
+  const _FeedAccessDenied();
+  @override
+  String toString() => 'HTTP 403 Forbidden';
 }

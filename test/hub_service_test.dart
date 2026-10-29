@@ -79,6 +79,21 @@ void main() {
     }
   });
 
+  test('unsafe release filenames never become installable assets', () {
+    for (final name in [
+      '',
+      'folder/AllHub-release.apk',
+      r'folder\AllHub-release.apk',
+      'AllHub\u0000-release.apk',
+      'AllHub\n-release.apk',
+      '${List.filled(201, 'x').join()}.apk',
+    ]) {
+      expect(HubService.assetPlatform(name), isNull, reason: name);
+    }
+    expect(HubService.assetPlatform('AllHub-release.apk'), 'android');
+    expect(HubService.assetPlatform('AllHub-Windows.zip'), 'windows');
+  });
+
   test('unsigned and unaligned Android packages are not offered as updates', () {
     for (final name in [
       'AllHub-unsigned.apk',

@@ -28,6 +28,33 @@ void main() {
     }
   });
 
+  test('rejects unsafe repository identifiers and oversized fields', () {
+    Map<String, dynamic> project({Object? repo = 'PerchikHot/all-hub'}) => {
+      'id': 'all-hub', 'name': 'All Hub', 'type': 'app',
+      'description': 'Launcher', 'repo': repo,
+    };
+    expect(HubService.parseCatalog(jsonEncode([project()])), isNotNull);
+    expect(HubService.parseCatalog(jsonEncode([project(repo: null)])), isNotNull);
+    for (final invalidRepo in [
+      'https://github.com/PerchikHot/all-hub',
+      'PerchikHot/../other',
+      'PerchikHot//all-hub',
+      '../all-hub',
+      'PerchikHot/all-hub?download=1',
+      42,
+      true,
+      '',
+    ]) {
+      expect(HubService.parseCatalog(jsonEncode([project(repo: invalidRepo)])),
+          isNull, reason: '$invalidRepo');
+    }
+    for (final field in ['id', 'name', 'type', 'description']) {
+      final oversized = project()..[field] = 'x' * 1100;
+      expect(HubService.parseCatalog(jsonEncode([oversized])),
+          isNull, reason: field);
+    }
+  });
+
   test('rejects oversized remote catalogs before caching', () {
     final oversized = List.generate(101, (i) => {
       'id': 'project-$i', 'name': 'Project $i',

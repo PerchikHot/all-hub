@@ -45,6 +45,20 @@ void main() {
       expect(isBankTransactionNotification('Ozon Банк', 'Оплата 125,50 руб.'), isTrue);
     });
 
+    test('does not import payment alerts containing credentials', () {
+      for (final body in [
+        'Пароль для оплаты 200 ₽: 1234',
+        'Payment 200 RUB. Your password is 1234',
+        'PIN для перевода 500 ₽',
+        'CVV для оплаты 300 ₽',
+        'Код безопасности: 456. Оплата 100 ₽',
+      ]) {
+        expect(isBankTransactionNotification('Банк', body), isFalse,
+            reason: body);
+      }
+      expect(isBankTransactionNotification('Т-Банк', 'Оплата 300 ₽'), isTrue);
+    });
+
     test('never offers login and transaction confirmation codes', () {
       expect(isBankTransactionNotification('Т-Банк', 'Код подтверждения перевода 1 000 ₽: 1234'), isFalse);
       expect(isBankTransactionNotification('Ozon', 'Никому не сообщайте код. Оплата 200 ₽'), isFalse);

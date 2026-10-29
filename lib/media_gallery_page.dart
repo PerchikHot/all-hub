@@ -16,6 +16,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool loading = false;
   bool hasMore = true;
   int page = 1;
+  int emptyPageRetries = 0;
   String kind = 'all';
   bool showFuta = true;
   bool showTrans = true;
@@ -172,6 +173,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       posts.clear();
       seenPostIds.clear();
       page = 1;
+      emptyPageRetries = 0;
       hasMore = true;
       error = '';
     });
@@ -234,6 +236,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           seenPostIds.add((post['id'] ?? '').toString());
         }
         posts.addAll(newPosts);
+        emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;
         if (posts.length > maxVisiblePosts) {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
@@ -250,6 +253,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     } finally {
       if (mounted && generation == searchGeneration) {
         setState(() => loading = false);
+        // GIFs are sparse: continue scanning a few pages before showing an
+        // empty gallery. Also try the other enabled category automatically.
+        if (error.isEmpty && hasMore && posts.isEmpty &&
+            emptyPageRetries < 8 && (showFuta || showTrans)) {
+          Future.microtask(() => loadMore());
+        }
       }
     }
   }

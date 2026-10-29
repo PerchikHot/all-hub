@@ -188,6 +188,23 @@ void main() {
     expect(noteOnly['date'], '2026-10-29');
   });
 
+  test('inclusive date range filters only the saved calendar day', () {
+    expect(matchesKopilkaHistory(purchase, 'since:2026-10-28 until:2026-10-28'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'с:27.10.2026 по:29.10.2026 bank:ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'since:2026-10-29'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'until:2026-10-27'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'с:27.10.2026 по:27.10.2026'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'since:2026-02-30'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'until:'), isFalse);
+    final noteOnly = <String, dynamic>{
+      'kind': 'expense', 'note': 'Дата 2026-10-28',
+      'date': '2026-10-30', 'amount': 100,
+    };
+    expect(matchesKopilkaHistory(noteOnly, 'until:2026-10-29'), isFalse);
+    expect(matchesKopilkaHistory(<String, dynamic>{}, 'since:2026-01-01'), isFalse);
+    expect(noteOnly['date'], '2026-10-30');
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

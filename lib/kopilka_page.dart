@@ -100,7 +100,7 @@ bool isBankTransactionNotification(String title, String body) {
   // Keep these alerts out of manual import suggestions; never delete them
   // from the Android notification tray or change saved transactions.
   final failedTransaction = RegExp(
-    r'отклон[её]н|не\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн\w*\s+средств|declined|rejected|failed|cancelled|canceled',
+    r'отклон[её]н|не\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|declined|rejected|failed|cancelled|canceled',
     caseSensitive: false,
   );
   // A currency label without a readable amount is not a transaction.

@@ -197,7 +197,7 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
     if (word.startsWith('min:') || word.startsWith('max:')) {
       final isMinimum = word.startsWith('min:');
       final raw = word.substring(4);
-      if (!RegExp(r'^\\d+(?:\\.\\d{1,2})?$').hasMatch(raw)) {
+      if (!RegExp(r'^\d+(?:\.\d{1,2})?$').hasMatch(raw)) {
         return false;
       }
       final limit = double.tryParse(raw);

@@ -36,6 +36,16 @@ void main() {
     expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 0, -1), isFalse);
   });
 
+  test('Windows ZIP streaming budget stops oversized downloads early', () {
+    const mb = 1024 * 1024;
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(0, 256 * mb), isTrue);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(255 * mb, 1 * mb), isTrue);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(255 * mb, 2 * mb), isFalse);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(257 * mb, 0), isFalse);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(-1, 1), isFalse);
+    expect(ProjectLauncher.isSafeWindowsDownloadBudget(0, -1), isFalse);
+  });
+
   test('Windows ZIP extraction rejects traversal and reserved device names', () {
     for (final path in [
       '', '/', '../outside.exe', 'assets/../../evil.dll', 'a//b.exe',

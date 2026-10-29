@@ -2,6 +2,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('malformed remote catalogs cannot replace the offline project list', () {
+    const valid = '[{"id":"all-hub","name":"All Hub","type":"app","description":"Launcher"},'
+        '{"id":"kopilka","name":"Копилка","type":"app","description":"Finance"}]';
+    final parsed = HubService.parseCatalog(valid);
+    expect(parsed, isNotNull);
+    expect(parsed!.map((project) => project.id).toList(), ['all-hub', 'kopilka']);
+    for (final invalid in [
+      '',
+      '<html>not a catalog</html>',
+      '[',
+      '{}',
+      '[]',
+      '[null]',
+      '[{"id":"all-hub"}]',
+      '[{"id":"all-hub","name":" ","type":"app","description":"Launcher"}]',
+      '[{"id":"all-hub","name":"All Hub","type":"app","description":"Launcher"},'
+          '{"id":"all-hub","name":"Duplicate","type":"app","description":"Duplicate"}]',
+    ]) {
+      expect(HubService.parseCatalog(invalid), isNull, reason: invalid);
+    }
+  });
+
   test('Windows portable archives are recognized across common naming schemes', () {
     for (final name in [
       'Kopilka-Windows-portable.zip',

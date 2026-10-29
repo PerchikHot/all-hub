@@ -178,7 +178,9 @@ class HubService {
     }
     if (releaseStatus == 404) return 'Релизы недоступны или репозиторий закрыт';
     if (releaseStatus != 200) return 'GitHub API: HTTP $releaseStatus';
-    if (actionsStatus == 403) return 'GitHub API: ограничение запросов (сборки)';
+    if (actionsStatus == 403 || actionsStatus == 429) {
+      return 'GitHub API: лимит запросов к сборкам (HTTP $actionsStatus). Повтори проверку позже';
+    }
     if (actionsStatus != 200) return 'GitHub Actions: HTTP $actionsStatus';
     return null;
   }

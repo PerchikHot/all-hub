@@ -164,7 +164,7 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       )
       // Ignore currency labels only when they follow a numeric amount.
       .replaceAllMapped(
-        RegExp(r'(\d)\s*(?:₽|руб\.?|rub)(?=\s|$)', caseSensitive: false),
+        RegExp(r'(\d)\s*(?:₽|руб(?:\.|ль|ля|лей)?|rub)(?=\s|$)', caseSensitive: false),
         (match) => match.group(1)!,
       );
   final words = normalizedQuery.split(RegExp(r'\s+'))

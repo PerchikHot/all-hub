@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
 
 void main() {
+  test('Android APK resumes only from a matching bounded HTTP range', () {
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-2047/4096', 1024), isTrue);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 0-1023/1024', 0), isTrue);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 1025-2047/4096', 1024), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-4096/4096', 1024), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-1000/4096', 1024), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-2047/*', 1024), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange(null, 1024), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 0-1023/4096', -1), isFalse);
+    expect(ProjectLauncher.isSafeApkContentRange('bytes 0-1023/4096', 0, maxBytes: 1024), isFalse);
+  });
+
   test('Windows installation IDs allow known project slugs', () {
     for (final id in ['all-hub', 'kopilka', 'eclipse-arena', 'shadow-rp']) {
       expect(ProjectLauncher.isValidProjectId(id), isTrue, reason: id);

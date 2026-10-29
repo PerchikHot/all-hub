@@ -111,7 +111,132 @@ class HubService {
 
   static String? assetPlatform(String name) {
     final n = name.toLowerCase();
-    if (n.endsWith('.apk')) return 'android';
+    // Unsigned/unaligned APKs cannot be safely installed as updates.
+    // Keep signed debug APKs visible for development builds.
+    if (n.endsWith('.apk')) {
+      if (RegExp(r'(^|[-_.])(unsigned|unaligned|androidtest|testonly)([-_.]|
+    // Never offer uninstallers, debugging tools or source archives as
+    // Windows installers just because their filenames contain "Windows".
+    if ((n.endsWith('.exe') || n.endsWith('.zip')) &&
+        RegExp(r'(^|[-_.])(source|sources|src|symbols|pdb|debug|uninstall|uninstaller|crashdump|crashreporter|helper|benchmark|updater)([-_.]|$)')
+            .hasMatch(n)) {
+      return null;
+    }
+    // MSI is not installable by ProjectLauncher yet: never advertise it as
+    // a working update. Recognize common portable Windows ZIP labels.
+    if (n.endsWith('.exe')) return 'windows';
+    if (n.endsWith('.zip') &&
+        (n.contains('windows') || n.contains('win64') ||
+         n.contains('win-x64') || n.contains('win32') ||
+         n.contains('win_amd64') || n.contains('desktop'))) {
+      return 'windows';
+    }
+    return null;
+  }
+
+  /// Only install packages from the requested repository's GitHub release.
+  /// The API response is network data, not an authorization to download
+  /// executables from arbitrary domains or another project's release.
+  static bool isTrustedReleaseAssetUrl(String repo, String url, {String? expectedName}) {
+    final repositoryParts = repo.split('/');
+    final uri = Uri.tryParse(url);
+    if (repositoryParts.length != 2 || uri == null ||
+        uri.scheme != 'https' || uri.host.toLowerCase() != 'github.com' ||
+        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
+      return false;
+    }
+    final parts = uri.pathSegments;
+    if (parts.length != 6 ||
+        parts[0].toLowerCase() != repositoryParts[0].toLowerCase() ||
+        parts[1].toLowerCase() != repositoryParts[1].toLowerCase() ||
+        parts[2] != 'releases' || parts[3] != 'download' ||
+        (expectedName != null && parts.last != expectedName) ||
+        parts.skip(4).any((part) => part.isEmpty ||
+            part == '.' || part == '..' ||
+            part.contains('/') || part.contains('\\'))) {
+      return false;
+    }
+    return true;
+  }
+
+  static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
+    try {
+      final responses = await Future.wait([
+        http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=5'), headers: _headers)
+          .timeout(const Duration(seconds: 12)),
+        http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
+          .timeout(const Duration(seconds: 12)),
+      ]);
+      final assets = <HubAsset>[];
+      String? version, workflow, actionsUrl;
+      if (responses[0].statusCode == 200) {
+        final releases = jsonDecode(responses[0].body) as List;
+        for (final raw in releases) {
+          final release = raw as Map<String, dynamic>;
+          if (release['draft'] == true || release['prerelease'] == true) continue;
+          final tag = (release['tag_name'] ?? 'latest').toString();
+          if (!releaseMatchesProject(tag, projectId)) continue;
+          final notes = release['body']?.toString().trim();
+          final publishedVersion = publishedVersionFromRelease(tag, notes);
+          for (final a in (release['assets'] as List? ?? [])) {
+            final file = a as Map<String, dynamic>;
+            final name = (file['name'] ?? '').toString();
+            final platform = assetPlatform(name);
+            final url = (file['browser_download_url'] ?? '').toString();
+            if (platform != null &&
+                isTrustedReleaseAssetUrl(repo, url, expectedName: name)) {
+              // A release for another OS must not be shown as an available
+              // update on this device without a matching installer.
+              if (platform == currentPlatform) version ??= publishedVersion;
+              assets.add(HubAsset(name, url, platform, publishedVersion, releaseNotes: notes));
+            }
+          }
+        }
+      }
+      if (responses[1].statusCode == 200) {
+        final runs = (jsonDecode(responses[1].body) as Map<String, dynamic>)['workflow_runs'] as List? ?? [];
+        final relevantRuns = runs.cast<Map<String, dynamic>>().where(
+          (run) => workflowMatchesProject(
+            run['name']?.toString(), projectId, currentPlatform,
+          ),
+        ).toList();
+        if (relevantRuns.isNotEmpty) {
+          final run = relevantRuns.first;
+          workflow = '${run['status'] ?? 'unknown'} / ${run['conclusion'] ?? 'pending'}';
+          // Link the latest relevant run, even if it failed. A previous
+          // successful run must not hide the current build failure.
+          actionsUrl = run['html_url']?.toString();
+        }
+      }
+      return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,
+        assets: assets, error: responses[0].statusCode == 403 ? 'GitHub API: ограничение запросов' :
+          responses[0].statusCode == 404 ? 'Релизы недоступны или репозиторий закрыт' :
+          responses[0].statusCode != 200 ? 'GitHub API: HTTP ${responses[0].statusCode}' : null);
+    } catch (e) {
+      return ProjectStatus(error: 'Ошибка сети: $e');
+    }
+  }
+}
+
+/// Favorites are local to each installation. The project catalog is shared online.
+class HubFavorites {
+  static final ValueNotifier<Set<String>> ids = ValueNotifier(<String>{});
+  static Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    ids.value = prefs.getStringList('favorites')?.toSet() ?? <String>{};
+  }
+  static Future<void> toggle(String id) async {
+    final next = Set<String>.from(ids.value);
+    if (!next.add(id)) next.remove(id);
+    ids.value = next;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('favorites', next.toList());
+  }
+}
+)
+          .hasMatch(n)) return null;
+      return 'android';
+    }
     // Never offer uninstallers, debugging tools or source archives as
     // Windows installers just because their filenames contain "Windows".
     if ((n.endsWith('.exe') || n.endsWith('.zip')) &&

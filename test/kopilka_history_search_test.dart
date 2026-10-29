@@ -125,6 +125,24 @@ void main() {
     expect(matchesKopilkaHistory(noteOnly, 'sum:1250.50'), isFalse);
   });
 
+  test('min: and max: filter saved amounts inclusively in kopecks', () {
+    expect(matchesKopilkaHistory(purchase, 'min:1250.50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'max:1250.50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'min:1000 max:1500 ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'min:1250.51'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'max:1250.49'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'min:1 250,50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'max:1 250,49'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'min:invalid'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'max:-1'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'min:0'), isFalse);
+    final noteOnly = <String, dynamic>{
+      'kind': 'expense', 'note': 'Оплата 9999', 'amount': 250,
+    };
+    expect(matchesKopilkaHistory(noteOnly, 'min:500'), isFalse);
+    expect(matchesKopilkaHistory(noteOnly, 'max:500'), isTrue);
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

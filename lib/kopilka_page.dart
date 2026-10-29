@@ -214,7 +214,29 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
         word.startsWith('с:') || word.startsWith('по:')) {
       final isStart = word.startsWith('since:') || word.startsWith('с:');
       final requested = word.substring(word.indexOf(':') + 1);
-      if (!RegExp(r'^\d{4}-\d{2}-\d{2}
+      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(requested)) {
+        return false;
+      }
+      final parsed = DateTime.tryParse(requested);
+      if (parsed == null ||
+          parsed.toIso8601String().substring(0, 10) != requested) {
+        return false;
+      }
+      final saved = (entry['date'] ?? '').toString();
+      if (saved.length < 10) return false;
+      final day = saved.substring(0, 10);
+      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(day)) {
+        return false;
+      }
+      final savedDate = DateTime.tryParse(day);
+      if (savedDate == null ||
+          savedDate.toIso8601String().substring(0, 10) != day) {
+        return false;
+      }
+      return isStart ? day.compareTo(requested) >= 0
+          : day.compareTo(requested) <= 0;
+    }
+    // Structured transaction-type filter: notes mentioning a transfer must
     // not make an ordinary expense appear in the transfers list.
     if (word.startsWith('type:') || word.startsWith('тип:')) {
       final requested = word.substring(word.indexOf(':') + 1);

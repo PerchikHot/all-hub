@@ -115,6 +115,13 @@ void main() {
       expect(suggestNotificationAmount('250 ₽ списание. 1000 ₽ остаток'), '250');
     });
 
+    test('ignores zero-value alerts and still finds a later valid amount', () {
+      expect(suggestNotificationAmount('Оплата 0 ₽'), isEmpty);
+      expect(isBankTransactionNotification('Т-Банк', 'Оплата 0 ₽'), isFalse);
+      expect(suggestNotificationAmount('Оплата 0 ₽. Покупка 250 ₽'), '250');
+      expect(isBankTransactionNotification('Т-Банк', 'Покупка 0,00 руб.'), isFalse);
+    });
+
     test('allows a standalone currency amount for manual confirmation', () {
       expect(suggestNotificationAmount('1 200 RUB'), '1200');
     });

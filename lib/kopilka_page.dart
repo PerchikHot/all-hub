@@ -152,6 +152,18 @@ double safeKopilkaAmount(Map<String, dynamic> entry) {
   return value is num && value.isFinite ? value.toDouble() : 0.0;
 }
 
+/// Net change of the visible history. Internal transfers are not income.
+/// This is display-only and never rewrites stored transactions.
+double kopilkaNetChange(Iterable<Map<String, dynamic>> visible) {
+  var net = 0.0;
+  for (final entry in visible) {
+    final amount = safeKopilkaAmount(entry);
+    if (entry['kind'] == 'income') net += amount;
+    if (entry['kind'] == 'expense') net -= amount;
+  }
+  return net;
+}
+
 /// Parse manually entered amounts without silently accepting broken grouping.
 /// This does not change any historical transaction values.
 double? parseKopilkaAmount(String input) {

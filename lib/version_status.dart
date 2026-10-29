@@ -1,12 +1,13 @@
 /// A rolling GitHub release tag is not a version. CI may include an
 /// explicit published package version in the release description.
 String publishedVersionFromRelease(String tag, String? notes) {
-  final match = RegExp(
+  final matches = RegExp(
     r'^[ \t]*(?:Version|Версия):[ \t]*(v?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*\r?$',
     multiLine: true,
     caseSensitive: false,
-  ).firstMatch(notes ?? '');
-  return match?.group(1) ?? tag;
+  ).allMatches(notes ?? '').map((match) => match.group(1)!).toSet();
+  // Conflicting version lines must not advertise an unverified update.
+  return matches.length == 1 ? matches.single : tag;
 }
 
 /// Compare only explicit numeric versions. Moving release tags such as

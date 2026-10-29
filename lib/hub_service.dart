@@ -178,7 +178,7 @@ class HubService {
             final name = (file['name'] ?? '').toString();
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();
-            if (platform != null && url.startsWith('https://')) {
+            if (platform != null && isTrustedReleaseAssetUrl(repo, url)) {
               // A release for another OS must not be shown as an available
               // update on this device without a matching installer.
               if (platform == currentPlatform) version ??= publishedVersion;

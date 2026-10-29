@@ -40,6 +40,11 @@ class ProjectLauncher {
       nextEntryBytes <= 512 * 1024 * 1024 &&
       totalBytes + nextEntryBytes <= 1024 * 1024 * 1024;
 
+  /// Reject oversized streaming downloads before consuming more disk space.
+  static bool isSafeWindowsDownloadBudget(int received, int nextChunk, {int maxBytes = 256 * 1024 * 1024}) =>
+      received >= 0 && nextChunk >= 0 && maxBytes >= 0 &&
+      received <= maxBytes && nextChunk <= maxBytes - received;
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
@@ -61,12 +66,20 @@ class ProjectLauncher {
     return prefs.getString('installed_version_$id');
   }
   /// Stream a response to disk for Windows installers and archives.
-  static Future<void> _download(http.StreamedResponse response, File file) async {
+  static Future<void> _download(http.StreamedResponse response, File file, {int? maxBytes}) async {
+    if (maxBytes != null && response.contentLength != null &&
+        !isSafeWindowsDownloadBudget(0, response.contentLength!, maxBytes: maxBytes)) {
+      throw const FormatException('Windows ZIP слишком большой');
+    }
     final sink = file.openWrite();
     var received = 0;
     downloadProgress.value = 0;
     try {
       await for (final bytes in response.stream) {
+        if (maxBytes != null &&
+            !isSafeWindowsDownloadBudget(received, bytes.length, maxBytes: maxBytes)) {
+          throw const FormatException('Windows ZIP слишком большой');
+        }
         sink.add(bytes);
         received += bytes.length;
         if (response.contentLength != null && response.contentLength! > 0) {
@@ -322,7 +335,7 @@ class ProjectLauncher {
       if (response.statusCode != 200) {
         throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
       }
-      await _download(response, zipFile);
+      await _download(response, zipFile, maxBytes: 256 * 1024 * 1024);
       if (await zipFile.length() > 256 * 1024 * 1024) {
         throw const FormatException('Windows ZIP слишком большой');
       }

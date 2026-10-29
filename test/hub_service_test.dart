@@ -63,6 +63,22 @@ void main() {
     expect(HubService.parseCatalog(jsonEncode(oversized)), isNull);
   });
 
+  test('oversized and control-character catalogs are rejected', () {
+    final normal = jsonEncode([{
+      'id': 'all-hub', 'name': 'All Hub', 'type': 'app',
+      'description': 'Launcher',
+    }]);
+    expect(HubService.parseCatalog(normal), isNotNull);
+    expect(HubService.parseCatalog(' ' * (256 * 1024 + 1)), isNull);
+    for (final invalid in ['Name\\u0000Hidden', 'Name\\u0007Hidden']) {
+      final catalog = jsonEncode([{
+        'id': 'all-hub', 'name': invalid, 'type': 'app',
+        'description': 'Launcher',
+      }]);
+      expect(HubService.parseCatalog(catalog), isNull);
+    }
+  });
+
   test('Windows portable archives are recognized across common naming schemes', () {
     for (final name in [
       'Kopilka-Windows-portable.zip',

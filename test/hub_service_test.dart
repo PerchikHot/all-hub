@@ -70,7 +70,7 @@ void main() {
     }]);
     expect(HubService.parseCatalog(normal), isNotNull);
     expect(HubService.parseCatalog(List.filled(256 * 1024 + 1, ' ').join()), isNull);
-    for (final invalid in ['Name\\u0000Hidden', 'Name\\u0007Hidden']) {
+    for (final invalid in ['Name\u0000Hidden', 'Name\u0007Hidden']) {
       final catalog = jsonEncode([{
         'id': 'all-hub', 'name': invalid, 'type': 'app',
         'description': 'Launcher',

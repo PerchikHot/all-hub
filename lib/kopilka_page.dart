@@ -123,6 +123,7 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
         if (rawKey is! String) return false;
         final key = rawKey.trim();
         if (key.isEmpty || key.length > 256 ||
+            RegExp(r'[\x00-\x1f\x7f]').hasMatch(key) ||
             normalizedReviewed.contains(key)) {
           return false;
         }

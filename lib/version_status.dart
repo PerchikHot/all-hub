@@ -49,10 +49,10 @@ int? comparePublishedVersions(String installed, String published) {
 }
 
 String describeUpdateStatus(String? installed, String? published) {
-  if (published == null || published.isEmpty) {
+  if (published == null || published.trim().isEmpty) {
     return 'Нет опубликованного файла для этой платформы';
   }
-  if (installed == null || installed.isEmpty) {
+  if (installed == null || installed.trim().isEmpty) {
     return 'Статус обновления неизвестен: версия установки не определена';
   }
   final comparison = comparePublishedVersions(installed, published);

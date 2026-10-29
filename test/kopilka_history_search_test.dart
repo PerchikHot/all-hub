@@ -43,6 +43,10 @@ void main() {
   test('amount searches accept optional currency suffixes', () {
     expect(matchesKopilkaHistory(purchase, '1 250,50 ₽'), isTrue);
     expect(matchesKopilkaHistory(purchase, '1250,50 руб.'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,50 рублей'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,50 рубля'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,50 рубль'), isTrue);
+    expect(matchesKopilkaHistory(purchase, '1250,51 рублей'), isFalse);
     expect(matchesKopilkaHistory(purchase, 'ozon 1250.5 RUB'), isTrue);
     expect(matchesKopilkaHistory(purchase, '1250,51 ₽'), isFalse);
     expect(matchesKopilkaHistory(purchase, 'RUB'), isFalse);

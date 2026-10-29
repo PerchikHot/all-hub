@@ -30,6 +30,21 @@ void main() {
     expect(transfer['from'], 'Т-Банк');
   });
 
+  test('type filter matches saved kind rather than a word in the note', () {
+    expect(matchesKopilkaHistory(purchase, 'тип:расход ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'type:expense min:1000'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'тип:перевод т-банк'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'type:transfer'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'тип:доход'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'type:expense'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'тип:'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'type:unknown'), isFalse);
+    final misleadingNote = <String, dynamic>{
+      'kind': 'expense', 'note': 'Перевод на оплату', 'amount': 250,
+    };
+    expect(matchesKopilkaHistory(misleadingNote, 'тип:перевод'), isFalse);
+  });
+
   test('cash aliases match accounts but not unrelated notes', () {
     final cash = <String, dynamic>{
       'kind': 'expense', 'bank': 'Наличные', 'note': 'Обед',

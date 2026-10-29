@@ -29,6 +29,25 @@ void main() {
     expect(filterPendingBankNotifications(padded, <String>{' tx-42 '}), isEmpty);
   });
 
+  test('oversized or non-text native bank alerts are not imported', () {
+    final valid = {'key': 'ok', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'};
+    final alerts = <dynamic>[
+      {'key': 'large-key-' + List.filled(260, 'x').join(),
+       'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'key': 'bad-title', 'title': {'bank': 'Т-Банк'},
+       'body': 'Оплата 250 ₽'},
+      {'key': 'bad-body', 'title': 'Т-Банк', 'body': ['Оплата 250 ₽']},
+      {'key': 'long-title', 'title': List.filled(201, 'x').join(),
+       'body': 'Оплата 250 ₽'},
+      {'key': 'long-body', 'title': 'Т-Банк',
+       'body': 'Оплата 250 ₽' + List.filled(2050, 'x').join()},
+      valid,
+    ];
+    final accepted = filterPendingBankNotifications(alerts, <String>{});
+    expect(accepted.map((e) => e['key']).toList(), ['ok']);
+    expect(valid['body'], 'Оплата 250 ₽');
+  });
+
   group('Kopilka transaction notification privacy filter', () {
     test('keeps purchase, transfer and incoming money notifications', () {
       expect(isBankTransactionNotification('Т-Банк', 'Оплата 250 ₽. Остаток 5 000 ₽'), isTrue);

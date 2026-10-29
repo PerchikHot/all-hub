@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// not be prefilled as expenses; the user still confirms every operation.
 String suggestNotificationAmount(String body) {
   final amountPattern = RegExp(
-    r'(\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:₽|руб(?:\.|ля|лей)?|RUB)',
+    r'(\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:₽|руб(?:\.|ль|ля|лей)?|RUB)',
     caseSensitive: false,
   );
   final transactionWords = RegExp(
@@ -78,7 +78,7 @@ bool isBankTransactionNotification(String title, String body) {
     caseSensitive: false,
   );
   final currency = RegExp(
-    r'₽|руб(?:\.|ля|лей)?|\bRUB\b',
+    r'₽|руб(?:\.|ль|ля|лей)?|\bRUB\b',
     caseSensitive: false,
   );
   final sensitive = RegExp(

@@ -21,6 +21,15 @@ void main() {
     expect(matchesKopilkaHistory(purchase, 'другая покупка'), isFalse);
   });
 
+  test('familiar bank aliases find operations without changing saved names', () {
+    expect(matchesKopilkaHistory(purchase, 'озон продукты'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'тинькофф перевод'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'озон'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'тинькофф'), isFalse);
+    expect(purchase['bank'], 'Ozon Банк');
+    expect(transfer['from'], 'Т-Банк');
+  });
+
   test('finds transfers by destination and date', () {
     expect(matchesKopilkaHistory(transfer, 'газпромбанк 2026-10-27'), isTrue);
     expect(matchesKopilkaHistory(transfer, 'перевод т-банк'), isTrue);

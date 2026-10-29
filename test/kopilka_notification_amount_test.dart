@@ -40,6 +40,9 @@ void main() {
     test('does not offer balance-only or promotional alerts', () {
       expect(isBankTransactionNotification('Т-Банк', 'Остаток 5 000 ₽'), isFalse);
       expect(isBankTransactionNotification('Акция', 'Скидка 100 ₽'), isFalse);
+      expect(isBankTransactionNotification('Т-Банк', 'Оплата в рублях завершена'), isFalse);
+      expect(isBankTransactionNotification('Т-Банк', 'Перевод RUB успешно выполнен'), isFalse);
+      expect(isBankTransactionNotification('Ozon Банк', 'Оплата 125,50 руб.'), isTrue);
     });
 
     test('never offers login and transaction confirmation codes', () {

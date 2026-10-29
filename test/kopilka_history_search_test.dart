@@ -111,6 +111,20 @@ void main() {
     expect(matchesKopilkaHistory(purchase, 'RUB'), isFalse);
   });
 
+  test('sum: matches exact kopecks, not amounts in notes or dates', () {
+    expect(matchesKopilkaHistory(purchase, 'sum:1250.50'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'sum:1 250,50 ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'sum:1250'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'sum:1250.51'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'sum:invalid'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'sum:'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'sum:99999999999999999999999999'), isFalse);
+    final noteOnly = <String, dynamic>{
+      'note': 'Оплата 1250.50', 'amount': 400, 'kind': 'expense',
+    };
+    expect(matchesKopilkaHistory(noteOnly, 'sum:1250.50'), isFalse);
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

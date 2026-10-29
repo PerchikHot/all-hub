@@ -192,6 +192,18 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
   // Bank rebrands and transliterations must work in both directions:
   // a saved legacy 'Тинькофф' entry should match 'Т-Банк' and vice versa.
   return words.every((word) {
+    // Structured transaction-type filter: notes mentioning a transfer must
+    // not make an ordinary expense appear in the transfers list.
+    if (word.startsWith('type:') || word.startsWith('тип:')) {
+      final requested = word.substring(word.indexOf(':') + 1);
+      const aliases = <String, String>{
+        'income': 'income', 'доход': 'income',
+        'expense': 'expense', 'расход': 'expense',
+        'transfer': 'transfer', 'перевод': 'transfer',
+      };
+      final expected = aliases[requested];
+      return expected != null && entry['kind'] == expected;
+    }
     // min:/max: filter by the saved amount, not by numbers in a note.
     // Use kopecks to avoid floating point comparison surprises.
     if (word.startsWith('min:') || word.startsWith('max:')) {

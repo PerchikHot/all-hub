@@ -194,6 +194,12 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       return text.contains('тинькофф') || text.contains('т-банк') ||
           text.contains('тбанк');
     }
+    if (word == 'нал' || word == 'cash') {
+      // Match only account fields: a note mentioning cash is not a cash account.
+      final accounts = [entry['bank'], entry['from'], entry['to']]
+          .map((value) => (value ?? '').toString().toLowerCase()).join(' ');
+      return accounts.contains('наличные') || accounts.contains('cash');
+    }
     if (word == 'газпром' || word == 'газпромбанк' || word == 'gazprombank') {
       return text.contains('газпромбанк') || text.contains('gazprombank');
     }

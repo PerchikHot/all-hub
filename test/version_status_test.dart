@@ -49,6 +49,13 @@ void main() {
     expect(releaseMatchesProject('eclipse-arena-android', 'eclipse-arena'), isTrue);
   });
 
+  test('blank release metadata does not advertise an update', () {
+    expect(describeUpdateStatus('1.0.0', '   '), contains('Нет опубликованного'));
+    expect(describeUpdateStatus('  ', '1.0.1'), contains('неизвестен'));
+    expect(describeUpdateStatus('1.0.0', '\\t\\n'), contains('Нет опубликованного'));
+    expect(installActionLabel('1.0.0', '  ', 'Скачать APK'), 'Скачать APK');
+  });
+
   test('rolling release tags must not trigger false updates', () {
     expect(comparePublishedVersions('0.18.3', 'shadow-rp-android'), isNull);
     expect(describeUpdateStatus('0.18.3', 'shadow-rp-android'),

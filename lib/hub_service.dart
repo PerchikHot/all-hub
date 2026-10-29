@@ -173,7 +173,9 @@ class HubService {
   /// Report release and Actions failures independently. A healthy release
   /// response does not imply that CI status was fetched successfully.
   static String? apiStatusError(int releaseStatus, int actionsStatus) {
-    if (releaseStatus == 403) return 'GitHub API: ограничение запросов (релизы)';
+    if (releaseStatus == 403 || releaseStatus == 429) {
+      return 'GitHub API: лимит запросов к релизам (HTTP $releaseStatus). Повтори проверку позже';
+    }
     if (releaseStatus == 404) return 'Релизы недоступны или репозиторий закрыт';
     if (releaseStatus != 200) return 'GitHub API: HTTP $releaseStatus';
     if (actionsStatus == 403) return 'GitHub API: ограничение запросов (сборки)';

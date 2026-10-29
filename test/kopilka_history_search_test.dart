@@ -172,6 +172,22 @@ void main() {
     expect(matchesKopilkaHistory(noteOnly, 'max:500'), isTrue);
   });
 
+  test('date filter matches saved calendar day, not dates in notes', () {
+    expect(matchesKopilkaHistory(purchase, 'date:2026-10-28'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'дата:28.10.2026 ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'date:2026-10-27'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'date:2026-02-30'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'date:invalid'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'дата:'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'date:2026-10-27'), isTrue);
+    final noteOnly = <String, dynamic>{
+      'kind': 'expense', 'note': 'Встреча 2026-10-28',
+      'date': '2026-10-29', 'amount': 500,
+    };
+    expect(matchesKopilkaHistory(noteOnly, 'date:2026-10-28'), isFalse);
+    expect(noteOnly['date'], '2026-10-29');
+  });
+
   test('blank query preserves every transaction including legacy entries', () {
     expect(matchesKopilkaHistory(purchase, ' '), isTrue);
     expect(matchesKopilkaHistory(<String, dynamic>{}, ''), isTrue);

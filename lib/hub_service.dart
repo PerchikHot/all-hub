@@ -52,7 +52,9 @@ class HubService {
         final id = item['id'] as String;
         if (id != id.trim() ||
             !RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(id) ||
-            !ids.add(id)) return null;
+            !ids.add(id)) {
+          return null;
+        }
         projects.add(HubProject.fromJson(item));
       }
       return projects;

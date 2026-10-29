@@ -66,6 +66,26 @@ void main() {
       expect(isBankTransactionNotification('Ozon Банк', 'Оплата 125,50 руб.'), isTrue);
     });
 
+    test('declined and cancelled transactions are not suggested as expenses', () {
+      for (final body in [
+        'Оплата 450 ₽ отклонена банком',
+        'Покупка 1 200 ₽ не прошла',
+        'Списание 500 ₽ не выполнено',
+        'Перевод 1000 RUB отменен',
+        'Оплата 350 ₽: недостаточно средств',
+        'Payment 300 RUB declined',
+        'Transfer 250 RUB failed',
+        'Purchase 150 RUB canceled',
+      ]) {
+        expect(isBankTransactionNotification('Банк', body), isFalse,
+            reason: body);
+      }
+      expect(isBankTransactionNotification('Т-Банк',
+          'Оплата 450 ₽ выполнена'), isTrue);
+      expect(isBankTransactionNotification('Ozon Банк',
+          'Возврат 300 ₽ за покупку'), isTrue);
+    });
+
     test('does not import payment alerts containing credentials', () {
       for (final body in [
         'Пароль для оплаты 200 ₽: 1234',

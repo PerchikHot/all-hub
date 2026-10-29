@@ -102,6 +102,23 @@ void main() {
     expect(HubService.assetPlatform('AllHub-Android.apk'), 'android');
   });
 
+  test('unfinished and empty release assets are never installable', () {
+    expect(HubService.isPublishedReleaseAsset({
+      'name': 'AllHub.apk', 'state': 'uploaded', 'size': 24000,
+    }), isTrue);
+    for (final asset in [
+      {'state': 'starter', 'size': 24000},
+      {'state': 'uploaded', 'size': 0},
+      {'state': 'uploaded', 'size': -1},
+      {'state': 'uploaded', 'size': '24000'},
+      {'state': 'uploaded'},
+      {'size': 24000},
+    ]) {
+      expect(HubService.isPublishedReleaseAsset(asset), isFalse,
+          reason: asset.toString());
+    }
+  });
+
   test('unsafe release filenames never become installable assets', () {
     for (final name in [
       '',

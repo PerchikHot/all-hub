@@ -149,6 +149,13 @@ class HubService {
     return null;
   }
 
+  /// GitHub release assets can be in an incomplete upload state. Never
+  /// advertise a zero-byte or unfinished package as an installable update.
+  static bool isPublishedReleaseAsset(Map<String, dynamic> file) {
+    final size = file['size'];
+    return file['state'] == 'uploaded' && size is int && size > 0;
+  }
+
   /// Only install packages from the requested repository's GitHub release.
   /// The API response is network data, not an authorization to download
   /// executables from arbitrary domains or another project's release.
@@ -210,6 +217,7 @@ class HubService {
           final publishedVersion = publishedVersionFromRelease(tag, notes);
           for (final a in (release['assets'] as List? ?? [])) {
             final file = a as Map<String, dynamic>;
+            if (!isPublishedReleaseAsset(file)) continue;
             final name = (file['name'] ?? '').toString();
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();

@@ -96,11 +96,19 @@ bool isBankTransactionNotification(String title, String body) {
     r'парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s+безопасности',
     caseSensitive: false,
   );
+  // A declined, cancelled or failed payment is not a completed expense.
+  // Keep these alerts out of manual import suggestions; never delete them
+  // from the Android notification tray or change saved transactions.
+  final failedTransaction = RegExp(
+    r'отклон[её]н|не\\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн\\w*\\s+средств|declined|rejected|failed|cancelled|canceled',
+    caseSensitive: false,
+  );
   // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
       suggestNotificationAmount(text).isNotEmpty &&
-      !sensitive.hasMatch(text) && !credentialWords.hasMatch(text);
+      !sensitive.hasMatch(text) && !credentialWords.hasMatch(text) &&
+      !failedTransaction.hasMatch(text);
 }
 
 /// Only review a native notification once, even if the listener returns the

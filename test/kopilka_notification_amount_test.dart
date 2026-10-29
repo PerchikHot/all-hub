@@ -196,6 +196,11 @@ void main() {
       expect(safeKopilkaAmount({'amount': null}), 0.0);
       expect(safeKopilkaAmount({'amount': double.infinity}), 0.0);
       expect(safeKopilkaAmount({'amount': double.nan}), 0.0);
+      expect(safeKopilkaAmount({'amount': -250}), 0.0);
+      expect(kopilkaNetChange([
+        {'kind': 'expense', 'amount': -250},
+        {'kind': 'income', 'amount': 100},
+      ]), 100.0);
     });
   });
 

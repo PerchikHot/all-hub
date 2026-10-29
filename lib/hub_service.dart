@@ -112,8 +112,12 @@ class HubService {
   static String? assetPlatform(String name) {
     // Release filenames become local downloads: reject path separators,
     // control characters and unusually long names before displaying them.
-    if (name.isEmpty || name.length > 200 ||
-        RegExp(r'[\\/\x00-\x1f\x7f]').hasMatch(name)) {
+    if (name.isEmpty || name.length > 200 || name != name.trim() ||
+        // Release assets become local filenames; avoid Windows device names
+        // and characters with filesystem semantics on either platform.
+        RegExp(r'[\\/\x00-\x1f\x7f<>:"|?*]').hasMatch(name) ||
+        RegExp(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)',
+          caseSensitive: false).hasMatch(name)) {
       return null;
     }
     final n = name.toLowerCase();

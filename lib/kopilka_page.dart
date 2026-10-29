@@ -149,7 +149,10 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 /// Invalid legacy amounts must never crash totals or contaminate balances.
 double safeKopilkaAmount(Map<String, dynamic> entry) {
   final value = entry['amount'];
-  return value is num && value.isFinite ? value.toDouble() : 0.0;
+  // Saved amounts are magnitudes. A negative legacy value must not reverse
+  // the meaning of an expense or income in the displayed totals.
+  return value is num && value.isFinite && value >= 0
+      ? value.toDouble() : 0.0;
 }
 
 /// Net change of the visible history. Internal transfers are not income.
@@ -266,6 +269,15 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       }
       return isStart ? day.compareTo(requested) >= 0
           : day.compareTo(requested) <= 0;
+    }
+    // note:/заметка: searches only the user's description, not account names,
+    // dates or other fields. All matching remains local to this device.
+    if (word.startsWith('note:') || word.startsWith('заметка:')) {
+      final requested = word.substring(word.indexOf(':') + 1);
+      if (requested.isEmpty) return false;
+      final note = (entry['note'] ?? '').toString()
+          .toLowerCase().replaceAll('ё', 'е');
+      return note.contains(requested);
     }
     // Structured transaction-type filter: notes mentioning a transfer must
     // not make an ordinary expense appear in the transfers list.
@@ -747,8 +759,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nИсключить слово: -такси',
-              helperMaxLines: 6,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nИсключить слово: -такси',
+              helperMaxLines: 7,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

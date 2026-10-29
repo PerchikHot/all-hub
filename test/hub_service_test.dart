@@ -90,6 +90,18 @@ void main() {
     }
   });
 
+  test('Windows-reserved and ambiguous release filenames are rejected', () {
+    for (final name in [
+      'CON.exe', 'nul.zip', 'COM1.exe', 'LPT9.zip',
+      'AllHub:latest.exe', 'AllHub?.zip', 'AllHub*.apk',
+      ' AllHub.exe', 'AllHub.apk ', 'AllHub|win64.zip',
+    ]) {
+      expect(HubService.assetPlatform(name), isNull, reason: name);
+    }
+    expect(HubService.assetPlatform('AllHub-Windows.exe'), 'windows');
+    expect(HubService.assetPlatform('AllHub-Android.apk'), 'android');
+  });
+
   test('unsafe release filenames never become installable assets', () {
     for (final name in [
       '',

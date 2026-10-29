@@ -28,6 +28,16 @@ void main() {
     'date': '2026-10-27',
   };
 
+  test('note: searches only saved notes, not account names or dates', () {
+    expect(matchesKopilkaHistory(purchase, 'note:продукты'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'заметка:продукты bank:ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'note:ozon'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'note:2026-10-28'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'note:'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'заметка:газпромбанк'), isFalse);
+    expect(purchase['note'], 'Продукты');
+  });
+
   test('negative terms exclude local matches without changing transactions', () {
     expect(matchesKopilkaHistory(purchase, 'ozon -такси'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'тип:расход -продукты'), isFalse);

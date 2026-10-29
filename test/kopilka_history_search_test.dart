@@ -30,6 +30,21 @@ void main() {
     expect(transfer['from'], 'Т-Банк');
   });
 
+  test('cash aliases match accounts but not unrelated notes', () {
+    final cash = <String, dynamic>{
+      'kind': 'expense', 'bank': 'Наличные', 'note': 'Обед',
+      'date': '2026-10-29', 'amount': 450,
+    };
+    final noteOnly = <String, dynamic>{
+      'kind': 'expense', 'bank': 'Т-Банк', 'note': 'Оплата наличными позже',
+      'date': '2026-10-29', 'amount': 450,
+    };
+    expect(matchesKopilkaHistory(cash, 'нал обед'), isTrue);
+    expect(matchesKopilkaHistory(cash, 'cash'), isTrue);
+    expect(matchesKopilkaHistory(noteOnly, 'нал'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'cash'), isFalse);
+  });
+
   test('finds transfers by destination and date', () {
     expect(matchesKopilkaHistory(transfer, 'газпромбанк 2026-10-27'), isTrue);
     expect(matchesKopilkaHistory(transfer, 'перевод т-банк'), isTrue);

@@ -134,7 +134,7 @@ class HubService {
   /// Only install packages from the requested repository's GitHub release.
   /// The API response is network data, not an authorization to download
   /// executables from arbitrary domains or another project's release.
-  static bool isTrustedReleaseAssetUrl(String repo, String url) {
+  static bool isTrustedReleaseAssetUrl(String repo, String url, {String? expectedName}) {
     final repositoryParts = repo.split('/');
     final uri = Uri.tryParse(url);
     if (repositoryParts.length != 2 || uri == null ||
@@ -147,6 +147,7 @@ class HubService {
         parts[0].toLowerCase() != repositoryParts[0].toLowerCase() ||
         parts[1].toLowerCase() != repositoryParts[1].toLowerCase() ||
         parts[2] != 'releases' || parts[3] != 'download' ||
+        (expectedName != null && parts.last != expectedName) ||
         parts.skip(4).any((part) => part.isEmpty ||
             part == '.' || part == '..' ||
             part.contains('/') || part.contains('\\'))) {
@@ -179,7 +180,8 @@ class HubService {
             final name = (file['name'] ?? '').toString();
             final platform = assetPlatform(name);
             final url = (file['browser_download_url'] ?? '').toString();
-            if (platform != null && isTrustedReleaseAssetUrl(repo, url)) {
+            if (platform != null &&
+                isTrustedReleaseAssetUrl(repo, url, expectedName: name)) {
               // A release for another OS must not be shown as an available
               // update on this device without a matching installer.
               if (platform == currentPlatform) version ??= publishedVersion;

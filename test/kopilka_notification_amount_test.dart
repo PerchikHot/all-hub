@@ -2,6 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('reviewing one bank notification twice never creates duplicate postings', () {
+    final entries = <Map<String, dynamic>>[
+      {'kind': 'expense', 'amount': 250.0, 'notificationKey': 'tx-1'},
+      {'kind': 'income', 'amount': 100.0, 'notificationKey': ' tx-2 '},
+      {'kind': 'expense', 'amount': 50.0},
+    ];
+    expect(isKopilkaNotificationImported(entries, 'tx-1'), isTrue);
+    expect(isKopilkaNotificationImported(entries, ' tx-2'), isTrue);
+    expect(isKopilkaNotificationImported(entries, 'tx-3'), isFalse);
+    expect(isKopilkaNotificationImported(entries, ''), isFalse);
+    expect(isKopilkaNotificationImported(entries, null), isFalse);
+    expect(entries.length, 3);
+    expect(entries[0]['amount'], 250.0);
+  });
+
   test('pending bank notifications require a stable unique unreviewed key', () {
     final alerts = <dynamic>[
       {'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},

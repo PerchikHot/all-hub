@@ -296,6 +296,14 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
             parsed.toIso8601String().substring(0, 10) == day;
         return requested == 'date' ? valid : !valid;
       }
+      if (requested == 'amount' || requested == 'no-amount') {
+        // Legacy imports may lack a usable amount. Never rewrite them.
+        // Zero is valid for reconciliation; negative and non-finite values
+        // are not valid transaction amounts in the current data model.
+        final value = entry['amount'];
+        final hasAmount = value is num && value.isFinite && value >= 0;
+        return requested == 'amount' ? hasAmount : !hasAmount;
+      }
       if (requested == 'bank' || requested == 'no-bank') {
         // Transfers have source/destination accounts; other operations use bank.
         // Do not mistake a bank mentioned in the note for an assigned account.

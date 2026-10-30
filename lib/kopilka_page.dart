@@ -522,6 +522,21 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   return '$connection Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.';
 }
 
+/// Counts supported-bank events observed by the native listener, including
+/// rejected OTP/balance alerts. No message bodies are included in diagnostics.
+/// Zero can also mean that a bank changed its Android package identifier.
+String describeKopilkaBankEvents(Map<String, dynamic>? diagnostics) {
+  final raw = diagnostics?['bankEvents'];
+  if (raw is! Map) return 'По каждому банку: данные появятся после подключения Android-службы.';
+  const banks = ['Т-Банк', 'Газпромбанк', 'Ozon Банк'];
+  final counts = banks.map((bank) {
+    final value = raw[bank];
+    final count = value is int && value >= 0 ? value : 0;
+    return '$bank: $count';
+  }).join(' · ');
+  return 'События по банкам (без текста): $counts. Ноль — проверь разрешение, энергосбережение и версию банковского приложения.';
+}
+
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
   @override
@@ -865,6 +880,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             leading: const Icon(Icons.health_and_safety_outlined),
             title: const Text('Диагностика получения уведомлений'),
             subtitle: Text(describeKopilkaListener(listenerDiagnostics)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_outlined),
+            title: const Text('События от каждого банка'),
+            subtitle: Text(describeKopilkaBankEvents(listenerDiagnostics)),
           ),
           if (pendingNotifications.isNotEmpty)
             ExpansionTile(

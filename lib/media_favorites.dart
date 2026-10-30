@@ -7,7 +7,7 @@ const int maxMediaFavorites = 150;
 
 Map<String, dynamic>? safeMediaFavorite(Map<String, dynamic> source) {
   final id = (source['id'] ?? '').toString();
-  if (!RegExp(r'^\d{1,16}).hasMatch(id)) return null;
+  if (!RegExp(r'^\d{1,16}$').hasMatch(id)) return null;
   final result = <String, dynamic>{'id': id};
   for (final key in [
     'preview_file_url', 'sample_url', 'large_file_url', 'file_url'

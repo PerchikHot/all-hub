@@ -46,6 +46,24 @@ void main() {
     expect(valid['date'], '2026-10-28T12:00:00');
   });
 
+  test('has:amount and has:no-amount identify malformed imported sums locally', () {
+    final valid = <String, dynamic>{'kind': 'expense', 'amount': 1250.50};
+    final zero = <String, dynamic>{'kind': 'transfer', 'amount': 0};
+    final missing = <String, dynamic>{'kind': 'expense', 'amount': null};
+    final invalid = <String, dynamic>{'kind': 'income', 'amount': 'oops'};
+    final negative = <String, dynamic>{'kind': 'expense', 'amount': -5};
+    final nonFinite = <String, dynamic>{'kind': 'income', 'amount': double.infinity};
+    expect(matchesKopilkaHistory(valid, 'has:amount'), isTrue);
+    expect(matchesKopilkaHistory(zero, 'has:amount'), isTrue);
+    for (final entry in [missing, invalid, negative, nonFinite]) {
+      expect(matchesKopilkaHistory(entry, 'has:no-amount'), isTrue);
+      expect(matchesKopilkaHistory(entry, 'has:amount'), isFalse);
+    }
+    expect(matchesKopilkaHistory(valid, 'has:no-amount'), isFalse);
+    expect(matchesKopilkaHistory(valid, 'has:unknown'), isFalse);
+    expect(valid['amount'], 1250.50);
+  });
+
   test('has:bank and has:no-bank find unassigned accounts without changing data', () {
     final missing = {'kind': 'expense', 'note': 'Т-Банк в заметке', 'bank': ''};
     final partial = {'kind': 'transfer', 'from': '', 'to': 'Ozon Банк'};

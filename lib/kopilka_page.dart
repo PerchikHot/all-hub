@@ -100,7 +100,7 @@ bool isBankTransactionNotification(String title, String body) {
   // Keep these alerts out of manual import suggestions; never delete them
   // from the Android notification tray or change saved transactions.
   final failedTransaction = RegExp(
-    r'отклон[её]н|не\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|declined|rejected|failed|cancelled|canceled|pending|processing|awaiting\s+approval|отказан[а-яё]*|не\s+одобрен[а-яё]*|ошибка\s+(?:оплаты|перевода)|insufficient\s+funds|требует\s+подтверждени[яй]|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required',
+    r'отклон[её]н|не\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|declined|rejected|failed|cancelled|canceled|pending|processing|awaiting\s+approval|отказан[а-яё]*|не\s+одобрен[а-яё]*|ошибка\s+(?:оплаты|перевода)|insufficient\s+funds|требует\s+подтверждени[яй]|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|заблокирован[а-яё]*|приостановлен[а-яё]*|заморожен[а-яё]*|\bblocked\b|\bsuspended\b|\bon\s+hold\b',
     caseSensitive: false,
   );
   // A currency label without a readable amount is not a transaction.

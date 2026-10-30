@@ -14,9 +14,7 @@ bool isVisibleFeedPost(
   required String kind,
   required Set<String> seenIds,
 }) {
-  final preview = post['preview_file_url'] ??
-      post['large_file_url'] ?? post['file_url'];
-  if (preview is! String || !preview.startsWith('https://')) return false;
+  if (mediaFeedImageUrl(post, highQuality: false) == null) return false;
   final id = (post['id'] ?? '').toString();
   if (id.isEmpty || seenIds.contains(id)) return false;
   final tags = (post['tag_string'] ?? '').toString().split(' ');
@@ -40,4 +38,21 @@ bool shouldContinueMediaFeed({
   if (hasPosts) return fetched >= pageSize;
   if (emptyRetries >= 8) return false;
   return fetched >= pageSize || requestedPage < categoryCount;
+}
+
+/// Select the first usable HTTPS URL; an invalid preferred URL must not hide
+/// a valid fallback image or create a broken thumbnail.
+String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}) {
+  final keys = highQuality
+      ? ['large_file_url', 'file_url', 'preview_file_url']
+      : ['preview_file_url', 'large_file_url', 'file_url'];
+  for (final key in keys) {
+    final value = post[key];
+    if (value is! String) continue;
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
+      return value;
+    }
+  }
+  return null;
 }

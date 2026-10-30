@@ -70,11 +70,12 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   required String selectedTag,
   required String kind,
   required Set<String> seenIds,
+  Set<String> seenUrls = const <String>{},
 }) {
   final pageSeen = <String>{...seenIds};
   // The API can return the same image under different post IDs. Avoid
   // showing identical thumbnail URLs twice on a single loaded page.
-  final pageUrls = <String>{};
+  final pageUrls = <String>{...seenUrls};
   final result = <Map<String, dynamic>>[];
   for (final post in candidates) {
     if (!isVisibleFeedPost(post, selectedTag: selectedTag,

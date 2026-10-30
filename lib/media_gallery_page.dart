@@ -233,8 +233,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       await prefs.setString('media_favorites_v1',
         writeMediaFavorites(favoritePosts));
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось сохранить избранное на устройстве')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось сохранить избранное на устройстве')));
+      }
     }
   }
 

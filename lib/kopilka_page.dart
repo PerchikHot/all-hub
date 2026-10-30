@@ -278,6 +278,15 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       return isStart ? day.compareTo(requested) >= 0
           : day.compareTo(requested) <= 0;
     }
+    // Find operations needing a description without changing saved entries.
+    // Unknown has: values fail closed rather than matching arbitrary notes.
+    if (word.startsWith('has:') || word.startsWith('есть:')) {
+      final requested = word.substring(word.indexOf(':') + 1);
+      final hasNote = (entry['note'] ?? '').toString().trim().isNotEmpty;
+      if (requested == 'note' || requested == 'заметка') return hasNote;
+      if (requested == 'no-note' || requested == 'без-заметки') return !hasNote;
+      return false;
+    }
     // note:/заметка: searches only the user's description, not account names,
     // dates or other fields. All matching remains local to this device.
     if (word.startsWith('note:') || word.startsWith('заметка:')) {
@@ -767,8 +776,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nИсключить слово: -такси',
-              helperMaxLines: 7,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nЕсть описание: has:note  •  без описания: has:no-note\nИсключить слово: -такси',
+              helperMaxLines: 8,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

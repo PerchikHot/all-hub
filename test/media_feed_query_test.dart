@@ -40,4 +40,19 @@ void main() {
     expect(isVisibleFeedPost({...gif, 'large_file_url': 'http://example.org/x'},
         selectedTag: 'futanari', kind: 'gif', seenIds: <String>{}), isFalse);
   });
+  test('empty first category tries the other; bounded GIF scan terminates', () {
+    expect(shouldContinueMediaFeed(fetched: 0, pageSize: 24,
+        categoryCount: 2, requestedPage: 1, emptyRetries: 1,
+        hasPosts: false), isTrue);
+    expect(shouldContinueMediaFeed(fetched: 0, pageSize: 24,
+        categoryCount: 2, requestedPage: 2, emptyRetries: 2,
+        hasPosts: false), isFalse);
+    expect(shouldContinueMediaFeed(fetched: 24, pageSize: 24,
+        categoryCount: 2, requestedPage: 8, emptyRetries: 8,
+        hasPosts: false), isFalse);
+    expect(shouldContinueMediaFeed(fetched: 24, pageSize: 24,
+        categoryCount: 1, requestedPage: 1, emptyRetries: 0,
+        hasPosts: true), isTrue);
+  });
+
 }

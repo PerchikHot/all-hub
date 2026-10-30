@@ -247,7 +247,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
         page++;
-        hasMore = data.length >= pageSize;
+        // Sparse GIF results can require scanning several source pages.
+        // Never report an empty search while another page can still be checked.
+        hasMore = data.isNotEmpty && (data.length >= pageSize || (posts.isEmpty && emptyPageRetries < 8));
       });
     } catch (e) {
       if (mounted && generation == searchGeneration) {
@@ -359,7 +361,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     if (!showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
     ),
-    if (!loading && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) const Padding(
+    if (!loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) const Padding(
       padding: EdgeInsets.all(12), child: Text('Нет изображений по запросу. Попробуй другое имя или тег.')),
     Expanded(child: RefreshIndicator(
       onRefresh: () async { search(); },

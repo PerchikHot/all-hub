@@ -50,7 +50,7 @@ String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}
     final value = post[key];
     if (value is! String) continue;
     final uri = Uri.tryParse(value);
-    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
+    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty && uri.userInfo.isEmpty) {
       return value;
     }
   }

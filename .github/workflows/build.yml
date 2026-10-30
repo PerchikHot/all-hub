@@ -236,20 +236,22 @@ jobs:
           test -s dist/windows/AllHub-Windows-portable.zip
           cp dist/android/app-release.apk AllHub-Android.apk
           cp dist/windows/AllHub-Windows-portable.zip AllHub-Windows-portable.zip
-      - name: Publish complete platform pair
+      - name: Publish immutable, complete platform pair
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release view all-hub-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create all-hub-latest --repo "$GITHUB_REPOSITORY" \
-              --title "All Hub — Android and Windows" \
-              --notes "Актуальные установочные файлы All Hub." --latest=false
-          # Both files are built and verified before either is replaced.
-          gh release upload all-hub-latest AllHub-Android.apk AllHub-Windows-portable.zip \
-            --repo "$GITHUB_REPOSITORY" --clobber
-          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
+          VERSION="$(sed -nE 's/^version: ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' pubspec.yaml)"
           test -n "$VERSION"
-          # Publish the version only after both assets have uploaded.
-          gh release edit all-hub-latest --repo "$GITHUB_REPOSITORY" \
-            --notes "$(printf 'Актуальные установочные файлы All Hub.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")"
+          TAG="all-hub-v${VERSION}+${GITHUB_RUN_NUMBER}"
+          # A rolling release can temporarily mix old and new binaries if
+          # uploads fail halfway. Publish a NEW draft release instead; it
+          # remains invisible to All Hub until BOTH assets are uploaded.
+          gh release create "$TAG" AllHub-Android.apk AllHub-Windows-portable.zip \\
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \\
+            --title "All Hub ${VERSION} build ${GITHUB_RUN_NUMBER}" \\
+            --notes "$(printf 'Verified Android and Windows build.\\nVersion: %s+%s\\n' "$VERSION" "$GITHUB_RUN_NUMBER")" \\
+            --draft --latest=false
+          # GitHub API only lists non-draft releases to normal clients.
+          # If publishing fails, the previous working release stays intact.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

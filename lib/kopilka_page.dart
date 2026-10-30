@@ -109,12 +109,19 @@ bool isBankTransactionNotification(String title, String body) {
     r'не\s+(?:провед[её]н[а-яё]*|подтвержд[её]н[а-яё]*|заверш[её]н[а-яё]*|состоял[а-яё]*)|\bnot\s+(?:completed|processed|approved|confirmed)\b',
     caseSensitive: false,
   );
+  // Future-dated payment reminders are not evidence of a posted expense.
+  // Do not suggest them for import even if they contain an exact amount.
+  final scheduledTransaction = RegExp(
+    r'запланирован[а-яё]*|планиру[ею]тся|будет\s+(?:списан[а-яё]*|списано|оплачен[а-яё]*|провед[её]н[а-яё]*)|\b(?:scheduled|upcoming)\b',
+    caseSensitive: false,
+  );
   // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
       suggestNotificationAmount(text).isNotEmpty &&
       !sensitive.hasMatch(text) && !credentialWords.hasMatch(text) &&
-      !failedTransaction.hasMatch(text) && !notCompleted.hasMatch(text);
+      !failedTransaction.hasMatch(text) && !notCompleted.hasMatch(text) &&
+      !scheduledTransaction.hasMatch(text);
 }
 
 /// Only review a native notification once, even if the listener returns the

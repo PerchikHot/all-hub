@@ -1176,7 +1176,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               if (originalIndex < 0) return;
               setState(() => entries.removeAt(originalIndex));
               await _save();
-              if (!mounted) return;
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: const Text('Операция удалена'),

@@ -91,17 +91,25 @@ jobs:
 
               override fun onNotificationPosted(sbn: StatusBarNotification?) {
                   if (sbn == null) return
-                  val bank = when (sbn.packageName) {
-                      "com.idamob.tinkoff.android" -> "Т-Банк"
-                      "ru.gazprombank.android.mobilebank.app" -> "Газпромбанк"
-                      "ru.ozon.fintech.finance" -> "Ozon Банк"
+                  val (bank, bankId) = when (sbn.packageName) {
+                      "com.idamob.tinkoff.android" -> Pair("Т-Банк", "tbank")
+                      "ru.gazprombank.android.mobilebank.app" -> Pair("Газпромбанк", "gazprom")
+                      "ru.ozon.fintech.finance" -> Pair("Ozon Банк", "ozon")
                       else -> return
                   }
                   // Record only metadata for the diagnostic screen, not the
                   // notification text or login codes.
                   val listenerPrefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                  listenerPrefs.edit().putLong("last_seen", System.currentTimeMillis())
-                      .putString("last_bank", bank).apply()
+                  // Count all observed supported-bank events without saving
+                  // their text. These diagnostics work even for OTP or balance
+                  // notifications that are intentionally excluded from import.
+                  val now = System.currentTimeMillis()
+                  listenerPrefs.edit().putLong("last_seen", now)
+                      .putString("last_bank", bank)
+                      .putLong("bank_last_" + bankId, now)
+                      .putInt("bank_count_" + bankId,
+                          (listenerPrefs.getInt("bank_count_" + bankId, 0) + 1)
+                              .coerceAtMost(100000000)).apply()
                   val extras = sbn.notification.extras
                   val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
                   val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
@@ -189,7 +197,17 @@ jobs:
                                       "lastSeen" to prefs.getLong("last_seen", 0L),
                                       "lastBank" to (prefs.getString("last_bank", "") ?: ""),
                                       "connected" to prefs.getBoolean("listener_connected", false),
-                                      "lastConnected" to prefs.getLong("last_connected", 0L)
+                                      "lastConnected" to prefs.getLong("last_connected", 0L),
+                                      "bankEvents" to mapOf(
+                                          "Т-Банк" to prefs.getInt("bank_count_tbank", 0),
+                                          "Газпромбанк" to prefs.getInt("bank_count_gazprom", 0),
+                                          "Ozon Банк" to prefs.getInt("bank_count_ozon", 0)
+                                      ),
+                                      "bankLastSeen" to mapOf(
+                                          "Т-Банк" to prefs.getLong("bank_last_tbank", 0L),
+                                          "Газпромбанк" to prefs.getLong("bank_last_gazprom", 0L),
+                                          "Ozon Банк" to prefs.getLong("bank_last_ozon", 0L)
+                                      )
                                   ))
                               }
                               "dismiss" -> {

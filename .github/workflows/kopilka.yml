@@ -76,6 +76,19 @@ jobs:
           import org.json.JSONObject
 
           class BankNotificationService : NotificationListenerService() {
+              override fun onListenerConnected() {
+                  super.onListenerConnected()
+                  getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
+                      .putBoolean("listener_connected", true)
+                      .putLong("last_connected", System.currentTimeMillis()).apply()
+              }
+
+              override fun onListenerDisconnected() {
+                  super.onListenerDisconnected()
+                  getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
+                      .putBoolean("listener_connected", false).apply()
+              }
+
               override fun onNotificationPosted(sbn: StatusBarNotification?) {
                   if (sbn == null) return
                   val bank = when (sbn.packageName) {
@@ -174,7 +187,9 @@ jobs:
                                   result.success(mapOf(
                                       "queued" to count,
                                       "lastSeen" to prefs.getLong("last_seen", 0L),
-                                      "lastBank" to (prefs.getString("last_bank", "") ?: "")
+                                      "lastBank" to (prefs.getString("last_bank", "") ?: ""),
+                                      "connected" to prefs.getBoolean("listener_connected", false),
+                                      "lastConnected" to prefs.getLong("last_connected", 0L)
                                   ))
                               }
                               "dismiss" -> {

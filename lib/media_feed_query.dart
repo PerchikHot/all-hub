@@ -1,8 +1,11 @@
 /// Small, testable Danbooru feed filters shared by image and GIF results.
 /// Never force an explicit-only rating: many tagged posts have other ratings.
 String buildMediaFeedTags(String category, String query) {
-  final cleaned = query.trim();
-  return cleaned.isEmpty ? category : '$category $cleaned';
+  // Normalize pasted multiline searches before sending tags to the API.
+  // Preserve tag operators and underscores; only collapse whitespace.
+  final cleaned = query.trim().replaceAll(RegExp(r'\s+'), ' ');
+  final base = category.trim();
+  return cleaned.isEmpty ? base : '$base $cleaned';
 }
 
 /// Validate URLs, tag membership and duplicate IDs before rendering.

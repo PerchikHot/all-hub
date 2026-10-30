@@ -19,6 +19,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool hasMore = true;
   int page = 1;
   int emptyPageRetries = 0;
+  int fetchedPosts = 0;
+  int filteredPosts = 0;
   String kind = 'all';
   bool showFuta = true;
   bool showTrans = true;
@@ -177,6 +179,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       seenPostIds.clear();
       page = 1;
       emptyPageRetries = 0;
+      fetchedPosts = 0;
+      filteredPosts = 0;
       hasMore = true;
       error = '';
       accessDenied = false;
@@ -235,6 +239,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           isVisibleFeedPost(p, selectedTag: selectedTag,
               kind: requestedKind, seenIds: seenPostIds)).toList();
       setState(() {
+        fetchedPosts += data.length;
+        filteredPosts += data.length - newPosts.length;
         for (final post in newPosts) {
           seenPostIds.add((post['id'] ?? '').toString());
         }
@@ -376,6 +382,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       padding: const EdgeInsets.all(12),
       child: Column(children: [
         const Text('Источник не вернул подходящих изображений. Попробуй другой тег или проверь поиск на сайте.'),
+        if (fetchedPosts > 0) Text('Получено записей: $fetchedPosts, исключено фильтрами: $filteredPosts'),
         TextButton.icon(
           onPressed: openSourceSearch,
           icon: const Icon(Icons.open_in_browser),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -509,14 +510,20 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                url, fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
+              // Cache thumbnails on disk as well as in Flutter's bounded
+              // memory cache. Revisiting a feed does not re-download every
+              // image; GIF codecs remain animated in the image widget.
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
                 filterQuality: FilterQuality.medium,
-                cacheWidth: highQuality ? 900 : 420,
-                gaplessPlayback: true,
-                errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image_outlined)),
-                loadingBuilder: (context, child, progress) => progress == null
-                    ? child : const Center(child: Icon(Icons.image_outlined, color: Colors.white24)),
+                memCacheWidth: highQuality ? 900 : 420,
+                maxWidthDiskCache: highQuality ? 900 : 420,
+                fadeInDuration: Duration.zero,
+                placeholder: (context, url) => const Center(
+                  child: Icon(Icons.image_outlined, color: Colors.white24)),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(Icons.broken_image_outlined)),
               ),
             ),
           ));

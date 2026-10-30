@@ -26,6 +26,26 @@ void main() {
         kind: 'gif', seenIds: <String>{}), isFalse);
   });
 
+  test('invalid preferred image URL falls back to a valid HTTPS sample', () {
+    final post = <String, dynamic>{
+      'id': 101,
+      'tag_string': 'transgender solo',
+      'preview_file_url': 'http://insecure.example/preview.jpg',
+      'large_file_url': 'https://example.org/large.jpg',
+      'file_url': 'https://example.org/original.jpg',
+    };
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'all', seenIds: <String>{}), isTrue);
+    expect(mediaFeedImageUrl(post, highQuality: false),
+        'https://example.org/large.jpg');
+    expect(mediaFeedImageUrl(post, highQuality: true),
+        'https://example.org/large.jpg');
+    expect(mediaFeedImageUrl({...post, 'large_file_url': 'invalid'},
+        highQuality: true), 'https://example.org/original.jpg');
+    expect(mediaFeedImageUrl({...post, 'large_file_url': 'https:///no-host',
+        'file_url': null}, highQuality: false), isNull);
+  });
+
   test('GIFs need a real HTTPS thumbnail and stable ID', () {
     final gif = <String, dynamic>{
       'id': 11,

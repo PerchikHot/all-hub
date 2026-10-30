@@ -64,6 +64,23 @@ void main() {
     expect(valid['amount'], 1250.50);
   });
 
+  test('same-account filter flags suspicious self-transfers without mutation', () {
+    final duplicate = <String, dynamic>{
+      'kind': 'transfer', 'from': ' Т-Банк ', 'to': 'т-банк',
+    };
+    final incomplete = <String, dynamic>{
+      'kind': 'transfer', 'from': '', 'to': 'Т-Банк',
+    };
+    expect(matchesKopilkaHistory(duplicate, 'has:same-account'), isTrue);
+    expect(matchesKopilkaHistory(duplicate, 'has:different-accounts'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'has:different-accounts'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'has:same-account'), isFalse);
+    expect(matchesKopilkaHistory(incomplete, 'has:same-account'), isFalse);
+    expect(matchesKopilkaHistory(incomplete, 'has:different-accounts'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'has:same-account'), isFalse);
+    expect(duplicate['from'], ' Т-Банк ');
+  });
+
   test('has:bank and has:no-bank find unassigned accounts without changing data', () {
     final missing = {'kind': 'expense', 'note': 'Т-Банк в заметке', 'bank': ''};
     final partial = {'kind': 'transfer', 'from': '', 'to': 'Ozon Банк'};

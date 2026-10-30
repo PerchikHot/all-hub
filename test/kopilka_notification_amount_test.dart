@@ -115,6 +115,23 @@ void main() {
           isTrue);
     });
 
+    test('unposted and unconfirmed payments are not treated as completed', () {
+      for (final body in [
+        'Оплата 400 ₽ не проведена',
+        'Перевод 500 ₽ не подтвержден',
+        'Платёж 300 ₽ не завершён',
+        'Оплата 200 ₽ не состоялась',
+        'Payment 400 RUB not completed',
+        'Transfer 200 RUB not processed',
+        'Payment 150 RUB not approved',
+      ]) {
+        expect(isBankTransactionNotification('Банк', body), isFalse,
+            reason: body);
+      }
+      expect(isBankTransactionNotification('Банк', 'Оплата 200 ₽ проведена'),
+          isTrue);
+    });
+
     test('does not import payment alerts containing credentials', () {
       for (final body in [
         'Пароль для оплаты 200 ₽: 1234',

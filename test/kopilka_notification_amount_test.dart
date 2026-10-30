@@ -99,6 +99,22 @@ void main() {
           'Возврат 300 ₽ за покупку'), isTrue);
     });
 
+    test('blocked or suspended payments are not completed expenses', () {
+      for (final body in [
+        'Оплата 500 ₽ заблокирована',
+        'Перевод 250 ₽ приостановлен',
+        'Списание 100 ₽ заморожено',
+        'Payment 300 RUB blocked',
+        'Transfer 200 RUB suspended',
+        'Payment 150 RUB on hold',
+      ]) {
+        expect(isBankTransactionNotification('Банк', body), isFalse,
+            reason: body);
+      }
+      expect(isBankTransactionNotification('Банк', 'Оплата 500 ₽ выполнена'),
+          isTrue);
+    });
+
     test('does not import payment alerts containing credentials', () {
       for (final body in [
         'Пароль для оплаты 200 ₽: 1234',

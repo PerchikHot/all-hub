@@ -325,6 +325,19 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
         final exists = account.isNotEmpty;
         return requested.startsWith('no-') ? !exists : exists;
       }
+      // Flag transfers accidentally assigned to the same account.
+      // Both account fields must be present; incomplete transfers are
+      // covered separately by has:no-from and has:no-to.
+      if (requested == 'same-account' || requested == 'different-accounts') {
+        if (entry['kind'] != 'transfer') return false;
+        final source = (entry['from'] ?? '').toString().trim()
+            .toLowerCase().replaceAll('ё', 'е');
+        final destination = (entry['to'] ?? '').toString().trim()
+            .toLowerCase().replaceAll('ё', 'е');
+        if (source.isEmpty || destination.isEmpty) return false;
+        return requested == 'same-account'
+            ? source == destination : source != destination;
+      }
       if (requested == 'bank' || requested == 'no-bank') {
         // Transfers have source/destination accounts; other operations use bank.
         // Do not mistake a bank mentioned in the note for an assigned account.

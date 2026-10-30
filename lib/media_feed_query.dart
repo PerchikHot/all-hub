@@ -49,8 +49,8 @@ bool shouldContinueMediaFeed({
 /// a valid fallback image or create a broken thumbnail.
 String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}) {
   final keys = highQuality
-      ? ['large_file_url', 'file_url', 'preview_file_url']
-      : ['preview_file_url', 'large_file_url', 'file_url'];
+      ? ['large_file_url', 'file_url', 'sample_url', 'preview_file_url']
+      : ['preview_file_url', 'sample_url', 'large_file_url', 'file_url'];
   for (final key in keys) {
     final value = post[key];
     if (value is! String) continue;
@@ -72,12 +72,17 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   required Set<String> seenIds,
 }) {
   final pageSeen = <String>{...seenIds};
+  // The API can return the same image under different post IDs. Avoid
+  // showing identical thumbnail URLs twice on a single loaded page.
+  final pageUrls = <String>{};
   final result = <Map<String, dynamic>>[];
   for (final post in candidates) {
     if (!isVisibleFeedPost(post, selectedTag: selectedTag,
         kind: kind, seenIds: pageSeen)) {
       continue;
     }
+    final url = mediaFeedImageUrl(post, highQuality: false);
+    if (url == null || !pageUrls.add(url)) continue;
     pageSeen.add((post['id'] ?? '').toString());
     result.add(post);
   }

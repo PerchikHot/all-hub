@@ -26,3 +26,18 @@ bool isVisibleFeedPost(
   }
   return true;
 }
+
+/// Continue checking the other enabled category before declaring an empty feed.
+/// Stop after a bounded number of empty filtered pages (especially for GIFs).
+bool shouldContinueMediaFeed({
+  required int fetched,
+  required int pageSize,
+  required int categoryCount,
+  required int requestedPage,
+  required int emptyRetries,
+  required bool hasPosts,
+}) {
+  if (hasPosts) return fetched >= pageSize;
+  if (emptyRetries >= 8) return false;
+  return fetched >= pageSize || requestedPage < categoryCount;
+}

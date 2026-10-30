@@ -12,6 +12,7 @@ on:
       - 'lib/kopilka_main.dart'
       - 'test/kopilka_notification_amount_test.dart'
       - 'test/kopilka_history_search_test.dart'
+      - 'test/kopilka_categories_test.dart'
       - '.github/workflows/kopilka.yml'
 
 jobs:
@@ -288,9 +289,10 @@ jobs:
           # package before an APK can be published.
           cp "$GITHUB_WORKSPACE/test/kopilka_notification_amount_test.dart" test/kopilka_notification_amount_test.dart
           cp "$GITHUB_WORKSPACE/test/kopilka_history_search_test.dart" test/kopilka_history_search_test.dart
-          sed -i 's#package:all_hub/kopilka_page.dart#package:kopilka_app/kopilka_page.dart#' test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart
+          cp "$GITHUB_WORKSPACE/test/kopilka_categories_test.dart" test/kopilka_categories_test.dart
+          sed -i 's#package:all_hub/kopilka_page.dart#package:kopilka_app/kopilka_page.dart#' test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart
           flutter analyze
-          flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart
+          flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
@@ -350,13 +352,16 @@ jobs:
           Remove-Item "test/widget_test.dart" -ErrorAction SilentlyContinue
           Copy-Item "$env:GITHUB_WORKSPACE/test/kopilka_notification_amount_test.dart" "test/kopilka_notification_amount_test.dart"
           Copy-Item "$env:GITHUB_WORKSPACE/test/kopilka_history_search_test.dart" "test/kopilka_history_search_test.dart"
+          Copy-Item "$env:GITHUB_WORKSPACE/test/kopilka_categories_test.dart" "test/kopilka_categories_test.dart"
           $testFile = 'test/kopilka_notification_amount_test.dart'
           (Get-Content $testFile -Raw).Replace('package:all_hub/kopilka_page.dart', 'package:kopilka_app/kopilka_page.dart') | Set-Content $testFile
           $historyTest = 'test/kopilka_history_search_test.dart'
           (Get-Content $historyTest -Raw).Replace('package:all_hub/kopilka_page.dart', 'package:kopilka_app/kopilka_page.dart') | Set-Content $historyTest
+          $categoryTest = 'test/kopilka_categories_test.dart'
+          (Get-Content $categoryTest -Raw).Replace('package:all_hub/kopilka_page.dart', 'package:kopilka_app/kopilka_page.dart') | Set-Content $categoryTest
           flutter analyze
           if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows analysis failed' }
-          flutter test $testFile $historyTest
+          flutter test $testFile $historyTest $categoryTest
           if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows tests failed' }
           flutter build windows --release
           if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows build failed' }

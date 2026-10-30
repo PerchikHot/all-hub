@@ -77,6 +77,27 @@ void main() {
     expect(isVisibleFeedPost({...gif, 'large_file_url': 'http://example.org/x'},
         selectedTag: 'futanari', kind: 'gif', seenIds: <String>{}), isFalse);
   });
+  test('same-page duplicate IDs are removed without mutating seen state', () {
+    final first = <String, dynamic>{
+      'id': 42, 'tag_string': 'transgender solo',
+      'preview_file_url': 'https://example.org/42.jpg', 'file_ext': 'jpg',
+    };
+    final second = <String, dynamic>{
+      'id': 43, 'tag_string': 'transgender solo',
+      'preview_file_url': 'https://example.org/43.jpg', 'file_ext': 'jpg',
+    };
+    final seen = <String>{'41'};
+    final filtered = filterNewMediaFeedPosts(
+      [first, {...first}, {...first, 'id': 41}, second,
+       {...second, 'tag_string': 'unrelated'}],
+      selectedTag: 'transgender', kind: 'all', seenIds: seen,
+    );
+    expect(filtered.map((p) => p['id']).toList(), [42, 43]);
+    expect(seen, <String>{'41'});
+    expect(filterNewMediaFeedPosts([first, second], selectedTag: 'transgender',
+        kind: 'all', seenIds: <String>{'42', '43'}), isEmpty);
+  });
+
   test('empty first category tries the other; bounded GIF scan terminates', () {
     expect(shouldContinueMediaFeed(fetched: 0, pageSize: 24,
         categoryCount: 2, requestedPage: 1, emptyRetries: 1,

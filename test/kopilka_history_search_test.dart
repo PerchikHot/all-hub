@@ -94,6 +94,26 @@ void main() {
     expect(noteOnly['to'], 'Ozon Банк');
   });
 
+  test('has:from/to detects incomplete transfers without touching saved data', () {
+    final complete = <String, dynamic>{
+      'kind': 'transfer', 'from': 'Т-Банк', 'to': 'Ozon Банк',
+    };
+    final missingFrom = <String, dynamic>{
+      'kind': 'transfer', 'from': ' ', 'to': 'Ozon Банк',
+    };
+    final missingTo = <String, dynamic>{
+      'kind': 'transfer', 'from': 'Т-Банк', 'to': null,
+    };
+    expect(matchesKopilkaHistory(complete, 'has:from has:to'), isTrue);
+    expect(matchesKopilkaHistory(complete, 'has:no-from'), isFalse);
+    expect(matchesKopilkaHistory(missingFrom, 'has:no-from has:to'), isTrue);
+    expect(matchesKopilkaHistory(missingTo, 'has:from has:no-to'), isTrue);
+    expect(matchesKopilkaHistory(missingTo, 'has:to'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'has:no-from'), isFalse);
+    expect(missingFrom['from'], ' ');
+    expect(missingTo['to'], isNull);
+  });
+
   test('has:note and has:no-note inspect descriptions only', () {
     expect(matchesKopilkaHistory(purchase, 'has:note bank:ozon'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'есть:заметка'), isTrue);

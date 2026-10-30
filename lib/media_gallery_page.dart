@@ -237,9 +237,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
-      final newPosts = data.whereType<Map<String, dynamic>>().where((p) =>
-          isVisibleFeedPost(p, selectedTag: selectedTag,
-              kind: requestedKind, seenIds: seenPostIds)).toList();
+      // The API can repeat an ID inside one response. De-duplicate before
+      // rendering, not only after merging the page into seenPostIds.
+      final newPosts = filterNewMediaFeedPosts(
+        data.whereType<Map<String, dynamic>>(),
+        selectedTag: selectedTag, kind: requestedKind, seenIds: seenPostIds,
+      );
       setState(() {
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;

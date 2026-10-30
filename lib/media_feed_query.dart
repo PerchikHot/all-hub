@@ -59,3 +59,23 @@ String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}
   }
   return null;
 }
+
+/// Remove duplicate IDs within a single API response as well as across pages.
+/// This function does not mutate the caller's seen set; the UI commits IDs
+/// only after confirming the response still belongs to the active search.
+List<Map<String, dynamic>> filterNewMediaFeedPosts(
+  Iterable<Map<String, dynamic>> candidates, {
+  required String selectedTag,
+  required String kind,
+  required Set<String> seenIds,
+}) {
+  final pageSeen = <String>{...seenIds};
+  final result = <Map<String, dynamic>>[];
+  for (final post in candidates) {
+    if (!isVisibleFeedPost(post, selectedTag: selectedTag,
+        kind: kind, seenIds: pageSeen)) continue;
+    pageSeen.add((post['id'] ?? '').toString());
+    result.add(post);
+  }
+  return result;
+}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
+import 'media_feed_query.dart';
 
 class MediaGalleryPage extends StatefulWidget {
   const MediaGalleryPage({super.key});
@@ -207,7 +208,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ];
       final selectedTag = enabledTags[(requestedPage - 1) % enabledTags.length];
       final sourcePage = ((requestedPage - 1) ~/ enabledTags.length) + 1;
-      final tags = [selectedTag, requestedQuery.isEmpty ? 'rating:explicit' : requestedQuery].join(' ');
+      // Search all ratings: forcing rating:explicit hid valid tagged posts.
+      final tags = buildMediaFeedTags(selectedTag, requestedQuery);
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -217,26 +219,18 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (response.statusCode == 403) {
         throw const _FeedAccessDenied();
       }
+      if (response.statusCode == 429) {
+        throw const _FeedRateLimited();
+      }
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
       final data = jsonDecode(response.body);
       if (data is! List) throw const FormatException('Неверный ответ сервера');
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
-      final newPosts = data.whereType<Map<String, dynamic>>().where((p) {
-        final preview = p['preview_file_url'] ?? p['large_file_url'] ?? p['file_url'];
-        if (preview is! String || !preview.startsWith('https://')) return false;
-        final id = (p['id'] ?? '').toString();
-        if (seenPostIds.contains(id)) return false;
-        final postTags = (p['tag_string'] ?? '').toString().split(' ');
-        if (!postTags.contains(selectedTag)) return false;
-        if ((p['rating'] ?? '').toString() != 'e') return false;
-        if (requestedKind == 'gif') {
-          final ext = (p['file_ext'] ?? '').toString().toLowerCase();
-          return ext == 'gif';
-        }
-        return true;
-      }).toList();
+      final newPosts = data.whereType<Map<String, dynamic>>().where((p) =>
+          isVisibleFeedPost(p, selectedTag: selectedTag,
+              kind: requestedKind, seenIds: seenPostIds)).toList();
       setState(() {
         for (final post in newPosts) {
           seenPostIds.add((post['id'] ?? '').toString());
@@ -256,8 +250,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         setState(() {
           accessDenied = e is _FeedAccessDenied;
           error = accessDenied
-              ? 'Danbooru отклонил запрос (HTTP 403). Это ограничение доступа к API на стороне сервера или сети.'
-              : 'Не удалось загрузить изображения: $e';
+              ? 'Источник отклонил запрос (HTTP 403). Проверь доступ или открой поиск на сайте.'
+              : e is _FeedRateLimited
+                  ? 'Источник временно ограничил запросы (HTTP 429). Попробуй позже.'
+                  : 'Не удалось загрузить изображения: $e';
           hasMore = false;
         });
       }
@@ -361,8 +357,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     if (!showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
     ),
-    if (!loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) const Padding(
-      padding: EdgeInsets.all(12), child: Text('Нет изображений по запросу. Попробуй другое имя или тег.')),
+    if (!loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(children: [
+        const Text('Источник не вернул подходящих изображений. Попробуй другой тег или проверь поиск на сайте.'),
+        TextButton.icon(
+          onPressed: openSourceSearch,
+          icon: const Icon(Icons.open_in_browser),
+          label: const Text('Открыть поиск на сайте'),
+        ),
+      ]),
+    ),
     Expanded(child: RefreshIndicator(
       onRefresh: () async { search(); },
       child: GridView.builder(
@@ -402,6 +407,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ),
     )),
   ]);
+}
+
+class _FeedRateLimited implements Exception {
+  const _FeedRateLimited();
+  @override
+  String toString() => 'HTTP 429 Too Many Requests';
 }
 
 class _FeedAccessDenied implements Exception {

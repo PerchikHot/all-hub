@@ -81,6 +81,10 @@ void main() {
         'Payment 200 RUB pending',
         'Transfer 300 RUB processing',
         'Payment 150 RUB awaiting approval',
+        'Оплата 300 ₽: отказано банком',
+        'Перевод 250 ₽ не одобрен',
+        'Ошибка оплаты 500 ₽',
+        'Payment 250 RUB insufficient funds',
       ]) {
         expect(isBankTransactionNotification('Банк', body), isFalse,
             reason: body);

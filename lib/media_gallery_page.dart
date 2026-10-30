@@ -283,6 +283,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     }
   }
 
+  // A failed next page should not discard images already loaded into the feed.
+  Future<void> retryFailedPage() async {
+    if (loading || posts.isEmpty) return;
+    setState(() {
+      error = '';
+      accessDenied = false;
+      hasMore = true;
+    });
+    await loadMore();
+  }
+
   Future<void> openSourceSearch() async {
     final tags = <String>[
       if (showFuta) feedTags[0],
@@ -371,7 +382,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
         const SizedBox(height: 8),
         Wrap(spacing: 8, children: [
-          OutlinedButton.icon(onPressed: search, icon: const Icon(Icons.refresh), label: const Text('Повторить')),
+          OutlinedButton.icon(onPressed: posts.isEmpty ? search : retryFailedPage, icon: const Icon(Icons.refresh), label: Text(posts.isEmpty ? 'Повторить' : 'Повторить страницу')),
           OutlinedButton.icon(
             onPressed: openSourceSearch,
             icon: const Icon(Icons.open_in_browser),

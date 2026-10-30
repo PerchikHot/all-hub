@@ -81,6 +81,24 @@ void main() {
     expect(duplicate['from'], ' Т-Банк ');
   });
 
+  test('legacy bank labels are compared conservatively for transfer audits', () {
+    final legacy = <String, dynamic>{
+      'kind': 'transfer', 'from': ' Тинькофф ', 'to': 'т-банк',
+    };
+    final ozon = <String, dynamic>{
+      'kind': 'transfer', 'from': 'Ozon Bank', 'to': 'Озон Банк',
+    };
+    final differentCards = <String, dynamic>{
+      'kind': 'transfer', 'from': 'Т-Банк карта 1', 'to': 'Т-Банк карта 2',
+    };
+    expect(matchesKopilkaHistory(legacy, 'has:same-account'), isTrue);
+    expect(matchesKopilkaHistory(ozon, 'has:same-account'), isTrue);
+    expect(matchesKopilkaHistory(differentCards, 'has:different-accounts'), isTrue);
+    expect(canonicalKopilkaAccountLabel(' Газпром '), 'газпромбанк');
+    expect(canonicalKopilkaAccountLabel('Т-Банк  карта 1'), 'т-банк карта 1');
+    expect(legacy['from'], ' Тинькофф ');
+  });
+
   test('has:bank and has:no-bank find unassigned accounts without changing data', () {
     final missing = {'kind': 'expense', 'note': 'Т-Банк в заметке', 'bank': ''};
     final partial = {'kind': 'transfer', 'from': '', 'to': 'Ozon Банк'};

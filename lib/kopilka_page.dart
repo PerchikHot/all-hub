@@ -167,6 +167,20 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 }
 
 
+/// Prevent duplicate financial postings when two review dialogs are open or
+/// a native notification is delivered again before its key is archived.
+/// This reads only saved operation IDs; it never changes existing entries.
+bool isKopilkaNotificationImported(
+  Iterable<Map<String, dynamic>> entries, String? notificationKey,
+) {
+  final key = notificationKey?.trim() ?? '';
+  if (key.isEmpty) return false;
+  return entries.any((entry) {
+    final stored = entry['notificationKey'];
+    return stored is String && stored.trim() == key;
+  });
+}
+
 /// Invalid legacy amounts must never crash totals or contaminate balances.
 double safeKopilkaAmount(Map<String, dynamic> entry) {
   final value = entry['amount'];
@@ -688,6 +702,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   }
 
   Future<void> _reviewNotification(Map<String, dynamic> event) async {
+    final key = (event['key'] ?? '').toString().trim();
+    if (isKopilkaNotificationImported(entries, key)) {
+      await _archiveNotificationKey(key);
+      return;
+    }
     final title = (event['title'] ?? '').toString();
     final body = (event['body'] ?? '').toString();
     final action = await showDialog<int>(context: context, builder: (ctx) => AlertDialog(
@@ -797,12 +816,21 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         ],
       )));
     if (saved == true) {
+      final key = notification?['key']?.toString().trim();
+      // Recheck immediately before insertion: another open dialog may have
+      // imported the same event while this one awaited user confirmation.
+      if (notification != null &&
+          (key == null || key.isEmpty ||
+              isKopilkaNotificationImported(entries, key))) {
+        if (key != null && key.isNotEmpty) await _archiveNotificationKey(key);
+        return;
+      }
       final value = parseKopilkaAmount(amount.text)!;
       setState(() => entries.insert(0, {
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
         'note': note.text.trim(), 'date': DateTime.now().toIso8601String(),
         if (kind == 'expense') 'category': category,
-        if (notification != null) 'notificationKey': (notification['key'] ?? '').toString(),
+        if (notification != null) 'notificationKey': key,
       }));
       await _save();
       if (notification != null) {

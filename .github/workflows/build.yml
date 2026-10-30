@@ -181,21 +181,7 @@ jobs:
           name: AllHub-Android-release
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-      - name: Publish Android APK for in-app All Hub updates
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk AllHub-Android.apk
-          gh release view all-hub-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create all-hub-latest --repo "$GITHUB_REPOSITORY" \
-              --title "All Hub — Android and Windows" \
-              --notes "Актуальные установочные файлы All Hub." --latest=false
-          gh release upload all-hub-latest AllHub-Android.apk --repo "$GITHUB_REPOSITORY" --clobber
-          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
-          test -n "$VERSION"
-          gh release edit all-hub-latest --repo "$GITHUB_REPOSITORY" \
-            --notes "$(printf 'Актуальные установочные файлы All Hub.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")"
+
   windows:
     runs-on: windows-latest
     steps:
@@ -224,17 +210,46 @@ jobs:
           name: AllHub-Windows
           path: AllHub-Windows-portable.zip
           if-no-files-found: error
-      - name: Publish Windows portable ZIP for All Hub
-        if: github.ref == 'refs/heads/main'
-        shell: pwsh
+  # A release must never advertise a new version while one platform still
+  # points to an older build. Only publish after BOTH artifacts passed CI.
+  publish:
+    name: Publish verified Android and Windows pair
+    needs: [android, windows]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AllHub-Android-release
+          path: dist/android
+      - uses: actions/download-artifact@v4
+        with:
+          name: AllHub-Windows
+          path: dist/windows
+      - name: Verify both packages before publishing
+        run: |
+          set -euo pipefail
+          test -s dist/android/app-release.apk
+          test -s dist/windows/AllHub-Windows-portable.zip
+          cp dist/android/app-release.apk AllHub-Android.apk
+          cp dist/windows/AllHub-Windows-portable.zip AllHub-Windows-portable.zip
+      - name: Publish complete platform pair
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view all-hub-latest --repo "$env:GITHUB_REPOSITORY" *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create all-hub-latest --repo "$env:GITHUB_REPOSITORY" --title "All Hub — Android and Windows" --notes "Актуальные установочные файлы All Hub." --latest=false
-          }
-          gh release upload all-hub-latest AllHub-Windows-portable.zip --repo "$env:GITHUB_REPOSITORY" --clobber
-          $versionLine = (Select-String -Path pubspec.yaml -Pattern '^version: (\d+\.\d+\.\d+)').Matches[0].Groups[1].Value
-          $version = "$versionLine+$env:GITHUB_RUN_NUMBER"
-          gh release edit all-hub-latest --repo "$env:GITHUB_REPOSITORY" --notes "Актуальные установочные файлы All Hub.`nVersion: $version"
+          set -euo pipefail
+          gh release view all-hub-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create all-hub-latest --repo "$GITHUB_REPOSITORY" \
+              --title "All Hub — Android and Windows" \
+              --notes "Актуальные установочные файлы All Hub." --latest=false
+          # Both files are built and verified before either is replaced.
+          gh release upload all-hub-latest AllHub-Android.apk AllHub-Windows-portable.zip \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
+          test -n "$VERSION"
+          # Publish the version only after both assets have uploaded.
+          gh release edit all-hub-latest --repo "$GITHUB_REPOSITORY" \
+            --notes "$(printf 'Актуальные установочные файлы All Hub.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")"

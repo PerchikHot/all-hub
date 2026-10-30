@@ -61,6 +61,13 @@ void main() {
     expect(releaseMatchesProject('kopilka-latest', 'all-hub'), isFalse);
     expect(releaseMatchesProject('all-hub-latest', 'kopilka'), isFalse);
     expect(releaseMatchesProject('eclipse-arena-android', 'eclipse-arena'), isTrue);
+    expect(releaseMatchesProject('all-hub-latest', 'nova-game'), isFalse);
+    expect(releaseMatchesProject('kopilka-latest', 'shadow-rp'), isFalse);
+    expect(releaseMatchesProject('all-hub-latest', 'eclipse-arena'), isFalse);
+    expect(releaseMatchesProject('nova-android', 'nova-game'), isTrue);
+    expect(releaseMatchesProject('shadow-rp-android', 'shadow-rp'), isTrue);
+    expect(releaseMatchesProject('kopilka-latest', 'unrecognized'), isFalse);
+    expect(releaseMatchesProject('all-hub-latest', null), isFalse);
   });
 
   test('blank release metadata does not advertise an update', () {

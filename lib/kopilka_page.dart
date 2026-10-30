@@ -1112,7 +1112,24 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Удалить')),
               ],
             ));
-            if (remove == true) { setState(() => entries.remove(e)); await _save(); }
+            if (remove == true && mounted) {
+              final originalIndex = entries.indexOf(e);
+              if (originalIndex < 0) return;
+              setState(() => entries.removeAt(originalIndex));
+              await _save();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: const Text('Операция удалена'),
+                duration: const Duration(seconds: 7),
+                action: SnackBarAction(label: 'Отменить', onPressed: () async {
+                  if (!mounted || entries.contains(e)) return;
+                  setState(() => entries.insert(
+                    originalIndex.clamp(0, entries.length), e));
+                  await _save();
+                }),
+              ));
+            }
           },
         )),
         const SizedBox(height: 90),

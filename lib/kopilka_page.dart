@@ -506,13 +506,20 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   if (diagnostics == null) return 'Диагностика доступна в отдельной Android APK Копилки.';
   final lastSeen = diagnostics['lastSeen'];
   final queued = diagnostics['queued'];
+  final connected = diagnostics['connected'] == true;
+  final lastConnected = diagnostics['lastConnected'];
+  final connection = connected
+      ? 'Служба уведомлений подключена.'
+      : lastConnected is int && lastConnected > 0
+          ? 'Служба отключена — проверь разрешение и энергосбережение.'
+          : 'Подключение службы ещё не подтверждено.';
   if (lastSeen is! int || lastSeen <= 0) {
-    return 'Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.';
+    return '$connection Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.';
   }
   final bank = (diagnostics['lastBank'] ?? '').toString();
   final time = DateTime.fromMillisecondsSinceEpoch(lastSeen).toLocal();
   final stamp = '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  return 'Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.';
+  return '$connection Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.';
 }
 
 class KopilkaPage extends StatefulWidget {

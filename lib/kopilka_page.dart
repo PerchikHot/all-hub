@@ -797,7 +797,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         if (entries.isNotEmpty && historyQuery.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Найдено: ${filteredEntries.length} из ${entries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))} · Переводов: ${filteredTransfers}',
+            child: Text('Найдено: ${filteredEntries.length} из ${entries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))} · Переводов: $filteredTransfers',
               style: const TextStyle(color: Colors.white70)),
           ),
         if (entries.isNotEmpty && filteredEntries.isEmpty)

@@ -28,6 +28,17 @@ void main() {
     'date': '2026-10-27',
   };
 
+  test('has:note and has:no-note inspect descriptions only', () {
+    expect(matchesKopilkaHistory(purchase, 'has:note bank:ozon'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'есть:заметка'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'has:no-note'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'has:no-note'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'есть:без-заметки'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'has:note'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'has:unknown'), isFalse);
+    expect(purchase['note'], 'Продукты');
+  });
+
   test('note: searches only saved notes, not account names or dates', () {
     expect(matchesKopilkaHistory(purchase, 'note:продукты'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'заметка:продукты bank:ozon'), isTrue);

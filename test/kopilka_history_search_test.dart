@@ -46,6 +46,20 @@ void main() {
     expect(valid['date'], '2026-10-28T12:00:00');
   });
 
+  test('has:bank and has:no-bank find unassigned accounts without changing data', () {
+    final missing = {'kind': 'expense', 'note': 'Т-Банк в заметке', 'bank': ''};
+    final partial = {'kind': 'transfer', 'from': '', 'to': 'Ozon Банк'};
+    final unknown = {'kind': 'transfer', 'from': null, 'to': ' '};
+    expect(matchesKopilkaHistory(purchase, 'has:bank'), isTrue);
+    expect(matchesKopilkaHistory(purchase, 'has:no-bank'), isFalse);
+    expect(matchesKopilkaHistory(missing, 'has:no-bank'), isTrue);
+    expect(matchesKopilkaHistory(missing, 'has:bank'), isFalse);
+    expect(matchesKopilkaHistory(partial, 'has:bank'), isTrue);
+    expect(matchesKopilkaHistory(unknown, 'has:no-bank'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'has:bank'), isTrue);
+    expect(missing['note'], 'Т-Банк в заметке');
+  });
+
   test('has:note and has:no-note inspect descriptions only', () {
     expect(matchesKopilkaHistory(purchase, 'has:note bank:ozon'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'есть:заметка'), isTrue);

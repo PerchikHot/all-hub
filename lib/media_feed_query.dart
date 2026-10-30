@@ -91,3 +91,16 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   }
   return result;
 }
+
+
+/// Clamp API-supplied image proportions so portrait and landscape posts can
+/// coexist in a Pinterest-style masonry grid without enormous layout tiles.
+double mediaFeedTileAspectRatio(Map<String, dynamic> post) {
+  final width = post['image_width'];
+  final height = post['image_height'];
+  if (width is! num || height is! num ||
+      !width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
+    return 0.72;
+  }
+  return (width.toDouble() / height.toDouble()).clamp(0.55, 1.45).toDouble();
+}

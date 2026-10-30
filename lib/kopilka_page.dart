@@ -501,6 +501,20 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
 }
 
 /// Local-first finance notebook. No bank credentials or transactions leave the device.
+/// Human-readable listener health without exposing notification bodies.
+String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
+  if (diagnostics == null) return 'Диагностика доступна в отдельной Android APK Копилки.';
+  final lastSeen = diagnostics['lastSeen'];
+  final queued = diagnostics['queued'];
+  if (lastSeen is! int || lastSeen <= 0) {
+    return 'Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.';
+  }
+  final bank = (diagnostics['lastBank'] ?? '').toString();
+  final time = DateTime.fromMillisecondsSinceEpoch(lastSeen).toLocal();
+  final stamp = '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  return 'Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.';
+}
+
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
   @override
@@ -514,6 +528,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final historySearchController = TextEditingController();
   static const _notifications = MethodChannel('kopilka/notifications');
   bool notificationsEnabled = false;
+  Map<String, dynamic>? listenerDiagnostics;
   final pendingNotifications = <Map<String, dynamic>>[];
   int visiblePendingCount = 10;
   double goal = 100000;
@@ -557,6 +572,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     try {
       final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
+      final nativeDiagnostics = await _notifications.invokeMethod<Map<dynamic, dynamic>>('diagnostics');
+      final diagnostics = nativeDiagnostics == null ? null : nativeDiagnostics.map(
+        (key, value) => MapEntry(key.toString(), value));
       final prefs = await SharedPreferences.getInstance();
       final reviewed = (prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[]).toSet();
       // Also check saved operations: a crash after saving an operation but
@@ -567,6 +585,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           notificationsEnabled = enabled;
+          listenerDiagnostics = diagnostics;
           pendingNotifications..clear()..addAll(data);
         });
       }
@@ -814,6 +833,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             subtitle: const Text('Т-Банк, Газпромбанк, Ozon Банк. Уведомления остаются на устройстве.'),
             trailing: IconButton(icon: const Icon(Icons.settings_outlined),
               onPressed: _openNotificationSettings),
+          ),
+          ListTile(
+            leading: const Icon(Icons.health_and_safety_outlined),
+            title: const Text('Диагностика получения уведомлений'),
+            subtitle: Text(describeKopilkaListener(listenerDiagnostics)),
           ),
           if (pendingNotifications.isNotEmpty)
             ExpansionTile(

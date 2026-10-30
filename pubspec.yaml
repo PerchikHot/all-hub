@@ -1,13 +1,14 @@
 name: all_hub
 description: Unified launcher for personal projects
 publish_to: none
-version: 0.6.0+7
+version: 0.7.0+8
 environment:
   sdk: '>=3.3.0 <4.0.0'
 dependencies:
   flutter:
     sdk: flutter
   archive: ^4.0.7
+  flutter_staggered_grid_view: ^0.7.0
   http: ^1.3.0
   url_launcher: ^6.3.1
   file_picker: ^8.3.7

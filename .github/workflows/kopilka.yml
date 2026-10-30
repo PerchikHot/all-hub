@@ -84,6 +84,11 @@ jobs:
                       "ru.ozon.fintech.finance" -> "Ozon Банк"
                       else -> return
                   }
+                  // Record only metadata for the diagnostic screen, not the
+                  // notification text or login codes.
+                  val listenerPrefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                  listenerPrefs.edit().putLong("last_seen", System.currentTimeMillis())
+                      .putString("last_bank", bank).apply()
                   val extras = sbn.notification.extras
                   val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
                   val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
@@ -100,9 +105,19 @@ jobs:
                   val sensitive = Regex(
                       """код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
                       RegexOption.IGNORE_CASE)
+                  // The native queue must reject unposted payments and
+                  // credential alerts BEFORE storing their text on disk.
+                  val notPosted = Regex(
+                      """отклон[её]н|не\\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\\s+средств|ожида[её]т\\s+подтверждени|в\\s+обработк|запланирован[а-яё]*|ожидается\\s+(?:завтра|послезавтра)|будет\\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\\s+funds|\\bblocked\\b|\\bsuspended\\b""",
+                      RegexOption.IGNORE_CASE)
+                  val credentials = Regex(
+                      """парол[ья]|password|passcode|\\bpin\\b|\\bcvv\\b|\\bcvc\\b|код\\s*[:№]|(?:ваш|your)\\s+(?:код|code)""",
+                      RegexOption.IGNORE_CASE)
                   if (!transaction.containsMatchIn(combined) ||
                       !currency.containsMatchIn(combined) ||
-                      sensitive.containsMatchIn(combined)) return
+                      sensitive.containsMatchIn(combined) ||
+                      credentials.containsMatchIn(combined) ||
+                      notPosted.containsMatchIn(combined)) return
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                   val current = JSONArray(prefs.getString("queue", "[]"))
                   val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}:${body.hashCode()}"
@@ -150,6 +165,17 @@ jobs:
                               "pending" -> {
                                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                                   result.success(prefs.getString("queue", "[]"))
+                              }
+                              "diagnostics" -> {
+                                  val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                  val count = try {
+                                      org.json.JSONArray(prefs.getString("queue", "[]")).length()
+                                  } catch (_: Exception) { 0 }
+                                  result.success(mapOf(
+                                      "queued" to count,
+                                      "lastSeen" to prefs.getLong("last_seen", 0L),
+                                      "lastBank" to (prefs.getString("last_bank", "") ?: "")
+                                  ))
                               }
                               "clear" -> {
                                   getSharedPreferences("kopilka_notifications", MODE_PRIVATE)

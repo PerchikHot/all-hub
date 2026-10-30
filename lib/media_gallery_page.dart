@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
@@ -452,23 +453,24 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     ),
     Expanded(child: RefreshIndicator(
       onRefresh: search,
-      child: GridView.builder(
+      child: MasonryGridView.builder(
         controller: scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(6),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        gridDelegate: const SliverSimpleGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 210,
-          mainAxisSpacing: 6,
-          crossAxisSpacing: 6,
-          childAspectRatio: 0.72,
         ),
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
         itemCount: posts.length + (loading ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
           // Use a sharper sample for HD; thumbnails are only placeholders.
           final url = mediaFeedImageUrl(post, highQuality: highQuality) ?? '';
-          return InkWell(
+          return AspectRatio(
+            aspectRatio: mediaFeedTileAspectRatio(post),
+            child: InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -482,7 +484,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
                     ? child : const Center(child: Icon(Icons.image_outlined, color: Colors.white24)),
               ),
             ),
-          );
+          ));
         },
       ),
     )),

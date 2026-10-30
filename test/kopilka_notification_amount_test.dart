@@ -288,4 +288,16 @@ void main() {
     });
   });
 
+  test('listener diagnostics are safe for empty and valid native states', () {
+    expect(describeKopilkaListener(null), contains('отдельной Android'));
+    expect(describeKopilkaListener({'lastSeen': 0, 'queued': 0}),
+        contains('ещё не получено'));
+    final summary = describeKopilkaListener({
+      'lastSeen': 1730000000000, 'queued': 2, 'lastBank': 'Т-Банк',
+    });
+    expect(summary, contains('Т-Банк'));
+    expect(summary, contains('в очереди: 2'));
+    expect(summary, isNot(contains('код')));
+  });
+
 }

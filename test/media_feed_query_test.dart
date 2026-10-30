@@ -174,4 +174,12 @@ void main() {
     expect(seenUrls, <String>{'https://example.org/same.jpg'});
   });
 
+  test('masonry feed sizes portrait and landscape images safely', () {
+    expect(mediaFeedTileAspectRatio({'image_width': 800, 'image_height': 1200}),
+        closeTo(0.667, 0.002));
+    expect(mediaFeedTileAspectRatio({'image_width': 1200, 'image_height': 800}), 1.45);
+    expect(mediaFeedTileAspectRatio({'image_width': 100, 'image_height': 1000}), 0.55);
+    expect(mediaFeedTileAspectRatio({'image_width': 0, 'image_height': 100}), 0.72);
+    expect(mediaFeedTileAspectRatio({'image_width': 'bad', 'image_height': 100}), 0.72);
+  });
 }

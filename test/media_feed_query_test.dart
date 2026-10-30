@@ -124,4 +124,30 @@ void main() {
         hasPosts: true), isTrue);
   });
 
+  test('sample thumbnail fallback loads posts with missing preview URLs', () {
+    final post = <String, dynamic>{
+      'id': 91, 'tag_string': 'transgender solo',
+      'sample_url': 'https://example.org/sample.jpg',
+      'file_ext': 'jpg',
+    };
+    expect(mediaFeedImageUrl(post, highQuality: false),
+        'https://example.org/sample.jpg');
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'all', seenIds: <String>{}), isTrue);
+  });
+
+  test('same-page repeated image URL is displayed once across post IDs', () {
+    final first = <String, dynamic>{
+      'id': 90, 'tag_string': 'transgender solo',
+      'preview_file_url': 'https://example.org/reused.jpg',
+      'file_ext': 'jpg',
+    };
+    final posts = filterNewMediaFeedPosts(
+      [first, {...first, 'id': 91}, {...first, 'id': 92,
+          'preview_file_url': 'https://example.org/different.jpg'}],
+      selectedTag: 'transgender', kind: 'all', seenIds: <String>{},
+    );
+    expect(posts.map((p) => p['id']).toList(), [90, 92]);
+  });
+
 }

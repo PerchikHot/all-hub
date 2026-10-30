@@ -108,10 +108,10 @@ jobs:
                   // The native queue must reject unposted payments and
                   // credential alerts BEFORE storing their text on disk.
                   val notPosted = Regex(
-                      """отклон[её]н|не\\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\\s+средств|ожида[её]т\\s+подтверждени|в\\s+обработк|запланирован[а-яё]*|ожидается\\s+(?:завтра|послезавтра)|будет\\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\\s+funds|\\bblocked\\b|\\bsuspended\\b""",
+                      """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b""",
                       RegexOption.IGNORE_CASE)
                   val credentials = Regex(
-                      """парол[ья]|password|passcode|\\bpin\\b|\\bcvv\\b|\\bcvc\\b|код\\s*[:№]|(?:ваш|your)\\s+(?:код|code)""",
+                      """парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s*[:№]|(?:ваш|your)\s+(?:код|code)""",
                       RegexOption.IGNORE_CASE)
                   if (!transaction.containsMatchIn(combined) ||
                       !currency.containsMatchIn(combined) ||

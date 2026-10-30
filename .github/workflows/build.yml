@@ -241,16 +241,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          VERSION="$(sed -nE 's/^version: ([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/p' pubspec.yaml)"
+          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
           test -n "$VERSION"
           TAG="all-hub-v${VERSION}+${GITHUB_RUN_NUMBER}"
           # A rolling release can temporarily mix old and new binaries if
           # uploads fail halfway. Publish a NEW draft release instead; it
           # remains invisible to All Hub until BOTH assets are uploaded.
-          gh release create "$TAG" AllHub-Android.apk AllHub-Windows-portable.zip \\
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \\
-            --title "All Hub ${VERSION} build ${GITHUB_RUN_NUMBER}" \\
-            --notes "$(printf 'Verified Android and Windows build.\\nVersion: %s+%s\\n' "$VERSION" "$GITHUB_RUN_NUMBER")" \\
+          gh release create "$TAG" AllHub-Android.apk AllHub-Windows-portable.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "All Hub ${VERSION} build ${GITHUB_RUN_NUMBER}" \
+            --notes "$(printf 'Verified Android and Windows build.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")" \
             --draft --latest=false
           # GitHub API only lists non-draft releases to normal clients.
           # If publishing fails, the previous working release stays intact.

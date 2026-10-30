@@ -537,6 +537,33 @@ String describeKopilkaBankEvents(Map<String, dynamic>? diagnostics) {
   return 'События по банкам (без текста): $counts. Ноль — проверь разрешение, энергосбережение и версию банковского приложения.';
 }
 
+/// Categories are chosen explicitly during confirmation, never inferred from
+/// private bank notification text. Older entries stay in "Без категории".
+const kopilkaExpenseCategories = <String>[
+  'Продукты', 'Транспорт', 'Жильё', 'Связь', 'Здоровье',
+  'Развлечения', 'Покупки', 'Другое',
+];
+
+String kopilkaExpenseCategory(Map<String, dynamic> entry) {
+  final category = entry['category'];
+  return category is String && kopilkaExpenseCategories.contains(category)
+      ? category : 'Без категории';
+}
+
+/// Read-only analytics: transfers and income never inflate expense totals.
+Map<String, double> summarizeKopilkaExpenses(
+    Iterable<Map<String, dynamic>> transactions) {
+  final totals = <String, double>{};
+  for (final entry in transactions) {
+    if (entry['kind'] != 'expense') continue;
+    final amount = safeKopilkaAmount(entry);
+    if (!amount.isFinite || amount <= 0) continue;
+    final category = kopilkaExpenseCategory(entry);
+    totals.update(category, (old) => old + amount, ifAbsent: () => amount);
+  }
+  return totals;
+}
+
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
   @override
@@ -705,6 +732,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     String kind = notification == null
         ? 'expense' : suggestNotificationKind(notificationText);
     String bank = banks.first, destination = banks[1];
+    String category = 'Другое';
     final notificationBank = notification?['bank']?.toString();
     if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
     final amount = TextEditingController(
@@ -731,6 +759,16 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             DropdownButtonFormField<String>(initialValue: destination, decoration: const InputDecoration(labelText: 'На счёт'),
               items: banks.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
               onChanged: (v) { if (v != null) update(() => destination = v); }),
+          ],
+          if (kind == 'expense') ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: category,
+              decoration: const InputDecoration(labelText: 'Категория расхода'),
+              items: kopilkaExpenseCategories.map((c) =>
+                DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (value) { if (value != null) update(() => category = value); },
+            ),
           ],
           const SizedBox(height: 12),
           TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -763,6 +801,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       setState(() => entries.insert(0, {
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
         'note': note.text.trim(), 'date': DateTime.now().toIso8601String(),
+        if (kind == 'expense') 'category': category,
         if (notification != null) 'notificationKey': (notification['key'] ?? '').toString(),
       }));
       await _save();
@@ -811,6 +850,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final monthlyExpenses = monthlyEntries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyBalance = monthlyIncome - monthlyExpenses;
+    final monthlyCategories = summarizeKopilkaExpenses(monthlyEntries);
+    final sortedCategories = monthlyCategories.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     // Reuse the same filtered list for display and summary. Transfers between
     // own accounts do not inflate income or expense totals.
     final filteredEntries = entries.where(
@@ -953,6 +995,29 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               style: const TextStyle(color: Colors.white70)),
           ],
         ))),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Расходы по категориям за месяц',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            const Text('Категорию выбираешь при добавлении операции. Старые записи не меняются.',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
+            if (sortedCategories.isEmpty)
+              const Padding(padding: EdgeInsets.only(top: 12),
+                child: Text('Пока нет расходов за этот месяц.')),
+            for (final item in sortedCategories) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: Text(item.key)),
+                Text(money(item.value)),
+              ]),
+              const SizedBox(height: 4),
+              LinearProgressIndicator(value: monthlyExpenses > 0
+                ? (item.value / monthlyExpenses).clamp(0.0, 1.0) : 0),
+            ],
+          ]),
+        )),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Счета', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
         for (final bank in banks) Card(child: ListTile(leading: Icon(bank == 'Наличные' ? Icons.payments_outlined : Icons.account_balance_outlined, color: const Color(0xFFA8C5FF)),
           title: Text(bank), trailing: Text(money(_sum(bank))))),
@@ -1004,7 +1069,10 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             e['kind'] == 'income' ? Icons.arrow_downward : Icons.arrow_upward),
           title: Text(e['kind'] == 'transfer' ? '${e['from']} → ${e['to']}' :
             (e['note'] ?? '').toString().isEmpty ? (e['kind'] == 'income' ? 'Доход' : 'Расход') : e['note'].toString()),
-          subtitle: Text(e['kind'] == 'transfer' ? 'Перевод между своими счетами' : (e['bank'] ?? 'Неизвестный счёт').toString()),
+          subtitle: Text(e['kind'] == 'transfer' ? 'Перевод между своими счетами' :
+            e['kind'] == 'expense'
+                ? '${(e['bank'] ?? 'Неизвестный счёт')} · ${kopilkaExpenseCategory(e)}'
+                : (e['bank'] ?? 'Неизвестный счёт').toString()),
           trailing: Text(money(safeKopilkaAmount(e))),
           onLongPress: () async {
             final remove = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(

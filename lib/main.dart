@@ -256,6 +256,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => info.remove(project.id)),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Проверить обновления'),
+                  ),
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
                   if (tab == 0 && i.downloadUrl == null)
                     FilledButton.icon(onPressed: () => open(i.actionsUrl ?? 'https://github.com/${project.repo}/actions'), icon: const Icon(Icons.download), label: const Text('Сборка пока недоступна')),

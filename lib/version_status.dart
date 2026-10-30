@@ -92,12 +92,11 @@ bool releaseMatchesProject(String tag, String? projectId) {
     case 'kopilka':
       return normalized.startsWith('kopilka-');
     case 'nova-game':
+      return normalized.startsWith('nova-');
     case 'shadow-rp':
+      return normalized.startsWith('shadow-rp-');
     case 'eclipse-arena':
-      // These live in separate repositories. Never accept a shared-repo
-      // rolling tag as their release, even if a catalog URL is misconfigured.
-      return !normalized.startsWith('all-hub-') &&
-          !normalized.startsWith('kopilka-') && normalized.isNotEmpty;
+      return normalized.startsWith('eclipse-arena-');
     default:
       // An unknown project must not inherit an unrelated release.
       return false;

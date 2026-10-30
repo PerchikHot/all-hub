@@ -20,7 +20,9 @@ bool isVisibleFeedPost(
   if (mediaFeedImageUrl(post, highQuality: false) == null) return false;
   final id = (post['id'] ?? '').toString();
   if (id.isEmpty || seenIds.contains(id)) return false;
-  final tags = (post['tag_string'] ?? '').toString().split(' ');
+  // API tag strings may contain repeated spaces, tabs or newlines.
+  // Split on all whitespace instead of rejecting otherwise valid posts.
+  final tags = (post['tag_string'] ?? '').toString().split(RegExp(r'\s+'));
   if (!tags.contains(selectedTag)) return false;
   if (kind == 'gif') {
     return (post['file_ext'] ?? '').toString().toLowerCase() == 'gif';
@@ -73,7 +75,9 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   final result = <Map<String, dynamic>>[];
   for (final post in candidates) {
     if (!isVisibleFeedPost(post, selectedTag: selectedTag,
-        kind: kind, seenIds: pageSeen)) continue;
+        kind: kind, seenIds: pageSeen)) {
+      continue;
+    }
     pageSeen.add((post['id'] ?? '').toString());
     result.add(post);
   }

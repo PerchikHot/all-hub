@@ -77,6 +77,17 @@ void main() {
     expect(isVisibleFeedPost({...gif, 'large_file_url': 'http://example.org/x'},
         selectedTag: 'futanari', kind: 'gif', seenIds: <String>{}), isFalse);
   });
+  test('tag membership tolerates multiline API tag strings', () {
+    final post = <String, dynamic>{
+      'id': 57, 'tag_string': 'solo\ntransgender\tanimated',
+      'preview_file_url': 'https://example.org/57.jpg', 'file_ext': 'jpg',
+    };
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'all', seenIds: <String>{}), isTrue);
+    expect(isVisibleFeedPost(post, selectedTag: 'futanari',
+        kind: 'all', seenIds: <String>{}), isFalse);
+  });
+
   test('same-page duplicate IDs are removed without mutating seen state', () {
     final first = <String, dynamic>{
       'id': 42, 'tag_string': 'transgender solo',

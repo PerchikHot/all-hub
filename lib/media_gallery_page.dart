@@ -33,6 +33,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String activeQuery = '';
   static const int pageSize = 100;
   bool highQuality = true;
+  bool showEntireImage = false;
   int searchGeneration = 0;
   static const aliases = <String, String>{
     'аква': 'aqua_(konosuba)',
@@ -345,6 +346,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             selected: showTrans,
             onSelected: (value) { showTrans = value; search(); },
           ),
+          FilterChip(
+            label: const Text('Без обрезки'),
+            tooltip: 'Показать изображение целиком, сохранив пропорции',
+            selected: showEntireImage,
+            onSelected: (value) => setState(() => showEntireImage = value),
+          ),
         ]),
         const SizedBox(height: 8),
         Row(children: [
@@ -436,7 +443,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                url, fit: BoxFit.cover,
+                url, fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
                 filterQuality: FilterQuality.medium,
                 cacheWidth: highQuality ? 900 : 420,
                 gaplessPlayback: true,

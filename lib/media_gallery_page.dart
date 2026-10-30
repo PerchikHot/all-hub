@@ -23,13 +23,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool showFuta = true;
   bool showTrans = true;
   static const feedTags = <String>['futanari', 'transgender'];
-  static const maxVisiblePosts = 90;
+  static const maxVisiblePosts = 180;
   final seenPostIds = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
   bool accessDenied = false;
   String activeQuery = '';
-  static const int pageSize = 24;
+  static const int pageSize = 100;
   bool highQuality = true;
   int searchGeneration = 0;
   static const aliases = <String, String>{
@@ -210,7 +210,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final selectedTag = enabledTags[(requestedPage - 1) % enabledTags.length];
       final sourcePage = ((requestedPage - 1) ~/ enabledTags.length) + 1;
       // Search all ratings: forcing rating:explicit hid valid tagged posts.
-      final tags = buildMediaFeedTags(selectedTag, requestedQuery);
+      final tags = requestedKind == 'gif' && requestedQuery.isEmpty
+          ? '$selectedTag filetype:gif'
+          : buildMediaFeedTags(selectedTag, requestedQuery);
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -268,7 +270,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         // GIFs are sparse: continue scanning a few pages before showing an
         // empty gallery. Also try the other enabled category automatically.
         if (error.isEmpty && hasMore && posts.isEmpty &&
-            emptyPageRetries < 8 && (showFuta || showTrans)) {
+            emptyPageRetries < 12 && (showFuta || showTrans)) {
           Future.microtask(() => loadMore());
         }
       }

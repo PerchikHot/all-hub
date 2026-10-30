@@ -177,6 +177,26 @@ jobs:
                                       "lastBank" to (prefs.getString("last_bank", "") ?: "")
                                   ))
                               }
+                              "dismiss" -> {
+                                  val key = call.argument<String>("key")
+                                  if (key.isNullOrBlank()) {
+                                      result.error("ARGUMENT", "Missing notification key", null)
+                                  } else {
+                                      val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                      try {
+                                          val current = org.json.JSONArray(prefs.getString("queue", "[]"))
+                                          val remaining = org.json.JSONArray()
+                                          for (i in 0 until current.length()) {
+                                              val item = current.getJSONObject(i)
+                                              if (item.optString("key") != key) remaining.put(item)
+                                          }
+                                          prefs.edit().putString("queue", remaining.toString()).apply()
+                                          result.success(null)
+                                      } catch (_: Exception) {
+                                          result.error("QUEUE", "Cannot update local notification queue", null)
+                                      }
+                                  }
+                              }
                               "clear" -> {
                                   getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                                       .edit().remove("queue").apply()

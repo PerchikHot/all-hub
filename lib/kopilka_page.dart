@@ -573,7 +573,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
       final nativeDiagnostics = await _notifications.invokeMethod<Map<dynamic, dynamic>>('diagnostics');
-      final diagnostics = nativeDiagnostics == null ? null : nativeDiagnostics.map(
+      final diagnostics = nativeDiagnostics?.map(
         (key, value) => MapEntry(key.toString(), value));
       final prefs = await SharedPreferences.getInstance();
       final reviewed = (prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[]).toSet();

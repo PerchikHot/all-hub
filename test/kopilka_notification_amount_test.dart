@@ -85,6 +85,10 @@ void main() {
         'Перевод 250 ₽ не одобрен',
         'Ошибка оплаты 500 ₽',
         'Payment 250 RUB insufficient funds',
+        'Оплата 300 ₽ требует подтверждения',
+        'Подтвердите перевод 500 ₽',
+        'Payment 200 RUB requires confirmation',
+        'Payment 200 RUB authorization required',
       ]) {
         expect(isBankTransactionNotification('Банк', body), isFalse,
             reason: body);

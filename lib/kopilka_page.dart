@@ -190,6 +190,35 @@ double safeKopilkaAmount(Map<String, dynamic> entry) {
       ? value.toDouble() : 0.0;
 }
 
+/// Edit an operation without changing its original date or notification ID.
+/// Never mutate the source map: old entries remain intact until Save.
+Map<String, dynamic> revisedKopilkaEntry(
+  Map<String, dynamic> original, {
+  required String kind,
+  required double amount,
+  required String bank,
+  required String destination,
+  required String category,
+  required String note,
+}) {
+  if (!['expense', 'income', 'transfer'].contains(kind) ||
+      !amount.isFinite || amount <= 0 ||
+      (kind == 'transfer' && bank == destination)) {
+    throw ArgumentError('Invalid transaction edit');
+  }
+  final revised = Map<String, dynamic>.from(original);
+  revised.addAll({
+    'kind': kind, 'amount': amount, 'bank': bank,
+    'from': bank, 'to': destination, 'note': note.trim(),
+  });
+  if (kind == 'expense') {
+    revised['category'] = category;
+  } else {
+    revised.remove('category');
+  }
+  return revised;
+}
+
 /// Net change of the visible history. Internal transfers are not income.
 /// This is display-only and never rewrites stored transactions.
 double kopilkaNetChange(Iterable<Map<String, dynamic>> visible) {
@@ -745,23 +774,34 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     return sum + (e['bank'] == bank ? (e['kind'] == 'income' ? amount : -amount) : 0);
   });
 
-  Future<void> _add({Map<String, dynamic>? notification}) async {
+  Future<void> _add({Map<String, dynamic>? notification, Map<String, dynamic>? existing}) async {
     final notificationText = notification == null ? '' :
         '${notification['title'] ?? ''}\n${notification['body'] ?? ''}';
-    String kind = notification == null
-        ? 'expense' : suggestNotificationKind(notificationText);
+    String kind = existing == null
+        ? (notification == null ? 'expense' : suggestNotificationKind(notificationText))
+        : (['expense', 'income', 'transfer'].contains(existing['kind'])
+            ? existing['kind'] as String : 'expense');
     String bank = banks.first, destination = banks[1];
-    String category = 'Другое';
+    if (existing != null) {
+      final savedBank = (existing[kind == 'transfer' ? 'from' : 'bank'] ?? '').toString();
+      final savedDestination = (existing['to'] ?? '').toString();
+      if (banks.contains(savedBank)) bank = savedBank;
+      if (banks.contains(savedDestination)) destination = savedDestination;
+    }
+    String category = kopilkaExpenseCategories.contains(existing?['category'])
+        ? existing!['category'] as String : 'Другое';
     final notificationBank = notification?['bank']?.toString();
     if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
     final amount = TextEditingController(
-      text: notification == null ? '' : suggestNotificationAmount((notification['body'] ?? '').toString()));
+      text: existing != null ? safeKopilkaAmount(existing).toStringAsFixed(2)
+          : notification == null ? '' : suggestNotificationAmount((notification['body'] ?? '').toString()));
     final note = TextEditingController(
-      text: notification == null ? '' : (notification['title'] ?? '').toString());
+      text: existing != null ? (existing['note'] ?? '').toString()
+          : notification == null ? '' : (notification['title'] ?? '').toString());
     String? validationError;
     final saved = await showDialog<bool>(context: context, builder: (dialogContext) =>
       StatefulBuilder(builder: (dialogContext, update) => AlertDialog(
-        title: const Text('Новая операция'),
+        title: Text(existing == null ? 'Новая операция' : 'Редактировать операцию'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           DropdownButtonFormField<String>(initialValue: kind, decoration: const InputDecoration(labelText: 'Тип'),
             items: const [
@@ -816,6 +856,20 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         ],
       )));
     if (saved == true) {
+      if (existing != null) {
+        final position = entries.indexOf(existing);
+        if (position >= 0) {
+          final edited = revisedKopilkaEntry(existing,
+            kind: kind, amount: parseKopilkaAmount(amount.text)!,
+            bank: bank, destination: destination,
+            category: category, note: note.text);
+          setState(() => entries[position] = edited);
+          await _save();
+        }
+        amount.dispose();
+        note.dispose();
+        return;
+      }
       final key = notification?['key']?.toString().trim();
       // Recheck immediately before insertion: another open dialog may have
       // imported the same event while this one awaited user confirmation.
@@ -1105,14 +1159,19 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 : (e['bank'] ?? 'Неизвестный счёт').toString()),
           trailing: Text(money(safeKopilkaAmount(e))),
           onLongPress: () async {
-            final remove = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-              title: const Text('Удалить операцию?'),
+            final action = await showDialog<int>(context: context, builder: (ctx) => AlertDialog(
+              title: const Text('Операция'),
+              content: const Text('Можно исправить сумму, счёт, категорию и описание без потери даты.'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Удалить')),
+                TextButton(onPressed: () => Navigator.pop(ctx, 0), child: const Text('Отмена')),
+                TextButton(onPressed: () => Navigator.pop(ctx, 1), child: const Text('Изменить')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, 2), child: const Text('Удалить')),
               ],
             ));
-            if (remove == true && mounted) {
+            if (action == 1 && mounted) {
+              await _add(existing: e);
+            }
+            if (action == 2 && mounted) {
               final originalIndex = entries.indexOf(e);
               if (originalIndex < 0) return;
               setState(() => entries.removeAt(originalIndex));

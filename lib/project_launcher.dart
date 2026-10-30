@@ -285,7 +285,7 @@ class ProjectLauncher {
   static Future<void> installAndroidApk(String url, {String? projectId}) async {
     if (!Platform.isAndroid) throw UnsupportedError('Android only');
     final uri = Uri.tryParse(url);
-    if (projectId == null || !isTrustedProjectDownload(projectId, url, 'apk')) {
+    if (uri == null || projectId == null || !isTrustedProjectDownload(projectId, url, 'apk')) {
       throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
     }
     activeDownloadProject.value = projectId;
@@ -332,7 +332,7 @@ class ProjectLauncher {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (!isTrustedProjectDownload(id, url, 'exe')) {
+    if (uri == null || !isTrustedProjectDownload(id, url, 'exe')) {
       throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
     }
     final client = http.Client();
@@ -392,7 +392,7 @@ class ProjectLauncher {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (!isTrustedProjectDownload(id, url, 'zip')) {
+    if (uri == null || !isTrustedProjectDownload(id, url, 'zip')) {
       throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
     }
     final root = await getApplicationSupportDirectory();

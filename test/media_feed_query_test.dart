@@ -46,6 +46,17 @@ void main() {
         'file_url': null}, highQuality: false), isNull);
   });
 
+  test('image URL credentials are rejected without hiding safe fallback', () {
+    final post = <String, dynamic>{
+      'preview_file_url': 'https://user:pass@example.org/unsafe.jpg',
+      'large_file_url': 'https://example.org/safe.jpg',
+    };
+    expect(mediaFeedImageUrl(post, highQuality: false),
+        'https://example.org/safe.jpg');
+    expect(mediaFeedImageUrl({...post, 'large_file_url': null},
+        highQuality: false), isNull);
+  });
+
   test('GIFs need a real HTTPS thumbnail and stable ID', () {
     final gif = <String, dynamic>{
       'id': 11,

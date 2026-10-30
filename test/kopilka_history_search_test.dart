@@ -37,6 +37,12 @@ void main() {
     expect(matchesKopilkaHistory(missing, 'has:no-date'), isTrue);
     expect(matchesKopilkaHistory(invalid, 'has:no-date'), isTrue);
     expect(matchesKopilkaHistory(invalid, 'has:date'), isFalse);
+    expect(matchesKopilkaHistory({'date': '2026-02-28'}, 'has:date'), isTrue);
+    expect(matchesKopilkaHistory({'date': '2026-02-29'}, 'has:no-date'), isTrue);
+    expect(matchesKopilkaHistory({'date': '2024-02-29'}, 'has:date'), isTrue);
+    expect(matchesKopilkaHistory({'date': 'not a date', 'note': '2026-10-28'}, 'has:date'), isFalse);
+    expect(matchesKopilkaHistory({'date': null}, 'has:no-date'), isTrue);
+    expect(matchesKopilkaHistory(valid, 'has:unknown'), isFalse);
     expect(valid['date'], '2026-10-28T12:00:00');
   });
 

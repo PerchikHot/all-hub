@@ -65,6 +65,9 @@ void main() {
     expect(releaseMatchesProject('kopilka-latest', 'shadow-rp'), isFalse);
     expect(releaseMatchesProject('all-hub-latest', 'eclipse-arena'), isFalse);
     expect(releaseMatchesProject('nova-android', 'nova-game'), isTrue);
+    expect(releaseMatchesProject('eclipse-arena-android', 'shadow-rp'), isFalse);
+    expect(releaseMatchesProject('shadow-rp-android', 'nova-game'), isFalse);
+    expect(releaseMatchesProject('nova-android', 'eclipse-arena'), isFalse);
     expect(releaseMatchesProject('shadow-rp-android', 'shadow-rp'), isTrue);
     expect(releaseMatchesProject('kopilka-latest', 'unrecognized'), isFalse);
     expect(releaseMatchesProject('all-hub-latest', null), isFalse);

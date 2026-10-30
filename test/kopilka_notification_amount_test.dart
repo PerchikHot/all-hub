@@ -57,6 +57,9 @@ void main() {
       'Завтра будет списано 300 ₽',
       'Payment 200 RUB scheduled for tomorrow',
       'Upcoming transfer 150 RUB',
+      'Оплата 450 ₽ ожидается завтра',
+      'Завтра будет оплата 200 ₽',
+      'Payment 300 RUB will be charged tomorrow',
     ]) {
       expect(isBankTransactionNotification('Банк', body), isFalse,
           reason: body);

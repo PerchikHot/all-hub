@@ -4,7 +4,9 @@ String buildMediaFeedTags(String category, String query) {
   // Normalize pasted multiline searches before sending tags to the API.
   // Preserve tag operators and underscores; only collapse whitespace.
   final cleaned = query.trim().replaceAll(RegExp(r'\s+'), ' ');
-  final base = category.trim();
+  final base = category.trim().replaceAll(RegExp(r'\s+'), ' ');
+  // An empty category should not add a leading space to a custom search.
+  if (base.isEmpty) return cleaned;
   return cleaned.isEmpty ? base : '$base $cleaned';
 }
 

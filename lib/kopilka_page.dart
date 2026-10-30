@@ -112,7 +112,7 @@ bool isBankTransactionNotification(String title, String body) {
   // Future-dated payment reminders are not evidence of a posted expense.
   // Do not suggest them for import even if they contain an exact amount.
   final scheduledTransaction = RegExp(
-    r'запланирован[а-яё]*|планиру[ею]тся|будет\s+(?:списан[а-яё]*|списано|оплачен[а-яё]*|провед[её]н[а-яё]*)|\b(?:scheduled|upcoming)\b',
+    r'запланирован[а-яё]*|планиру[ею]тся|будет\s+(?:списан[а-яё]*|списано|оплачен[а-яё]*|провед[её]н[а-яё]*|оплата)|ожидается\s+(?:завтра|послезавтра)|\bwill\s+be\s+(?:charged|debited|paid)\b|\b(?:scheduled|upcoming)\b',
     caseSensitive: false,
   );
   // A currency label without a readable amount is not a transaction.

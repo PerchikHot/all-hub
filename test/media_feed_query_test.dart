@@ -14,6 +14,14 @@ void main() {
     expect(buildMediaFeedTags(' transgender ', '  \n  '), 'transgender');
   });
 
+  test('empty or pasted multiline category does not corrupt search tags', () {
+    expect(buildMediaFeedTags('  \n ', ' erza_scarlet \n -animated '),
+        'erza_scarlet -animated');
+    expect(buildMediaFeedTags(' futanari \n transgender ', '  '),
+        'futanari transgender');
+    expect(buildMediaFeedTags('  ', '  '), isEmpty);
+  });
+
   test('valid tagged images survive any rating and duplicates are rejected', () {
     final safe = <String, dynamic>{
       'id': 42,

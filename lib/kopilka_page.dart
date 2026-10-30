@@ -337,6 +337,19 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       final expected = aliases[requested];
       return expected != null && entry['kind'] == expected;
     }
+    // Inspect the direction of an own-account transfer, not words in notes.
+    // This is a local-only filter and never alters either account.
+    if (word.startsWith('from:') || word.startsWith('to:') ||
+        word.startsWith('откуда:') || word.startsWith('куда:')) {
+      if (entry['kind'] != 'transfer') return false;
+      final key = word.substring(0, word.indexOf(':'));
+      final requested = word.substring(word.indexOf(':') + 1);
+      if (requested.isEmpty) return false;
+      final source = key == 'from' || key == 'откуда';
+      final account = (entry[source ? 'from' : 'to'] ?? '').toString()
+          .toLowerCase().replaceAll('ё', 'е');
+      return account.contains(requested);
+    }
     // bank:/банк: limits the search to real account fields, never notes.
     // Transfers match either source or destination account.
     if (word.startsWith('bank:') || word.startsWith('банк:')) {
@@ -808,8 +821,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nЕсть описание: has:note  •  без описания: has:no-note\nПроверка дат: has:date  •  has:no-date\nСчёт: has:bank  •  has:no-bank\nИсключить слово: -такси',
-              helperMaxLines: 10,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nПереводы: from:т-банк  •  to:ozon\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nЕсть описание: has:note  •  без описания: has:no-note\nПроверка дат: has:date  •  has:no-date\nСчёт: has:bank  •  has:no-bank\nИсключить слово: -такси',
+              helperMaxLines: 11,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',

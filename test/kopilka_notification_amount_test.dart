@@ -50,6 +50,21 @@ void main() {
     expect(valid['body'], 'Оплата 250 ₽');
   });
 
+  test('scheduled payment reminders are not posted transaction suggestions', () {
+    for (final body in [
+      'Запланирована оплата 250 ₽ на завтра',
+      'Перевод 500 ₽ планируется завтра',
+      'Завтра будет списано 300 ₽',
+      'Payment 200 RUB scheduled for tomorrow',
+      'Upcoming transfer 150 RUB',
+    ]) {
+      expect(isBankTransactionNotification('Банк', body), isFalse,
+          reason: body);
+    }
+    expect(isBankTransactionNotification('Банк', 'Оплата 250 ₽ выполнена'),
+        isTrue);
+  });
+
   group('Kopilka transaction notification privacy filter', () {
     test('keeps purchase, transfer and incoming money notifications', () {
       expect(isBankTransactionNotification('Т-Банк', 'Оплата 250 ₽. Остаток 5 000 ₽'), isTrue);

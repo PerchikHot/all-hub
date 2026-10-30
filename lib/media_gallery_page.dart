@@ -243,7 +243,11 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         page++;
         // Sparse GIF results can require scanning several source pages.
         // Never report an empty search while another page can still be checked.
-        hasMore = data.isNotEmpty && (data.length >= pageSize || (posts.isEmpty && emptyPageRetries < 8));
+        hasMore = shouldContinueMediaFeed(
+          fetched: data.length, pageSize: pageSize,
+          categoryCount: enabledTags.length, requestedPage: requestedPage,
+          emptyRetries: emptyPageRetries, hasPosts: posts.isNotEmpty,
+        );
       });
     } catch (e) {
       if (mounted && generation == searchGeneration) {

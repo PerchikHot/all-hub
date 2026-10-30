@@ -2,6 +2,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('editing an imported transaction preserves its identity and date', () {
+    final original = <String, dynamic>{
+      'kind': 'expense', 'amount': 250.0, 'bank': 'Т-Банк',
+      'category': 'Продукты', 'note': 'Старое',
+      'date': '2026-10-28T12:00:00', 'notificationKey': 'event-123',
+    };
+    final edited = revisedKopilkaEntry(original,
+      kind: 'transfer', amount: 500.0, bank: 'Т-Банк',
+      destination: 'Ozon Банк', category: 'Другое', note: '  Пополнение  ');
+    expect(edited['kind'], 'transfer');
+    expect(edited['from'], 'Т-Банк');
+    expect(edited['to'], 'Ozon Банк');
+    expect(edited['amount'], 500.0);
+    expect(edited['note'], 'Пополнение');
+    expect(edited.containsKey('category'), isFalse);
+    expect(edited['date'], original['date']);
+    expect(edited['notificationKey'], 'event-123');
+    expect(original['amount'], 250.0);
+    expect(original['kind'], 'expense');
+    expect(() => revisedKopilkaEntry(original,
+      kind: 'transfer', amount: 50.0, bank: 'Т-Банк',
+      destination: 'Т-Банк', category: 'Другое', note: ''), throwsArgumentError);
+    expect(() => revisedKopilkaEntry(original,
+      kind: 'expense', amount: double.nan, bank: 'Т-Банк',
+      destination: 'Ozon Банк', category: 'Другое', note: ''), throwsArgumentError);
+  });
+
   test('filtered net excludes own-account transfers and invalid legacy amounts', () {
     final visible = <Map<String, dynamic>>[
       {'kind': 'income', 'amount': 2000.0},

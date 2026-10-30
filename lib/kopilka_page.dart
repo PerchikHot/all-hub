@@ -616,21 +616,49 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     }
   }
 
+  // A reviewed or dismissed alert is removed individually from the native
+  // queue. Never clear other pending alerts or create an operation silently.
+  Future<void> _archiveNotificationKey(String key) async {
+    if (key.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final reviewed = prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[];
+    reviewed.remove(key);
+    reviewed.add(key);
+    if (reviewed.length > 500) reviewed.removeRange(0, reviewed.length - 500);
+    await prefs.setStringList('kopilka_reviewed_notifications_v1', reviewed);
+    try {
+      await _notifications.invokeMethod<void>('dismiss', {'key': key});
+    } on MissingPluginException {
+      // All Hub embeds the finance page without the standalone listener.
+    } on PlatformException {
+      // The local reviewed key still prevents a duplicate suggestion.
+    }
+    if (mounted) {
+      setState(() => pendingNotifications.removeWhere((e) => e['key'] == key));
+    }
+  }
+
   Future<void> _reviewNotification(Map<String, dynamic> event) async {
     final title = (event['title'] ?? '').toString();
     final body = (event['body'] ?? '').toString();
-    final add = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+    final action = await showDialog<int>(context: context, builder: (ctx) => AlertDialog(
       title: Text((event['bank'] ?? 'Банк').toString()),
       content: SingleChildScrollView(child: SelectableText(
         title.isEmpty ? body : '$title\n$body')),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false),
+        TextButton(onPressed: () => Navigator.pop(ctx, 0),
           child: const Text('Закрыть')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true),
+        TextButton(onPressed: () => Navigator.pop(ctx, 2),
+          child: const Text('Не операция')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, 1),
           child: const Text('Создать операцию')),
       ],
     ));
-    if (add == true && mounted) await _add(notification: event);
+    if (action == 2) {
+      await _archiveNotificationKey((event['key'] ?? '').toString());
+    } else if (action == 1 && mounted) {
+      await _add(notification: event);
+    }
   }
 
   Future<void> _save() async {
@@ -719,15 +747,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       if (notification != null) {
         final key = (notification['key'] ?? '').toString();
         if (key.isNotEmpty) {
-          final prefs = await SharedPreferences.getInstance();
-          final reviewed = prefs.getStringList('kopilka_reviewed_notifications_v1') ?? <String>[];
-          reviewed.remove(key);
-          reviewed.add(key);
-          if (reviewed.length > 500) reviewed.removeRange(0, reviewed.length - 500);
-          await prefs.setStringList('kopilka_reviewed_notifications_v1', reviewed);
-          if (mounted) {
-            setState(() => pendingNotifications.removeWhere((e) => e['key'] == key));
-          }
+          await _archiveNotificationKey(key);
         }
       }
     }

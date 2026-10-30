@@ -76,6 +76,11 @@ void main() {
         'Payment 300 RUB declined',
         'Transfer 250 RUB failed',
         'Purchase 150 RUB canceled',
+        'Оплата 450 ₽ ожидает подтверждения',
+        'Перевод 1000 ₽ в обработке',
+        'Payment 200 RUB pending',
+        'Transfer 300 RUB processing',
+        'Payment 150 RUB awaiting approval',
       ]) {
         expect(isBankTransactionNotification('Банк', body), isFalse,
             reason: body);

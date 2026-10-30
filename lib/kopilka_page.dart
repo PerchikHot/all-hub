@@ -206,6 +206,28 @@ double? parseKopilkaAmount(String input) {
   return amount != null && amount.isFinite && amount > 0 ? amount : null;
 }
 
+/// Canonicalize only whole known bank labels for the advisory self-transfer
+/// filter. Never collapse arbitrary account names: two different cards at
+/// the same bank must not be silently treated as one saved account.
+String canonicalKopilkaAccountLabel(String value) {
+  final label = value.trim().toLowerCase().replaceAll('ё', 'е')
+      .replaceAll(RegExp(r'\\s+'), ' ');
+  const aliases = <String, String>{
+    'тинькофф': 'т-банк',
+    'тбанк': 'т-банк',
+    'т банк': 'т-банк',
+    'ozon': 'ozon банк',
+    'ozon bank': 'ozon банк',
+    'озон': 'ozon банк',
+    'озон банк': 'ozon банк',
+    'газпром': 'газпромбанк',
+    'gazprombank': 'газпромбанк',
+    'cash': 'наличные',
+    'нал': 'наличные',
+  };
+  return aliases[label] ?? label;
+}
+
 /// Local search of already saved transactions; never sends finance data online.
 bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
   // Normalize Russian thousands separators and decimal commas for searching.
@@ -336,10 +358,10 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
       // covered separately by has:no-from and has:no-to.
       if (requested == 'same-account' || requested == 'different-accounts') {
         if (entry['kind'] != 'transfer') return false;
-        final source = (entry['from'] ?? '').toString().trim()
-            .toLowerCase().replaceAll('ё', 'е');
-        final destination = (entry['to'] ?? '').toString().trim()
-            .toLowerCase().replaceAll('ё', 'е');
+        final source = canonicalKopilkaAccountLabel(
+            (entry['from'] ?? '').toString());
+        final destination = canonicalKopilkaAccountLabel(
+            (entry['to'] ?? '').toString());
         if (source.isEmpty || destination.isEmpty) return false;
         return requested == 'same-account'
             ? source == destination : source != destination;

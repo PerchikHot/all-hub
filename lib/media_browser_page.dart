@@ -48,6 +48,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   String currentUrl = '';
   bool loading = true;
   bool downloading = false;
+  String? pageError;
   String? savedFile;
 
 
@@ -66,10 +67,18 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setNavigationDelegate(NavigationDelegate(
           onPageStarted: (url) {
-            if (mounted) setState(() { currentUrl = url; loading = true; });
+            if (mounted) setState(() { currentUrl = url; loading = true; pageError = null; });
           },
           onPageFinished: (url) {
             if (mounted) setState(() { currentUrl = url; loading = false; });
+          },
+          onWebResourceError: (error) {
+            // A failed image or ad must not hide an otherwise working page.
+            if (!mounted || error.isForMainFrame != true) return;
+            setState(() {
+              loading = false;
+              pageError = 'Страница недоступна. Проверь подключение и повтори загрузку.';
+            });
           },
           onNavigationRequest: (request) {
             final uri = Uri.tryParse(request.url);
@@ -206,6 +215,17 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     ),
     body: Column(children: [
       if (loading || downloading) const LinearProgressIndicator(),
+      if (pageError != null)
+        MaterialBanner(
+          content: Text(pageError!),
+          actions: [TextButton(
+            onPressed: browser == null ? null : () {
+              setState(() { pageError = null; loading = true; });
+              browser!.reload();
+            },
+            child: const Text('Повторить'),
+          )],
+        ),
       if (savedFile != null)
         Padding(padding: const EdgeInsets.all(8), child: Text(
           'Последний файл: $savedFile', maxLines: 2, overflow: TextOverflow.ellipsis)),

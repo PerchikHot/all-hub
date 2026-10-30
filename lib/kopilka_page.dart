@@ -103,12 +103,18 @@ bool isBankTransactionNotification(String title, String body) {
     r'отклон[её]н|не\s+(?:выполнен|прошл[ао]|удал(?:ось|ась))|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|declined|rejected|failed|cancelled|canceled|pending|processing|awaiting\s+approval|отказан[а-яё]*|не\s+одобрен[а-яё]*|ошибка\s+(?:оплаты|перевода)|insufficient\s+funds|требует\s+подтверждени[яй]|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|заблокирован[а-яё]*|приостановлен[а-яё]*|заморожен[а-яё]*|\bblocked\b|\bsuspended\b|\bon\s+hold\b',
     caseSensitive: false,
   );
+  // Some banks report an unposted operation without using the words
+  // "declined" or "pending". Keep these out of completed transaction review.
+  final notCompleted = RegExp(
+    r'не\\s+(?:провед[её]н[а-яё]*|подтвержд[её]н[а-яё]*|заверш[её]н[а-яё]*|состоял[а-яё]*)|\\bnot\\s+(?:completed|processed|approved|confirmed)\\b',
+    caseSensitive: false,
+  );
   // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
       suggestNotificationAmount(text).isNotEmpty &&
       !sensitive.hasMatch(text) && !credentialWords.hasMatch(text) &&
-      !failedTransaction.hasMatch(text);
+      !failedTransaction.hasMatch(text) && !notCompleted.hasMatch(text);
 }
 
 /// Only review a native notification once, even if the listener returns the

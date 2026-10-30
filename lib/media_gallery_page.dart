@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 import 'media_feed_query.dart';
+import 'multi_engine_search_page.dart';
 
 class MediaGalleryPage extends StatefulWidget {
   const MediaGalleryPage({super.key});
@@ -295,6 +296,20 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     await loadMore();
   }
 
+  Future<void> openYandexSearch() async {
+    final query = <String>[
+      if (showFuta) 'futanari',
+      if (showTrans) 'transgender',
+      if (activeQuery.isNotEmpty) activeQuery.replaceAll('_', ' '),
+    ].join(' ');
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MultiEngineSearchPage(
+        query: query.isEmpty ? 'anime art' : query,
+        media: kind == 'gif' ? 'gifs' : 'images',
+      ),
+    ));
+  }
+
   Future<void> openSourceSearch() async {
     final tags = <String>[
       if (showFuta) feedTags[0],
@@ -382,6 +397,13 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           style: const TextStyle(color: Colors.white70),
         )),
       ]),
+    ),
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: SizedBox(width: double.infinity, child: OutlinedButton.icon(
+        onPressed: openYandexSearch,
+        icon: const Icon(Icons.travel_explore),
+        label: Text('Яндекс.Картинки • ${kind == 'gif' ? 'GIF' : 'изображения'}'),
+      )),
     ),
     if (error.isNotEmpty) Padding(
       padding: const EdgeInsets.all(8),

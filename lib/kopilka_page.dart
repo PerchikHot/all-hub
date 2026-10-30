@@ -823,6 +823,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           (key == null || key.isEmpty ||
               isKopilkaNotificationImported(entries, key))) {
         if (key != null && key.isNotEmpty) await _archiveNotificationKey(key);
+        amount.dispose();
+        note.dispose();
         return;
       }
       final value = parseKopilkaAmount(amount.text)!;

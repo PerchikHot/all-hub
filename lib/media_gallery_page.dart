@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 import 'media_feed_query.dart';
@@ -164,7 +165,39 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         loadMore();
       }
     });
-    search();
+    _restoreFeedPreferences();
+  }
+
+  // Preserve feed filters and image display choices between app launches.
+  // Search results and private queries are deliberately not persisted.
+  Future<void> _restoreFeedPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        showFuta = prefs.getBool('media_show_futa_v1') ?? true;
+        showTrans = prefs.getBool('media_show_trans_v1') ?? true;
+        highQuality = prefs.getBool('media_hd_v1') ?? true;
+        showEntireImage = prefs.getBool('media_fit_v1') ?? false;
+        kind = prefs.getString('media_kind_v1') == 'gif' ? 'gif' : 'all';
+      });
+    } catch (_) {
+      // Storage may be unavailable; default filters still work offline.
+    }
+    if (mounted) await search();
+  }
+
+  Future<void> _saveFeedPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('media_show_futa_v1', showFuta);
+      await prefs.setBool('media_show_trans_v1', showTrans);
+      await prefs.setBool('media_hd_v1', highQuality);
+      await prefs.setBool('media_fit_v1', showEntireImage);
+      await prefs.setString('media_kind_v1', kind);
+    } catch (_) {
+      // Never block browsing because preferences could not be written.
+    }
   }
 
   @override
@@ -363,34 +396,36 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           FilterChip(
             label: const Text('Футы'),
             selected: showFuta,
-            onSelected: (value) { showFuta = value; search(); },
+            onSelected: (value) { showFuta = value; _saveFeedPreferences(); search(); },
           ),
           FilterChip(
             label: const Text('Трансы'),
             selected: showTrans,
-            onSelected: (value) { showTrans = value; search(); },
+            onSelected: (value) { showTrans = value; _saveFeedPreferences(); search(); },
           ),
           FilterChip(
             label: const Text('Без обрезки'),
             tooltip: 'Показать изображение целиком, сохранив пропорции',
             selected: showEntireImage,
-            onSelected: (value) => setState(() => showEntireImage = value),
+            onSelected: (value) { setState(() => showEntireImage = value); _saveFeedPreferences(); },
           ),
         ]),
         const SizedBox(height: 8),
         Row(children: [
           ChoiceChip(label: const Text('Картинки'), selected: kind == 'all', onSelected: (_) {
             setState(() => kind = 'all');
+            _saveFeedPreferences();
             search();
           }),
           const SizedBox(width: 8),
           ChoiceChip(label: const Text('GIF'), selected: kind == 'gif', onSelected: (_) {
             setState(() => kind = 'gif');
+            _saveFeedPreferences();
             search();
           }),
           const Spacer(),
           const Text('HD'),
-          Switch.adaptive(value: highQuality, onChanged: (value) => setState(() => highQuality = value)),
+          Switch.adaptive(value: highQuality, onChanged: (value) { setState(() => highQuality = value); _saveFeedPreferences(); }),
           IconButton(tooltip: 'Обновить', onPressed: search, icon: const Icon(Icons.refresh)),
         ]),
       ]),

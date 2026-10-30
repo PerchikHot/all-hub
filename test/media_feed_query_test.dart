@@ -8,6 +8,12 @@ void main() {
         'futanari erza_scarlet');
   });
 
+  test('pasted multiline tags are normalized without changing operators', () {
+    expect(buildMediaFeedTags(' futanari ', '  erza_scarlet\n  -animated\t rating:s  '),
+        'futanari erza_scarlet -animated rating:s');
+    expect(buildMediaFeedTags(' transgender ', '  \n  '), 'transgender');
+  });
+
   test('valid tagged images survive any rating and duplicates are rejected', () {
     final safe = <String, dynamic>{
       'id': 42,

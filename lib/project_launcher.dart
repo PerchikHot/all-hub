@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'version_status.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,35 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 class ProjectLauncher {
+  /// Only verified project-specific GitHub release assets may be installed.
+  /// This also prevents accidentally installing another Veyrion app's APK.
+  static bool isTrustedProjectDownload(String id, String url, String extension) {
+    const repos = <String, String>{
+      'all-hub': 'all-hub',
+      'kopilka': 'all-hub',
+      'nova-game': '-',
+      'shadow-rp': 'Shadow-rp',
+      'eclipse-arena': 'Eclipse-Arena-',
+    };
+    final repo = repos[id];
+    final uri = Uri.tryParse(url);
+    if (repo == null || !['apk', 'exe', 'zip'].contains(extension) ||
+        uri == null || uri.scheme != 'https' ||
+        uri.host.toLowerCase() != 'github.com' ||
+        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
+      return false;
+    }
+    final parts = uri.pathSegments;
+    return parts.length == 6 &&
+        parts[0].toLowerCase() == 'perchikhot' &&
+        parts[1].toLowerCase() == repo.toLowerCase() &&
+        parts[2] == 'releases' && parts[3] == 'download' &&
+        releaseMatchesProject(parts[4], id) &&
+        parts[5].isNotEmpty &&
+        !parts[5].contains('/') && !parts[5].contains('\\\\') &&
+        parts[5].toLowerCase().endsWith('.$extension');
+  }
+
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
       RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(id);
@@ -255,8 +285,7 @@ class ProjectLauncher {
   static Future<void> installAndroidApk(String url, {String? projectId}) async {
     if (!Platform.isAndroid) throw UnsupportedError('Android only');
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.scheme != 'https' || uri.host != 'github.com' ||
-        !uri.path.toLowerCase().endsWith('.apk')) {
+    if (projectId == null || !isTrustedProjectDownload(projectId, url, 'apk')) {
       throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
     }
     activeDownloadProject.value = projectId;
@@ -303,8 +332,7 @@ class ProjectLauncher {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.scheme != 'https' ||
-        uri.host != 'github.com' || !uri.path.toLowerCase().endsWith('.exe')) {
+    if (!isTrustedProjectDownload(id, url, 'exe')) {
       throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
     }
     final client = http.Client();
@@ -364,8 +392,7 @@ class ProjectLauncher {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.scheme != 'https' || uri.host != 'github.com' ||
-        !uri.path.toLowerCase().endsWith('.zip')) {
+    if (!isTrustedProjectDownload(id, url, 'zip')) {
       throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
     }
     final root = await getApplicationSupportDirectory();

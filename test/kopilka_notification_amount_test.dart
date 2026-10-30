@@ -307,4 +307,20 @@ void main() {
 
   });
 
+  test('per-bank listener counts are visible without notification bodies', () {
+    expect(describeKopilkaBankEvents(null), contains('Android-службы'));
+    final summary = describeKopilkaBankEvents({
+      'bankEvents': {'Т-Банк': 4, 'Газпромбанк': 2, 'Ozon Банк': 0},
+      'lastBank': 'Т-Банк',
+      'body': 'Секретный код 123456',
+    });
+    expect(summary, contains('Т-Банк: 4'));
+    expect(summary, contains('Газпромбанк: 2'));
+    expect(summary, contains('Ozon Банк: 0'));
+    expect(summary, isNot(contains('123456')));
+    expect(describeKopilkaBankEvents({
+      'bankEvents': {'Т-Банк': -5, 'Газпромбанк': 'bad'},
+    }), contains('Т-Банк: 0'));
+  });
+
 }

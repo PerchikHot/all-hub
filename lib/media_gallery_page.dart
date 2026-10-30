@@ -361,6 +361,14 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         ]),
       ]),
     ),
+    if (posts.isNotEmpty) Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text('Загружено изображений: ${posts.length}',
+          style: const TextStyle(color: Colors.white70)),
+      ),
+    ),
     if (!showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
     ),

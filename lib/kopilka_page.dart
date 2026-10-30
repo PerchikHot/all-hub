@@ -175,6 +175,17 @@ double kopilkaNetChange(Iterable<Map<String, dynamic>> visible) {
   return net;
 }
 
+/// Count own-account transfers that need account assignment. Display-only:
+/// never changes the saved operations or counts transfers as income.
+int countIncompleteKopilkaTransfers(Iterable<Map<String, dynamic>> entries) {
+  return entries.where((entry) {
+    if (entry['kind'] != 'transfer') return false;
+    final source = (entry['from'] ?? '').toString().trim();
+    final destination = (entry['to'] ?? '').toString().trim();
+    return source.isEmpty || destination.isEmpty;
+  }).length;
+}
+
 /// Parse manually entered amounts without silently accepting broken grouping.
 /// This does not change any historical transaction values.
 double? parseKopilkaAmount(String input) {
@@ -703,6 +714,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     // Internal transfers affect neither income nor expenses, but remain
     // visible in the filtered operation summary for reconciliation.
     final filteredTransfers = filteredEntries.where((entry) => entry['kind'] == 'transfer').length;
+    final incompleteTransfers = countIncompleteKopilkaTransfers(filteredEntries);
+    final incompleteSuffix = incompleteTransfers > 0
+        ? ' · Неполных переводов: $incompleteTransfers' : '';
     String money(double value) {
       final parts = value.toStringAsFixed(2).split('.');
       final digits = parts.first.replaceAllMapped(RegExp(r'(?<=\d)(?=(\d{3})+$)'), (_) => ' ');
@@ -831,8 +845,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
               hintText: 'Описание, счёт, дата или сумма',
-              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nПереводы: from:т-банк  •  to:ozon\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nЕсть описание: has:note  •  без описания: has:no-note\nПроверка дат: has:date  •  has:no-date\nСчёт: has:bank  •  has:no-bank\nПеревод без счёта: has:no-from  •  has:no-to\nИсключить слово: -такси',
-              helperMaxLines: 12,
+              helperText: 'Сумма: sum:1250.50  •  min:500  •  max:2000\nТип: тип:расход  •  тип:доход  •  тип:перевод\nБанк: bank:ozon  •  банк:т-банк\nПереводы: from:т-банк  •  to:ozon\nДата: date:2026-10-28  •  дата:28.10.2026\nПериод: с:01.10.2026  •  по:29.10.2026\nЗаметка: note:кофе  •  заметка:продукты\nЕсть описание: has:note  •  без описания: has:no-note\nПроверка дат: has:date  •  has:no-date\nСчёт: has:bank  •  has:no-bank\nСумма записи: has:amount  •  has:no-amount\nПеревод без счёта: has:no-from  •  has:no-to\nИсключить слово: -такси',
+              helperMaxLines: 13,
               border: const OutlineInputBorder(),
               suffixIcon: historyQuery.isEmpty ? null : IconButton(
                 tooltip: 'Очистить поиск',
@@ -849,7 +863,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         if (entries.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('${historyQuery.trim().isEmpty ? 'Всего' : 'Найдено'}: ${filteredEntries.length} из ${entries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))} · Переводов: $filteredTransfers',
+            child: Text('${historyQuery.trim().isEmpty ? 'Всего' : 'Найдено'}: ${filteredEntries.length} из ${entries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))} · Переводов: $filteredTransfers$incompleteSuffix',
               style: const TextStyle(color: Colors.white70)),
           ),
         if (entries.isNotEmpty && filteredEntries.isEmpty)

@@ -94,6 +94,21 @@ void main() {
     expect(noteOnly['to'], 'Ozon Банк');
   });
 
+  test('incomplete transfer count is display-only and excludes purchases', () {
+    final records = <Map<String, dynamic>>[
+      {'kind': 'transfer', 'from': 'Т-Банк', 'to': 'Ozon Банк'},
+      {'kind': 'transfer', 'from': '', 'to': 'Ozon Банк'},
+      {'kind': 'transfer', 'from': 'Т-Банк', 'to': null},
+      {'kind': 'transfer', 'from': ' ', 'to': ' '},
+      {'kind': 'expense', 'bank': 'Т-Банк', 'amount': 250},
+    ];
+    expect(countIncompleteKopilkaTransfers(records), 3);
+    expect(countIncompleteKopilkaTransfers([records.first]), 0);
+    expect(countIncompleteKopilkaTransfers([]), 0);
+    expect(records[2]['to'], isNull);
+    expect(records[3]['from'], ' ');
+  });
+
   test('has:from/to detects incomplete transfers without touching saved data', () {
     final complete = <String, dynamic>{
       'kind': 'transfer', 'from': 'Т-Банк', 'to': 'Ozon Банк',

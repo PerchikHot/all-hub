@@ -106,7 +106,7 @@ bool isBankTransactionNotification(String title, String body) {
   // Some banks report an unposted operation without using the words
   // "declined" or "pending". Keep these out of completed transaction review.
   final notCompleted = RegExp(
-    r'не\\s+(?:провед[её]н[а-яё]*|подтвержд[её]н[а-яё]*|заверш[её]н[а-яё]*|состоял[а-яё]*)|\\bnot\\s+(?:completed|processed|approved|confirmed)\\b',
+    r'не\s+(?:провед[её]н[а-яё]*|подтвержд[её]н[а-яё]*|заверш[её]н[а-яё]*|состоял[а-яё]*)|\bnot\s+(?:completed|processed|approved|confirmed)\b',
     caseSensitive: false,
   );
   // A currency label without a readable amount is not a transaction.

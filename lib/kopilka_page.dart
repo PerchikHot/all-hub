@@ -1125,7 +1125,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 action: SnackBarAction(label: 'Отменить', onPressed: () async {
                   if (!mounted || entries.contains(e)) return;
                   setState(() => entries.insert(
-                    originalIndex.clamp(0, entries.length), e));
+                    (originalIndex <= entries.length ? originalIndex : entries.length), e));
                   await _save();
                 }),
               ));

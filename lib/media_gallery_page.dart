@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 import 'media_feed_query.dart';
+import 'media_favorites.dart';
 import 'multi_engine_search_page.dart';
 
 class MediaGalleryPage extends StatefulWidget {
@@ -19,6 +20,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final queryController = TextEditingController();
   final scroll = ScrollController();
   final posts = <Map<String, dynamic>>[];
+  final favoritePosts = <Map<String, dynamic>>[];
+  final favoriteIds = <String>{};
+  bool favoritesOnly = false;
+  List<Map<String, dynamic>> get visiblePosts => favoritesOnly ? favoritePosts : posts;
   bool loading = false;
   bool hasMore = true;
   int page = 1;
@@ -162,7 +167,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     super.initState();
     PaintingBinding.instance.imageCache.maximumSizeBytes = maxImageCacheBytes;
     scroll.addListener(() {
-      if (scroll.hasClients && scroll.position.extentAfter < 700 && !loading && hasMore) {
+      if (!favoritesOnly && scroll.hasClients && scroll.position.extentAfter < 700 && !loading && hasMore) {
         loadMore();
       }
     });
@@ -181,6 +186,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         highQuality = prefs.getBool('media_hd_v1') ?? true;
         showEntireImage = prefs.getBool('media_fit_v1') ?? false;
         kind = prefs.getString('media_kind_v1') == 'gif' ? 'gif' : 'all';
+        favoritePosts
+          ..clear()
+          ..addAll(readMediaFavorites(prefs.getString('media_favorites_v1')));
+        favoriteIds
+          ..clear()
+          ..addAll(favoritePosts.map((post) => post['id'].toString()));
       });
     } catch (_) {
       // Storage may be unavailable; default filters still work offline.
@@ -201,6 +212,32 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     }
   }
 
+  Future<void> _toggleFavorite(Map<String, dynamic> source) async {
+    final safe = safeMediaFavorite(source);
+    if (safe == null) return;
+    final id = safe['id'] as String;
+    setState(() {
+      if (favoriteIds.remove(id)) {
+        favoritePosts.removeWhere((post) => post['id'] == id);
+      } else {
+        favoritePosts.insert(0, safe);
+        favoriteIds.add(id);
+        if (favoritePosts.length > maxMediaFavorites) {
+          final removed = favoritePosts.removeLast();
+          favoriteIds.remove(removed['id']);
+        }
+      }
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('media_favorites_v1',
+        writeMediaFavorites(favoritePosts));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось сохранить избранное на устройстве')));
+    }
+  }
+
   @override
   void dispose() {
     scroll.dispose();
@@ -210,6 +247,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
 
   Future<void> search() async {
     final q = queryController.text.trim();
+    favoritesOnly = false;
     searchGeneration++;
     setState(() {
       activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
@@ -230,7 +268,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   }
 
   Future<void> loadMore() async {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore || favoritesOnly) return;
     setState(() => loading = true);
     final generation = searchGeneration;
     final requestedPage = page;
@@ -405,6 +443,14 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             onSelected: (value) { showTrans = value; _saveFeedPreferences(); search(); },
           ),
           FilterChip(
+            label: Text('Избранное (${favoritePosts.length})'),
+            selected: favoritesOnly,
+            onSelected: (value) {
+              setState(() => favoritesOnly = value);
+              if (!value && posts.isEmpty && !loading) search();
+            },
+          ),
+          FilterChip(
             label: const Text('Без обрезки'),
             tooltip: 'Показать изображение целиком, сохранив пропорции',
             selected: showEntireImage,
@@ -464,18 +510,23 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         ]),
       ]),
     ),
-    if (posts.isNotEmpty) Padding(
+    if (visiblePosts.isNotEmpty) Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text('Загружено изображений: ${posts.length}',
+        child: Text(favoritesOnly
+          ? 'Сохранено в избранном: ${favoritePosts.length} (локально)'
+          : 'Загружено изображений: ${posts.length}',
           style: const TextStyle(color: Colors.white70)),
       ),
     ),
-    if (!showFuta && !showTrans) const Padding(
+    if (favoritesOnly && favoritePosts.isEmpty)
+      const Padding(padding: EdgeInsets.all(12),
+        child: Text('Пока нет избранного. Нажми сердечко на изображении, чтобы сохранить его здесь.')),
+    if (!favoritesOnly && !showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
     ),
-    if (!loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) Padding(
+    if (!favoritesOnly && !loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) Padding(
       padding: const EdgeInsets.all(12),
       child: Column(children: [
         const Text('Источник не вернул подходящих изображений. Попробуй другой тег или проверь поиск на сайте.'),
@@ -498,35 +549,47 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         ),
         mainAxisSpacing: 6,
         crossAxisSpacing: 6,
-        itemCount: posts.length + (loading ? 1 : 0),
+        itemCount: visiblePosts.length + (!favoritesOnly && loading ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= posts.length) return const Center(child: CircularProgressIndicator());
-          final post = posts[index];
-          // Use a sharper sample for HD; thumbnails are only placeholders.
+          if (index >= visiblePosts.length) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final post = visiblePosts[index];
+          final id = (post['id'] ?? '').toString();
           final url = mediaFeedImageUrl(post, highQuality: highQuality) ?? '';
           return AspectRatio(
             aspectRatio: mediaFeedTileAspectRatio(post),
-            child: InkWell(
-            onTap: () => openPost(post),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              // Cache thumbnails on disk as well as in Flutter's bounded
-              // memory cache. Revisiting a feed does not re-download every
-              // image; GIF codecs remain animated in the image widget.
-              child: CachedNetworkImage(
-                imageUrl: url,
-                fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
-                filterQuality: FilterQuality.medium,
-                memCacheWidth: highQuality ? 900 : 420,
-                maxWidthDiskCache: highQuality ? 900 : 420,
-                fadeInDuration: Duration.zero,
-                placeholder: (context, url) => const Center(
-                  child: Icon(Icons.image_outlined, color: Colors.white24)),
-                errorWidget: (context, url, error) => const Center(
-                  child: Icon(Icons.broken_image_outlined)),
-              ),
-            ),
-          ));
+            child: Stack(children: [
+              Positioned.fill(child: InkWell(
+                onTap: () => openPost(post),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: url,
+                    fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
+                    filterQuality: FilterQuality.medium,
+                    memCacheWidth: highQuality ? 900 : 420,
+                    maxWidthDiskCache: highQuality ? 900 : 420,
+                    fadeInDuration: Duration.zero,
+                    placeholder: (context, url) => const Center(
+                      child: Icon(Icons.image_outlined, color: Colors.white24)),
+                    errorWidget: (context, url, error) => const Center(
+                      child: Icon(Icons.broken_image_outlined)),
+                  ),
+                ),
+              )),
+              Positioned(right: 3, top: 3, child: IconButton(
+                tooltip: favoriteIds.contains(id) ? 'Убрать из избранного' : 'В избранное',
+                icon: Icon(favoriteIds.contains(id)
+                  ? Icons.favorite : Icons.favorite_border,
+                  color: favoriteIds.contains(id)
+                    ? const Color(0xFFFF6F9F) : Colors.white),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xBB0A1426)),
+                onPressed: () => _toggleFavorite(post),
+              )),
+            ]),
+          );
         },
       ),
     )),

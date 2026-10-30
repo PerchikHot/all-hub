@@ -168,7 +168,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     super.dispose();
   }
 
-  void search() {
+  Future<void> search() async {
     final q = queryController.text.trim();
     searchGeneration++;
     setState(() {
@@ -182,7 +182,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       accessDenied = false;
     });
     loading = false;
-    loadMore();
+    // Keep pull-to-refresh active until the first network response arrives.
+    await loadMore();
   }
 
   Future<void> loadMore() async {
@@ -351,7 +352,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         const SizedBox(height: 8),
         Wrap(spacing: 8, children: [
           OutlinedButton.icon(onPressed: search, icon: const Icon(Icons.refresh), label: const Text('Повторить')),
-          if (accessDenied) OutlinedButton.icon(
+          OutlinedButton.icon(
             onPressed: openSourceSearch,
             icon: const Icon(Icons.open_in_browser),
             label: const Text('Открыть поиск на сайте')),
@@ -373,7 +374,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ]),
     ),
     Expanded(child: RefreshIndicator(
-      onRefresh: () async { search(); },
+      onRefresh: search,
       child: GridView.builder(
         controller: scroll,
         physics: const AlwaysScrollableScrollPhysics(),

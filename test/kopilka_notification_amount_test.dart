@@ -298,6 +298,13 @@ void main() {
     expect(summary, contains('Т-Банк'));
     expect(summary, contains('в очереди: 2'));
     expect(summary, isNot(contains('код')));
+    expect(describeKopilkaListener({
+      'lastSeen': 0, 'queued': 0, 'connected': true,
+    }), contains('служба уведомлений подключена'.replaceFirst('служба', 'Служба')));
+    expect(describeKopilkaListener({
+      'lastSeen': 0, 'queued': 0, 'connected': false, 'lastConnected': 1234,
+    }), contains('Служба отключена'));
+
   });
 
 }

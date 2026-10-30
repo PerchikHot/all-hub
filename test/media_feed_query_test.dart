@@ -150,4 +150,20 @@ void main() {
     expect(posts.map((p) => p['id']).toList(), [90, 92]);
   });
 
+  test('different post IDs sharing a thumbnail across pages are not repeated', () {
+    final first = <String, dynamic>{
+      'id': 100, 'tag_string': 'transgender solo',
+      'preview_file_url': 'https://example.org/same.jpg', 'file_ext': 'jpg',
+    };
+    final seenUrls = <String>{'https://example.org/same.jpg'};
+    final filtered = filterNewMediaFeedPosts(
+      [first, {...first, 'id': 101,
+          'preview_file_url': 'https://example.org/new.jpg'}],
+      selectedTag: 'transgender', kind: 'all',
+      seenIds: <String>{}, seenUrls: seenUrls,
+    );
+    expect(filtered.map((post) => post['id']).toList(), [101]);
+    expect(seenUrls, <String>{'https://example.org/same.jpg'});
+  });
+
 }

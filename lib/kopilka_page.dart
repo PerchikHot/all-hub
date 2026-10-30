@@ -211,7 +211,7 @@ double? parseKopilkaAmount(String input) {
 /// the same bank must not be silently treated as one saved account.
 String canonicalKopilkaAccountLabel(String value) {
   final label = value.trim().toLowerCase().replaceAll('ё', 'е')
-      .replaceAll(RegExp(r'\\s+'), ' ');
+      .replaceAll(RegExp(r'\s+'), ' ');
   const aliases = <String, String>{
     'тинькофф': 'т-банк',
     'тбанк': 'т-банк',

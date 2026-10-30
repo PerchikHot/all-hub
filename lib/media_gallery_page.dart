@@ -353,6 +353,18 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         ]),
       ]),
     ),
+    if (loading && posts.isEmpty && (showFuta || showTrans)) Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(children: [
+        const SizedBox(width: 16, height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2)),
+        const SizedBox(width: 10),
+        Expanded(child: Text(
+          'Проверяем источник: страница $page · получено $fetchedPosts записей',
+          style: const TextStyle(color: Colors.white70),
+        )),
+      ]),
+    ),
     if (error.isNotEmpty) Padding(
       padding: const EdgeInsets.all(8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

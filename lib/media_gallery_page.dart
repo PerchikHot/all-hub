@@ -32,7 +32,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   String error = '';
   bool accessDenied = false;
   String activeQuery = '';
-  static const int pageSize = 100;
+  static const int pageSize = 40;
   bool highQuality = true;
   bool showEntireImage = false;
   int searchGeneration = 0;
@@ -224,7 +224,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         'limit': '$pageSize',
         'page': '$sourcePage',
       });
-      final response = await http.get(uri).timeout(const Duration(seconds: 25));
+      final response = await http.get(uri).timeout(const Duration(seconds: 18));
       if (response.statusCode == 403) {
         throw const _FeedAccessDenied();
       }
@@ -271,7 +271,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
               ? 'Источник отклонил запрос (HTTP 403). Проверь доступ или открой поиск на сайте.'
               : e is _FeedRateLimited
                   ? 'Источник временно ограничил запросы (HTTP 429). Попробуй позже.'
-                  : 'Не удалось загрузить изображения: $e';
+                  : 'Не удалось подключиться к источнику. Проверь сеть или открой Яндекс.Картинки.';
           hasMore = false;
         });
       }

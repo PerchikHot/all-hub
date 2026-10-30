@@ -2,6 +2,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
 
 void main() {
+  test('installer accepts only the matching project release and platform', () {
+    expect(ProjectLauncher.isTrustedProjectDownload(
+      'all-hub',
+      'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v0.7.0%2B633/AllHub-Android.apk',
+      'apk'), isTrue);
+    expect(ProjectLauncher.isTrustedProjectDownload(
+      'kopilka',
+      'https://github.com/PerchikHot/all-hub/releases/download/kopilka-latest/Kopilka-Android.apk',
+      'apk'), isTrue);
+    expect(ProjectLauncher.isTrustedProjectDownload(
+      'shadow-rp',
+      'https://github.com/PerchikHot/Shadow-rp/releases/download/shadow-rp-android/ShadowRP-Android.apk',
+      'apk'), isTrue);
+    expect(ProjectLauncher.isTrustedProjectDownload(
+      'eclipse-arena',
+      'https://github.com/PerchikHot/Eclipse-Arena-/releases/download/eclipse-arena-windows/EclipseArena.exe',
+      'exe'), isTrue);
+    for (final url in [
+      'https://github.com/PerchikHot/all-hub/releases/download/kopilka-latest/Kopilka-Android.apk',
+      'https://github.com/attacker/all-hub/releases/download/all-hub-v1.0.0/payload.apk',
+      'https://github.com/PerchikHot/all-hub/releases/download/all-hub-latest/payload.apk?x=1',
+      'https://github.com/PerchikHot/all-hub/releases/download/all-hub-latest/payload.exe',
+    ]) {
+      expect(ProjectLauncher.isTrustedProjectDownload('all-hub', url, 'apk'),
+          isFalse, reason: url);
+    }
+  });
+
   test('Android APK resumes only from a matching bounded HTTP range', () {
     expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-2047/4096', 1024), isTrue);
     expect(ProjectLauncher.isSafeApkContentRange('bytes 0-1023/1024', 0), isTrue);

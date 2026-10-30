@@ -78,6 +78,22 @@ void main() {
     expect(missing['note'], 'Т-Банк в заметке');
   });
 
+  test('from:/to: filter only the direction of a saved transfer', () {
+    expect(matchesKopilkaHistory(transfer, 'from:т-банк to:газпром'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'откуда:т-банк куда:газпром'), isTrue);
+    expect(matchesKopilkaHistory(transfer, 'from:газпромбанк'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'to:т-банк'), isFalse);
+    expect(matchesKopilkaHistory(transfer, 'from:'), isFalse);
+    expect(matchesKopilkaHistory(purchase, 'from:ozon'), isFalse);
+    final noteOnly = <String, dynamic>{
+      'kind': 'transfer', 'from': 'Т-Банк', 'to': 'Ozon Банк',
+      'note': 'Газпромбанк упомянут в комментарии',
+    };
+    expect(matchesKopilkaHistory(noteOnly, 'to:газпромбанк'), isFalse);
+    expect(matchesKopilkaHistory(noteOnly, 'to:ozon'), isTrue);
+    expect(noteOnly['to'], 'Ozon Банк');
+  });
+
   test('has:note and has:no-note inspect descriptions only', () {
     expect(matchesKopilkaHistory(purchase, 'has:note bank:ozon'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'есть:заметка'), isTrue);

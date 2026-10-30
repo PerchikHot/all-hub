@@ -785,11 +785,21 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         if (entries.isNotEmpty && historyQuery.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text('Найдено: ${filteredEntries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))}',
+            child: Text('Найдено: ${filteredEntries.length} из ${entries.length} · Доходы: ${money(filteredIncome)} · Расходы: ${money(filteredExpenses)}\nРазница: ${money(kopilkaNetChange(filteredEntries))}',
               style: const TextStyle(color: Colors.white70)),
           ),
         if (entries.isNotEmpty && filteredEntries.isEmpty)
-          const ListTile(title: Text('Операции не найдены')),
+          ListTile(
+            title: const Text('Операции не найдены'),
+            subtitle: const Text('Попробуй изменить или очистить фильтр.'),
+            trailing: TextButton(
+              onPressed: () {
+                historySearchController.clear();
+                setState(() => historyQuery = '');
+              },
+              child: const Text('Сбросить'),
+            ),
+          ),
         if (entries.isEmpty) const ListTile(title: Text('Пока нет операций'),
           subtitle: Text('Нажми «Операция», чтобы внести начальные остатки, расходы или перевод между своими счетами.')),
         for (final e in filteredEntries) Card(child: ListTile(

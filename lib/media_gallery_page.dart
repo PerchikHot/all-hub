@@ -289,8 +289,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   }
 
   void openPost(Map<String, dynamic> post) {
-    final raw = post['file_url'] ?? post['large_file_url'] ?? post['preview_file_url'];
-    final uri = raw is String ? Uri.tryParse(raw) : null;
+    final raw = mediaFeedImageUrl(post, highQuality: true);
+    final uri = raw == null ? null : Uri.tryParse(raw);
     if (uri == null || uri.scheme != 'https') return;
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => MediaBrowserPage(url: uri),
@@ -389,9 +389,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           if (index >= posts.length) return const Center(child: CircularProgressIndicator());
           final post = posts[index];
           // Use a sharper sample for HD; thumbnails are only placeholders.
-          final url = (highQuality
-              ? (post['large_file_url'] ?? post['file_url'] ?? post['preview_file_url'])
-              : (post['preview_file_url'] ?? post['large_file_url'] ?? post['file_url'])).toString();
+          final url = mediaFeedImageUrl(post, highQuality: highQuality) ?? '';
           return InkWell(
             onTap: () => openPost(post),
             child: ClipRRect(

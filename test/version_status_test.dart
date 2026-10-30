@@ -5,6 +5,10 @@ void main() {
   test('numeric versions compare without lexicographic errors', () {
     expect(comparePublishedVersions('1.9.0', '1.10.0'), lessThan(0));
     expect(comparePublishedVersions('v1.2.3', '1.2.3'), 0);
+    expect(comparePublishedVersions('V1.2.3', '1.2.3'), 0);
+    expect(comparePublishedVersions('1.2.3', 'V1.2.4'), lessThan(0));
+    expect(describeUpdateStatus('V1.2.3', 'V1.2.4'), contains('Доступно обновление'));
+    expect(describeUpdateStatus('V1.2.3', 'V1.2.3'), contains('актуальная'));
     expect(comparePublishedVersions('1.2.3+5', '1.2.3+7'), lessThan(0));
     expect(comparePublishedVersions('2.0.0', '1.9.9'), greaterThan(0));
     // A release with an explicit CI build must not be marked current

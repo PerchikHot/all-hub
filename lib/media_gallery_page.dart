@@ -28,6 +28,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   static const feedTags = <String>['futanari', 'transgender'];
   static const maxVisiblePosts = 180;
   final seenPostIds = <String>{};
+  final seenPostUrls = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
   bool accessDenied = false;
@@ -179,6 +180,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
       posts.clear();
       seenPostIds.clear();
+      seenPostUrls.clear();
       page = 1;
       emptyPageRetries = 0;
       fetchedPosts = 0;
@@ -241,13 +243,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       // rendering, not only after merging the page into seenPostIds.
       final newPosts = filterNewMediaFeedPosts(
         data.whereType<Map<String, dynamic>>(),
-        selectedTag: selectedTag, kind: requestedKind, seenIds: seenPostIds,
+        selectedTag: selectedTag, kind: requestedKind,
+        seenIds: seenPostIds, seenUrls: seenPostUrls,
       );
       setState(() {
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;
         for (final post in newPosts) {
           seenPostIds.add((post['id'] ?? '').toString());
+          final thumbnail = mediaFeedImageUrl(post, highQuality: false);
+          if (thumbnail != null) seenPostUrls.add(thumbnail);
         }
         posts.addAll(newPosts);
         emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;

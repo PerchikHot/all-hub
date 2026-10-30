@@ -28,6 +28,18 @@ void main() {
     'date': '2026-10-27',
   };
 
+  test('has:date and has:no-date find malformed legacy dates locally', () {
+    final valid = {'date': '2026-10-28T12:00:00', 'note': 'A'};
+    final missing = {'date': '', 'note': 'B'};
+    final invalid = {'date': '2026-02-30', 'note': 'C'};
+    expect(matchesKopilkaHistory(valid, 'has:date'), isTrue);
+    expect(matchesKopilkaHistory(valid, 'has:no-date'), isFalse);
+    expect(matchesKopilkaHistory(missing, 'has:no-date'), isTrue);
+    expect(matchesKopilkaHistory(invalid, 'has:no-date'), isTrue);
+    expect(matchesKopilkaHistory(invalid, 'has:date'), isFalse);
+    expect(valid['date'], '2026-10-28T12:00:00');
+  });
+
   test('has:note and has:no-note inspect descriptions only', () {
     expect(matchesKopilkaHistory(purchase, 'has:note bank:ozon'), isTrue);
     expect(matchesKopilkaHistory(purchase, 'есть:заметка'), isTrue);

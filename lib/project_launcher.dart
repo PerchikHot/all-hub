@@ -161,6 +161,31 @@ class ProjectLauncher {
         total <= maxBytes;
   }
 
+  /// Users register a third-party Android package explicitly. Android only
+  /// permits launching visible apps; no private app data is accessed.
+  static bool isValidAndroidPackageName(String value) =>
+      value.length <= 200 &&
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+$')
+          .hasMatch(value);
+
+  static Future<bool> setExternalPackageName(String id, String packageName) async {
+    if (!id.startsWith('external-') || !isValidProjectId(id) ||
+        !isValidAndroidPackageName(packageName)) {
+      throw ArgumentError('Некорректный идентификатор Android-приложения');
+    }
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString('external_package_$id', packageName);
+  }
+
+  static Future<String?> externalPackageName(String id) async {
+    if (!id.startsWith('external-') || !isValidProjectId(id)) {
+      return null;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('external_package_$id');
+    return name != null && isValidAndroidPackageName(name) ? name : null;
+  }
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
@@ -172,7 +197,8 @@ class ProjectLauncher {
     if (Platform.isAndroid) {
       // The launcher itself is not an external launchable project, but its
       // installed Android version must still be shown in the update catalog.
-      final packageName = id == 'all-hub' ? 'com.example.all_hub' : packages[id];
+      final packageName = id == 'all-hub' ? 'com.example.all_hub' :
+          (packages[id] ?? await externalPackageName(id));
       if (packageName == null) return null;
       try {
         return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
@@ -288,7 +314,7 @@ class ProjectLauncher {
 
   static Future<bool> isAvailable(String id) async {
     if (Platform.isAndroid) {
-      final packageName = packages[id];
+      final packageName = packages[id] ?? await externalPackageName(id);
       if (packageName == null) return false;
       try {
         return await _channel.invokeMethod<bool>(
@@ -307,7 +333,7 @@ class ProjectLauncher {
 
   static Future<bool> launch(String id) async {
     if (Platform.isAndroid) {
-      final packageName = packages[id];
+      final packageName = packages[id] ?? await externalPackageName(id);
       if (packageName == null) return false;
       return await _channel.invokeMethod<bool>('launchPackage', {'packageName': packageName}) ?? false;
     }
@@ -555,5 +581,6 @@ class ProjectLauncher {
   }
 
   static bool canLaunch(String id) => Platform.isWindows ||
-      (Platform.isAndroid && packages.containsKey(id));
+      (Platform.isAndroid &&
+          (packages.containsKey(id) || id.startsWith('external-')));
 }

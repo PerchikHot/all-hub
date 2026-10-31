@@ -628,7 +628,7 @@ KopilkaSalaryForecast forecastKopilkaToPayday(
   final today = DateTime.utc(now.year, now.month, now.day);
   DateTime payday(int year, int month) {
     final lastDay = DateTime.utc(year, month + 1, 0).day;
-    return DateTime.utc(year, month, paydayDay.clamp(1, lastDay));
+    return DateTime.utc(year, month, paydayDay.clamp(1, lastDay).toInt());
   }
   var next = payday(today.year, today.month);
   if (!next.isAfter(today)) next = payday(today.year, today.month + 1);

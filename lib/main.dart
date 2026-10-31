@@ -346,7 +346,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 16),
         for (final project in (tab == 0 ? filtered : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
           if (project.id.startsWith('external-'))
-            HubProjectHeader(title: project.name, type: project.type)
+            HubProjectHeader(title: project.name, type: project.type, repo: project.repo)
           else
             ProjectCover(id: project.id, title: project.name, type: project.type),
           Padding(

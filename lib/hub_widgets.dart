@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
 const hubBackground = Color(0xFF090E1C);
 const hubPanel = Color(0xFF141C30);
@@ -52,7 +53,9 @@ class HubProjectHeader extends StatelessWidget {
   final String title;
   final String type;
   final String? repo;
-  const HubProjectHeader({super.key, required this.title, required this.type, this.repo});
+  final String? localBannerPath;
+  const HubProjectHeader({super.key, required this.title, required this.type,
+      this.repo, this.localBannerPath});
   @override
   Widget build(BuildContext context) {
     final isGame = type.toLowerCase().contains('game');
@@ -69,8 +72,12 @@ class HubProjectHeader extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(fit: StackFit.expand, children: [
+        // A chosen local image takes precedence and is never uploaded.
+        if (localBannerPath != null)
+          Image.file(File(localBannerPath!), fit: BoxFit.cover, cacheWidth: 900,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
         // Public GitHub social preview, with the Veyrion gradient as fallback.
-        if (repo != null && RegExp(r'^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$').hasMatch(repo!))
+        if (localBannerPath == null && repo != null && RegExp(r'^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$').hasMatch(repo!))
           Image.network(
             Uri.https('opengraph.githubassets.com', '/1/$repo').toString(),
             fit: BoxFit.cover, cacheWidth: 900,

@@ -193,6 +193,25 @@ class ProjectLauncher {
     return name != null && isValidAndroidPackageName(name) ? name : null;
   }
 
+  /// Serialize installs so repeated taps cannot race on staging/backup files.
+  static String? _installationInProgress;
+
+  static Future<T> runInstallExclusive<T>(
+      String projectId, Future<T> Function() operation) async {
+    if (!isValidProjectId(projectId)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    if (_installationInProgress != null) {
+      throw StateError('Другая установка уже выполняется: $_installationInProgress');
+    }
+    _installationInProgress = projectId;
+    try {
+      return await operation();
+    } finally {
+      _installationInProgress = null;
+    }
+  }
+
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {

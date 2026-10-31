@@ -29,6 +29,7 @@ class ProjectLauncher {
     }
     final parts = uri.pathSegments;
     return parts.length == 6 &&
+        parts[4].length <= 100 && parts[5].length <= 120 &&
         parts[0].toLowerCase() == 'perchikhot' &&
         parts[1].toLowerCase() == repo.toLowerCase() &&
         parts[2] == 'releases' && parts[3] == 'download' &&
@@ -37,6 +38,21 @@ class ProjectLauncher {
         !parts[5].contains('/') && !parts[5].contains('\\\\') &&
         parts[5].toLowerCase().endsWith('.$extension');
   }
+
+  /// Isolate resumable APK files by project, release and asset. Otherwise an
+  /// interrupted download from one release could be resumed as another APK.
+  static String androidApkCacheName(String id, String url) {
+    if (!isTrustedProjectDownload(id, url, 'apk')) {
+      throw ArgumentError('Недопустимый APK релиз');
+    }
+    final parts = Uri.parse(url).pathSegments;
+    return ('${id}_${parts[4]}_${parts[5]}')
+        .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+  }
+
+  /// Check a portable EXE before replacing a previously working installation.
+  static bool hasWindowsExecutableHeader(List<int> bytes) =>
+      bytes.length >= 2 && bytes[0] == 0x4d && bytes[1] == 0x5a;
 
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
@@ -293,7 +309,8 @@ class ProjectLauncher {
     final client = http.Client();
     try {
       final cache = await getTemporaryDirectory();
-      final apk = File('${cache.path}${Platform.pathSeparator}allhub-install.apk');
+      final cacheName = androidApkCacheName(projectId, url);
+      final apk = File('${cache.path}${Platform.pathSeparator}$cacheName');
       final temporary = File('${apk.path}.download');
       try {
         downloadProgress.value = 0;
@@ -357,7 +374,7 @@ class ProjectLauncher {
         final file = await temporary.open();
         try {
           final header = await file.read(2);
-          if (header.length != 2 || header[0] != 0x4d || header[1] != 0x5a) {
+          if (!hasWindowsExecutableHeader(header)) {
             throw const FormatException('Файл не похож на Windows EXE (нет MZ-заголовка)');
           }
         } finally {
@@ -450,6 +467,19 @@ class ProjectLauncher {
       ).cast<File>().toList();
       if (executables.isEmpty) {
         throw const FormatException('В архиве нет исполняемого EXE');
+      }
+      // A ZIP can contain arbitrary files named .exe. Reject an invalid
+      // launcher before activating the staging directory, preserving the
+      // previous installation and its settings.
+      for (final executable in executables) {
+        final handle = await executable.open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(2))) {
+            throw const FormatException('ZIP содержит некорректный Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
       }
       executables.sort((a, b) {
         final aName = a.uri.pathSegments.last.toLowerCase();

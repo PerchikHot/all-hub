@@ -239,7 +239,9 @@ class HubService {
           continue;
         }
         final digest = parseSha256Digest(rawAsset['digest']);
-        if (rawAsset['digest'] != null && digest == null) continue;
+        if (rawAsset['digest'] != null && digest == null) {
+          continue;
+        }
         thisRelease.add(HubAsset(name, url, platform, publishedVersion,
             releaseNotes: notes, sha256Digest: digest));
       }

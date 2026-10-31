@@ -648,11 +648,10 @@ class _HomePageState extends State<HomePage> {
                         // Always expose the update action on Windows: legacy
                         // installations have no stored version and previously
                         // made the button disappear completely.
-                        final isCurrent = comparison == 0;
                         final isNewerLocal = comparison == 1;
                         return FilledButton.icon(
                           icon: const Icon(Icons.system_update_alt_rounded),
-                          label: Text(isCurrent ? 'Переустановить текущую версию' : isNewerLocal ? 'Установлена более новая версия' : 'Обновить приложение${i.version == null ? '' : ' до ${i.version}'}'),
+                          label: Text(windowsUpdateActionLabel(installed.data, i.version)),
                           
                           onPressed: isNewerLocal ? null : () async {
                             try {
@@ -682,90 +681,6 @@ class _HomePageState extends State<HomePage> {
                             }
                           },
                         );
-                      },
-                    ),
-                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
-                      Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.exe'))
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.install_desktop),
-                      label: FutureBuilder<String?>(
-                        future: ProjectLauncher.installedVersion(project.id),
-                        builder: (context, installed) => Text(installActionLabel(
-                          installed.data, i.version, 'Скачать и установить')),
-                      ),
-                      onPressed: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скачивание EXE из GitHub Releases...')));
-                        try {
-                          if (isPublishedDowngrade(
-                              await ProjectLauncher.installedVersion(project.id), i.version)) {
-                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
-                          }
-                          if (!await confirmExternalInstall(project)) {
-                            return;
-                          }
-                          await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
-                            externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null,
-                            sha256Digest: i.sha256Digest);
-                          await ProjectLauncher.recordInstalledVersion(project.id, i.version);
-                          if (context.mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
-                           }
-                        } catch (e) {
-                          if (context.mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось установить EXE: $e')));
-                           }
-                        }
-                      },
-                    ),
-                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
-                      Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.zip'))
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.inventory_2_outlined),
-                      label: FutureBuilder<String?>(
-                        future: ProjectLauncher.installedVersion(project.id),
-                        builder: (context, installed) => Text(installActionLabel(
-                          installed.data, i.version, 'Скачать и установить')),
-                      ),
-                      onPressed: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скачиваем игру со всеми файлами...')));
-                        try {
-                          if (isPublishedDowngrade(
-                              await ProjectLauncher.installedVersion(project.id), i.version)) {
-                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
-                          }
-                          if (!await confirmExternalInstall(project)) {
-                            return;
-                          }
-                          await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
-                            externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null,
-                            sha256Digest: i.sha256Digest);
-                          await ProjectLauncher.recordInstalledVersion(project.id, i.version);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Игра установлена. Нажми «Открыть».')));
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Ошибка установки: $e')));
-                          }
-                        }
-                      },
-                    ),
-                  if (tab == 0 && Platform.isWindows)
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.folder_open),
-                      label: const Text('Выбрать EXE'),
-                      onPressed: () async {
-                        final ok = await ProjectLauncher.configureWindowsExecutable(project.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(ok ? 'EXE привязан' : 'EXE не выбран')));
-                        }
                       },
                     ),
                   if (tab == 1) OutlinedButton(onPressed: () => open('https://github.com/${project.repo}/actions'), child: const Text('Actions')),

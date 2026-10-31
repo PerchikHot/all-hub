@@ -140,4 +140,12 @@ void main() {
       'Скачать APK и установить');
   });
 
+  test('Windows has one install/update action without manual EXE selection', () {
+    expect(windowsUpdateActionLabel(null, '1.0.0'), 'Установить приложение');
+    expect(windowsUpdateActionLabel('1.0.0', '1.1.0'), 'Обновить до 1.1.0');
+    expect(windowsUpdateActionLabel('1.1.0', '1.1.0'), 'Переустановить текущую версию');
+    expect(windowsUpdateActionLabel('2.0.0', '1.0.0'), 'Установлена более новая версия');
+    expect(windowsUpdateActionLabel('1.0.0', null), 'Проверить и установить');
+  });
+
 }

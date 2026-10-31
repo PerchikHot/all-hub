@@ -156,3 +156,17 @@ String installActionLabel(String? installed, String? published, String fallback)
   }
   return fallback;
 }
+
+
+/// One Steam-like Windows action; never require users to browse for an EXE.
+String windowsUpdateActionLabel(String? installed, String? published) {
+  if (installed == null || installed.trim().isEmpty) {
+    return 'Установить приложение';
+  }
+  final comparison = published == null ? null :
+      comparePublishedVersions(installed, published);
+  if (comparison == 1) return 'Установлена более новая версия';
+  if (comparison == 0) return 'Переустановить текущую версию';
+  if (comparison == -1) return 'Обновить до $published';
+  return 'Проверить и установить';
+}

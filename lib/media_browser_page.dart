@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'media_download_policy.dart';
 
 /// Render direct photos and animated GIFs with Flutter on both platforms.
 /// Android WebView navigation can treat a GIF as a download instead of showing
@@ -112,7 +113,8 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     File? temp;
     try {
       client = http.Client();
-      final response = await client.send(http.Request('GET', uri));
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -121,26 +123,24 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           type.startsWith('application/octet-stream'))) {
         throw Exception('Ссылка не ведёт на изображение или видео');
       }
-      // Temporary private staging only. Final media is written to public Downloads/All Hub.
+      final safeName = mediaDownloadFileName(uri, type);
+      if (safeName == null) {
+        throw Exception('Неподдерживаемый тип файла');
+      }
+      if ((response.contentLength ?? 0) > 200 * 1024 * 1024) {
+        throw Exception('Файл больше 200 МБ');
+      }
+      // Private staging only. Final media is written to Downloads/All Hub.
       final folder = await getTemporaryDirectory();
-      final ext = switch (type.split(';').first) {
-        'image/gif' => '.gif',
-        'image/png' => '.png',
-        'image/webp' => '.webp',
-        'image/jpeg' => '.jpg',
-        'video/mp4' => '.mp4',
-        'video/webm' => '.webm',
-        _ => '.bin',
-      };
-      final raw = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
-      final name = raw.contains('.') ? raw : 'media$ext';
-      final safe = name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      final destination = File('${folder.path}/${DateTime.now().microsecondsSinceEpoch}_$safe');
+      final destination = File(
+          '${folder.path}/${DateTime.now().microsecondsSinceEpoch}_$safeName');
       temp = File('${destination.path}.part');
       final sink = temp.openWrite();
       var received = 0;
       try {
-        await for (final chunk in response.stream) {
+        // Abort stalled CDN streams rather than keeping a spinner forever.
+        await for (final chunk in response.stream.timeout(
+            const Duration(seconds: 25))) {
           received += chunk.length;
           if (received > 200 * 1024 * 1024) {
             throw Exception('Файл больше 200 МБ');

@@ -197,6 +197,7 @@ class ProjectLauncher {
   /// Public GitHub repositories are not proof of APK package identity.
   static Future<String?> expectedAndroidPackageName(String id) async {
     if (!isValidProjectId(id)) return null;
+    if (id == 'all-hub') return 'com.example.all_hub';
     return packages[id] ?? await externalPackageName(id);
   }
 

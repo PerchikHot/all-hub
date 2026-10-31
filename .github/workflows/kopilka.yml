@@ -123,22 +123,28 @@ jobs:
                   // promotions or balance-only notifications in the local queue.
                   val combined = title + " " + body
                   val transaction = Regex(
-                      """покупк|оплат|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw""",
+                      """покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw""",
                       RegexOption.IGNORE_CASE)
-                  val currency = Regex("""₽|руб(?:\.|ля|лей)?|\bRUB\b""", RegexOption.IGNORE_CASE)
+                  val currency = Regex("""₽|руб(?:\.|ль|ля|лей)?|\bRUB\b""", RegexOption.IGNORE_CASE)
                   val sensitive = Regex(
                       """код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
                       RegexOption.IGNORE_CASE)
                   // The native queue must reject unposted payments and
                   // credential alerts BEFORE storing their text on disk.
                   val notPosted = Regex(
-                      """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b""",
+                      """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b|требует\s+подтверждени|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|\bwill\s+be\s+(?:charged|debited|paid)\b""",
                       RegexOption.IGNORE_CASE)
                   val credentials = Regex(
                       """парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s*[:№]|(?:ваш|your)\s+(?:код|code)""",
                       RegexOption.IGNORE_CASE)
+                  // Mirror the Dart import gate: a currency word alone is
+                  // not evidence of a posted transaction amount.
+                  val amount = Regex(
+                      """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
+                      RegexOption.IGNORE_CASE)
                   if (!transaction.containsMatchIn(combined) ||
                       !currency.containsMatchIn(combined) ||
+                      !amount.containsMatchIn(combined) ||
                       sensitive.containsMatchIn(combined) ||
                       credentials.containsMatchIn(combined) ||
                       notPosted.containsMatchIn(combined)) return

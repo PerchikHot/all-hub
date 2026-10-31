@@ -13,6 +13,52 @@ void main() {
     expect(nextAvailableMediaFeedPage(0, tags, <String>{}), isNull);
   });
 
+  test('GIF gallery plays the animated file before a static preview', () {
+    final post = <String, dynamic>{
+      'id': 12,
+      'file_ext': 'gif',
+      'file_size': 2 * 1024 * 1024,
+      'tag_string': 'transgender animated',
+      'preview_file_url': 'https://cdn.example/12-preview.jpg',
+      'file_url': 'https://cdn.example/12.gif',
+    };
+    expect(mediaFeedAnimatedUrl(post), 'https://cdn.example/12.gif');
+    for (final hd in [true, false]) {
+      expect(mediaFeedImageCandidates(post, highQuality: hd), [
+        'https://cdn.example/12.gif',
+        'https://cdn.example/12-preview.jpg',
+      ]);
+    }
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'gif', seenIds: <String>{}), isTrue);
+  });
+
+  test('GIF tab excludes static previews and oversized animated assets', () {
+    final post = <String, dynamic>{
+      'id': 13,
+      'file_ext': 'gif',
+      'tag_string': 'transgender animated',
+      'preview_file_url': 'https://cdn.example/static.jpg',
+    };
+    expect(mediaFeedAnimatedUrl(post), isNull);
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'gif', seenIds: <String>{}), isFalse);
+    final animated = {...post, 'file_url': 'https://cdn.example/live.gif'};
+    expect(mediaFeedAnimatedUrl(animated), 'https://cdn.example/live.gif');
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_size': 25 * 1024 * 1024}), isNull);
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_size': 'unknown'}), isNull);
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_url': 'https://user:pass@cdn.example/live.gif'}), isNull);
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_url': 'http://cdn.example/live.gif'}), isNull);
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_url': 'https://cdn.example/live.gif#bad'}), isNull);
+    expect(mediaFeedAnimatedUrl({...animated,
+        'file_url': 'https://cdn.example/static.jpg'}), isNull);
+  });
+
   test('image CDN fallback candidates are ordered, unique and HTTPS-only', () {
     final post = <String, dynamic>{
       'preview_file_url': 'https://cdn.example/preview.jpg',

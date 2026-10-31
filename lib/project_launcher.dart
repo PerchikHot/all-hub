@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'external_repositories.dart';
 import 'hub_service.dart';
 import 'version_status.dart';
@@ -346,6 +347,257 @@ class ProjectLauncher {
       return true;
     }
     return false;
+  }
+
+  /// Check GitHub's published SHA-256 digest before activating an installer.
+  /// Older releases without a digest retain existing container checks.
+  static Future<void> verifyDownloadedDigest(File file, String? expected) async {
+    if (expected == null) return;
+    if (!RegExp(r'^[a-f0-9]{64}
+  /// Android always requires user confirmation; this cannot silently install apps.
+  static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isAndroid) throw UnsupportedError('Android only');
+    final uri = Uri.tryParse(url);
+    if (uri == null || projectId == null ||
+        !(externalRepo == null
+            ? isTrustedProjectDownload(projectId, url, 'apk')
+            : isTrustedExternalDownload(projectId, externalRepo, url, 'apk'))) {
+      throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
+    }
+    activeDownloadProject.value = projectId;
+    downloadProgress.value = null;
+    final client = http.Client();
+    try {
+      final cache = await getTemporaryDirectory();
+      final cacheName = externalRepo == null
+          ? androidApkCacheName(projectId, url)
+          : ('${projectId}_${uri.pathSegments[4]}_${uri.pathSegments[5]}')
+              .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+      final apk = File('${cache.path}${Platform.pathSeparator}$cacheName');
+      final temporary = File('${apk.path}.download');
+      try {
+        downloadProgress.value = 0;
+        await _downloadResumable(client, uri, temporary);
+        if (await temporary.length() < 1024) {
+          throw const FormatException('APK слишком мал');
+        }
+        final file = await temporary.open();
+        try {
+          final header = await file.read(4);
+          if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
+              header[2] != 0x03 || header[3] != 0x04) {
+            throw const FormatException('Скачан не APK (не ZIP-контейнер)');
+          }
+        } finally {
+          await file.close();
+        }
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        if (await apk.exists()) await apk.delete();
+        await temporary.rename(apk.path);
+        await _channel.invokeMethod<bool>('installApk', {'path': apk.path});
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+    }
+  }
+
+  // Installs a standalone Windows EXE from a published GitHub release.
+  // Portable ZIP distributions require their full folder and are not handled here.
+  static Future<void> installWindowsExe(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'exe')
+        : isTrustedExternalDownload(id, externalRepo, url, 'exe'))) {
+      throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
+    }
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri);
+      final response = await client.send(request).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      final root = await getApplicationSupportDirectory();
+      final directory = Directory('${root.path}${Platform.pathSeparator}projects${Platform.pathSeparator}$id');
+      await directory.create(recursive: true);
+      final target = File('${directory.path}${Platform.pathSeparator}$id.exe');
+      final temporary = File('${target.path}.download');
+      try {
+        // Apply the same streaming size limit to standalone EXEs as to ZIPs.
+        // A server with a missing Content-Length must not fill the disk.
+        await _download(response, temporary, maxBytes: 256 * 1024 * 1024);
+        if (await temporary.length() < 1024) {
+          throw const FormatException('Загруженный EXE слишком мал');
+        }
+        final file = await temporary.open();
+        try {
+          final header = await file.read(2);
+          if (!hasWindowsExecutableHeader(header)) {
+            throw const FormatException('Файл не похож на Windows EXE (нет MZ-заголовка)');
+          }
+        } finally {
+          await file.close();
+        }
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        // Preserve the last working version if the replacement fails.
+        final backup = File('${target.path}.backup');
+        if (await backup.exists()) await backup.delete();
+        if (await target.exists()) await target.rename(backup.path);
+        try {
+          await temporary.rename(target.path);
+          if (await backup.exists()) await backup.delete();
+        } catch (_) {
+          if (await backup.exists()) await backup.rename(target.path);
+          rethrow;
+        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('exe_$id', target.path);
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
+  /// Files are extracted to a staging directory and activated only after validation.
+  static Future<void> installWindowsZip(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'zip')
+        : isTrustedExternalDownload(id, externalRepo, url, 'zip'))) {
+      throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
+    }
+    final root = await getApplicationSupportDirectory();
+    final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+    await projects.create(recursive: true);
+    final target = Directory('${projects.path}${Platform.pathSeparator}$id');
+    final staging = Directory('${projects.path}${Platform.pathSeparator}$id.staging');
+    final backup = Directory('${projects.path}${Platform.pathSeparator}$id.backup');
+    final zipFile = File('${projects.path}${Platform.pathSeparator}$id.download.zip');
+    if (await staging.exists()) await staging.delete(recursive: true);
+    await staging.create(recursive: true);
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      await _download(response, zipFile, maxBytes: 256 * 1024 * 1024);
+      if (await zipFile.length() > 256 * 1024 * 1024) {
+        throw const FormatException('Windows ZIP слишком большой');
+      }
+      final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
+      if (!isSafeWindowsArchiveLayout(
+        archive.where((entry) => entry.isFile).map((entry) => entry.name),
+        archive.where((entry) => !entry.isFile).map((entry) => entry.name),
+      )) {
+        throw const FormatException('ZIP содержит конфликтующие пути файлов');
+      }
+      final rootPath = staging.absolute.path;
+      var unpackedBytes = 0;
+      var entriesSeen = 0;
+      for (final entry in archive) {
+        entriesSeen++;
+        if (!isSafeWindowsArchiveBudget(entriesSeen, unpackedBytes, entry.size)) {
+          throw const FormatException('ZIP превышает безопасный размер распаковки');
+        }
+        unpackedBytes += entry.size;
+        final name = entry.name.replaceAll('\\', '/');
+        if (!isSafeWindowsArchivePath(name)) {
+          throw const FormatException('Недопустимый путь в ZIP');
+        }
+        if (name.isEmpty) continue;
+        final destination = '$rootPath${Platform.pathSeparator}${name.replaceAll('/', Platform.pathSeparator)}';
+        if (entry.isFile) {
+          final file = File(destination);
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.content as List<int>, flush: true);
+        } else {
+          await Directory(destination).create(recursive: true);
+        }
+      }
+      final executables = await staging.list(recursive: true).where(
+        (entity) => entity is File && entity.path.toLowerCase().endsWith('.exe'),
+      ).cast<File>().toList();
+      if (executables.isEmpty) {
+        throw const FormatException('В архиве нет исполняемого EXE');
+      }
+      // A ZIP can contain arbitrary files named .exe. Reject an invalid
+      // launcher before activating the staging directory, preserving the
+      // previous installation and its settings.
+      for (final executable in executables) {
+        final handle = await executable.open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(2))) {
+            throw const FormatException('ZIP содержит некорректный Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+      }
+      executables.sort((a, b) {
+        final aName = a.uri.pathSegments.last.toLowerCase();
+        final bName = b.uri.pathSegments.last.toLowerCase();
+        final aRank = aName.contains(id.replaceAll('-', '')) ? 0 : 1;
+        final bRank = bName.contains(id.replaceAll('-', '')) ? 0 : 1;
+        return aRank.compareTo(bRank);
+      });
+      final relativeExe = executables.first.path.substring(staging.path.length);
+      if (await backup.exists()) await backup.delete(recursive: true);
+      if (await target.exists()) await target.rename(backup.path);
+      try {
+        await staging.rename(target.path);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('exe_$id', '${target.path}$relativeExe');
+        if (await backup.exists()) await backup.delete(recursive: true);
+      } catch (_) {
+        if (await target.exists()) await target.delete(recursive: true);
+        if (await backup.exists()) await backup.rename(target.path);
+        rethrow;
+      }
+    } finally {
+      client.close();
+      if (await zipFile.exists()) await zipFile.delete();
+      if (await staging.exists()) await staging.delete(recursive: true);
+    }
+  }
+
+  static Future<bool> configureWindowsExecutable(String id) async {
+    if (!Platform.isWindows) return false;
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['exe']);
+    final path = selection?.files.single.path;
+    if (path == null || !path.toLowerCase().endsWith('.exe')) return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString('exe_$id', path);
+  }
+
+  static bool canLaunch(String id) => Platform.isWindows ||
+      (Platform.isAndroid &&
+          (packages.containsKey(id) || id.startsWith('external-')));
+}
+).hasMatch(expected)) {
+      throw const FormatException('Некорректная контрольная сумма SHA-256');
+    }
+    final actual = (await sha256.bind(file.openRead()).first).toString();
+    if (actual != expected) {
+      throw const FormatException('SHA-256 файла не совпадает с GitHub Releases');
+    }
   }
 
   /// Downloads a published APK directly, then asks Android to install it.

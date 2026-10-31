@@ -37,6 +37,30 @@ void main() {
     expect(flows['Газпромбанк']!.net, 0);
   });
 
+  test('bank aliases and missing accounts cannot create self-transfers', () {
+    expect(validKopilkaTransferEndpoints('Тинькофф', 'Т-Банк'), isFalse);
+    expect(validKopilkaTransferEndpoints('Ozon', 'Ozon Банк'), isFalse);
+    expect(validKopilkaTransferEndpoints('Т-Банк', '  '), isFalse);
+    expect(validKopilkaTransferEndpoints('Т-Банк карта 1',
+        'Т-Банк карта 2'), isTrue);
+    expect(validKopilkaTransferEndpoints('Т-Банк', 'Ozon Банк'), isTrue);
+    expect(countIncompleteKopilkaTransfers([
+      {'kind': 'transfer', 'from': 'Тинькофф', 'to': 'Т-Банк'},
+      {'kind': 'transfer', 'from': 'Т-Банк', 'to': ''},
+      {'kind': 'transfer', 'from': 'Т-Банк', 'to': 'Ozon Банк'},
+    ]), 2);
+    expect(() => revisedKopilkaEntry({'date': '2026-10-31'},
+        kind: 'transfer', amount: 100, bank: 'Ozon',
+        destination: 'Ozon Банк', category: '', note: ''),
+        throwsArgumentError);
+    final flows = summarizeKopilkaAccountFlows([
+      {'kind': 'transfer', 'from': 'Тинькофф', 'to': 'Т-Банк',
+       'amount': 500},
+    ], ['Тинькофф', 'Т-Банк']);
+    expect(flows['Тинькофф']!.transfersOut, 0);
+    expect(flows['Т-Банк']!.transfersIn, 0);
+  });
+
   test('own-bank transfer hints are read-only and reject ambiguous matches', () {
     final entries = <Map<String, dynamic>>[
       {'kind': 'expense', 'bank': 'Т-Банк', 'amount': 2000,

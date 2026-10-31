@@ -303,9 +303,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final selectedTag = enabledTags[(effectivePage - 1) % enabledTags.length];
       final sourcePage = ((effectivePage - 1) ~/ enabledTags.length) + 1;
       // Search all ratings: forcing rating:explicit hid valid tagged posts.
-      final tags = requestedKind == 'gif' && requestedQuery.isEmpty
-          ? '$selectedTag filetype:gif'
-          : buildMediaFeedTags(selectedTag, requestedQuery);
+      final tags = buildMediaFeedRequestTags(
+          selectedTag, requestedQuery, requestedKind);
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
         'tags': tags,
         'limit': '$pageSize',
@@ -330,6 +329,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         data.whereType<Map<String, dynamic>>(),
         selectedTag: selectedTag, kind: requestedKind,
         seenIds: seenPostIds, seenUrls: seenPostUrls,
+        query: requestedQuery,
       );
       setState(() {
         fetchedPosts += data.length;

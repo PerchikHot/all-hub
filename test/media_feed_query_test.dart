@@ -266,4 +266,41 @@ void main() {
     expect(mediaFeedTileAspectRatio({'image_width': 0, 'image_height': 100}), 0.72);
     expect(mediaFeedTileAspectRatio({'image_width': 'bad', 'image_height': 100}), 0.72);
   });
+  test('GIF search always requests animated files within the two-tag limit', () {
+    expect(buildMediaFeedRequestTags('transgender', '', 'gif'),
+        'transgender filetype:gif');
+    expect(buildMediaFeedRequestTags('transgender', 'erza_scarlet', 'gif'),
+        'erza_scarlet filetype:gif');
+    expect(buildMediaFeedRequestTags('transgender',
+        'erza_scarlet blue_hair', 'gif'), 'erza_scarlet filetype:gif');
+    expect(buildMediaFeedRequestTags('transgender',
+        'filetype:gif', 'gif'), 'transgender filetype:gif');
+    expect(buildMediaFeedRequestTags('transgender',
+        'erza_scarlet blue_hair', 'all'), 'transgender erza_scarlet');
+  });
+
+  test('client filters category and every user tag in a GIF search', () {
+    final animated = <String, dynamic>{
+      'id': 17, 'tag_string': 'transgender erza_scarlet blue_hair',
+      'file_ext': 'gif', 'rating': 's',
+      'file_url': 'https://example.org/17.gif',
+    };
+    final wrongCategory = {...animated,
+        'id': 18, 'tag_string': 'erza_scarlet blue_hair'};
+    final wrongTag = {...animated,
+        'id': 19, 'tag_string': 'transgender erza_scarlet'};
+    final results = filterNewMediaFeedPosts(
+      [animated, wrongCategory, wrongTag],
+      selectedTag: 'transgender', kind: 'gif', seenIds: <String>{},
+      query: 'erza_scarlet blue_hair rating:s -monochrome',
+    );
+    expect(results.map((post) => post['id']).toList(), [17]);
+    expect(matchesMediaFeedQuery({...animated, 'rating': 'e'},
+        'erza_scarlet rating:s'), isFalse);
+    expect(matchesMediaFeedQuery(animated,
+        'erza_scarlet -blue_hair'), isFalse);
+    expect(matchesMediaFeedQuery(animated, 'filetype:gif'), isTrue);
+    expect(matchesMediaFeedQuery(animated, 'filetype:jpg'), isFalse);
+  });
+
 }

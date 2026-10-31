@@ -10,6 +10,47 @@ String buildMediaFeedTags(String category, String query) {
   return cleaned.isEmpty ? base : '$base $cleaned';
 }
 
+
+/// Danbooru's anonymous API accepts only two search tags. GIF queries used
+/// to omit filetype:gif whenever a character was entered, so eight pages of
+/// still images could be scanned without finding a single animation.
+/// Put the file type and the most selective user tag on the server; check
+/// category and any remaining terms locally before showing a result.
+String buildMediaFeedRequestTags(String category, String query, String kind) {
+  final terms = query.trim().split(RegExp(r'\\s+'))
+      .where((term) => term.isNotEmpty).toList();
+  if (kind == 'gif') {
+    final first = terms.where((term) =>
+        term.toLowerCase() != 'filetype:gif').firstOrNull;
+    return buildMediaFeedTags(first ?? category, 'filetype:gif');
+  }
+  return buildMediaFeedTags(category, terms.isEmpty ? '' : terms.first);
+}
+
+/// Apply the complete search locally when the server tag budget is exhausted.
+/// Never display a result that fails a positive/negative tag, rating or type
+/// requested by the user. The API may still return fewer matches for very
+/// restrictive searches, but it will not return misleading matches.
+bool matchesMediaFeedQuery(Map<String, dynamic> post, String query) {
+  final tags = (post['tag_string'] ?? '').toString()
+      .toLowerCase().split(RegExp(r'\\s+')).toSet();
+  final rating = (post['rating'] ?? '').toString().toLowerCase();
+  final extension = (post['file_ext'] ?? '').toString().toLowerCase();
+  for (final raw in query.toLowerCase().split(RegExp(r'\\s+'))) {
+    if (raw.isEmpty) continue;
+    final excluded = raw.startsWith('-');
+    final term = excluded ? raw.substring(1) : raw;
+    if (term.isEmpty) continue;
+    final found = term.startsWith('rating:')
+        ? rating == term.substring(7)
+        : term.startsWith('filetype:')
+            ? extension == term.substring(9)
+            : tags.contains(term);
+    if (excluded ? found : !found) return false;
+  }
+  return true;
+}
+
 /// Validate URLs, tag membership and duplicate IDs before rendering.
 /// Rating is intentionally not restricted: the adult-confirmation gate lives
 /// in MediaSearchPage, while an explicit-only filter hid valid results.
@@ -18,7 +59,9 @@ bool isVisibleFeedPost(
   required String selectedTag,
   required String kind,
   required Set<String> seenIds,
+  String query = '',
 }) {
+  if (!matchesMediaFeedQuery(post, query)) return false;
   if (mediaFeedImageUrl(post, highQuality: false) == null) return false;
   final id = (post['id'] ?? '').toString();
   if (id.isEmpty || seenIds.contains(id)) return false;
@@ -126,6 +169,7 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   required String kind,
   required Set<String> seenIds,
   Set<String> seenUrls = const <String>{},
+  String query = '',
 }) {
   final pageSeen = <String>{...seenIds};
   // The API can return the same image under different post IDs. Avoid
@@ -134,7 +178,7 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   final result = <Map<String, dynamic>>[];
   for (final post in candidates) {
     if (!isVisibleFeedPost(post, selectedTag: selectedTag,
-        kind: kind, seenIds: pageSeen)) {
+        kind: kind, seenIds: pageSeen, query: query)) {
       continue;
     }
     final url = mediaFeedImageUrl(post, highQuality: false);

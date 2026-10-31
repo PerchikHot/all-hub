@@ -23,6 +23,12 @@ void main() {
     }
   });
 
+  test('Android installer failures are never reported as completed updates', () {
+    expect(() => ProjectLauncher.requireAndroidInstallerOpened(true), returnsNormally);
+    expect(() => ProjectLauncher.requireAndroidInstallerOpened(false), throwsStateError);
+    expect(() => ProjectLauncher.requireAndroidInstallerOpened(null), throwsStateError);
+  });
+
   test('manual Android package binding validates IDs and stays local', () async {
     SharedPreferences.setMockInitialValues({});
     final id = ExternalRepository.parse('ExampleOrg/Widget-App')!.projectId;

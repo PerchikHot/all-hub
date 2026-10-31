@@ -734,6 +734,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   static const _notifications = MethodChannel('kopilka/notifications');
   bool notificationsEnabled = false;
   Map<String, dynamic>? listenerDiagnostics;
+  String? listenerError;
   final pendingNotifications = <Map<String, dynamic>>[];
   int visiblePendingCount = 10;
   double goal = 100000;
@@ -803,18 +804,34 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         setState(() {
           notificationsEnabled = enabled;
           listenerDiagnostics = diagnostics;
+          listenerError = null;
           pendingNotifications..clear()..addAll(data);
         });
       }
     } on MissingPluginException {
       // Embedded All Hub builds do not include the standalone listener yet.
-    } on PlatformException {
-      // Android settings may be unavailable on some devices.
+      _reportListenerError('Встроенный All Hub не содержит службы чтения уведомлений. '
+          'Нужна отдельная APK Копилки.');
+    } on PlatformException catch (error) {
+      // Only expose a diagnostic code, never a bank notification payload.
+      _reportListenerError('Android вернул ошибку службы: ${error.code}. '
+          'Проверь разрешение доступа к уведомлениям.');
     } on FormatException {
-      // Malformed notification data must not crash the finance dashboard.
+      _reportListenerError('Очередь уведомлений повреждена или имеет неверный формат. '
+          'Сохранённые операции не изменены.');
     } on TypeError {
-      // Older native queue formats may not match the current schema.
+      _reportListenerError('Формат очереди несовместим с этой версией Копилки.');
     }
+  }
+
+  void _reportListenerError(String message) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      listenerError = message;
+      notificationsEnabled = false;
+    });
   }
 
   Future<void> _openNotificationSettings() async {
@@ -1204,6 +1221,13 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             title: const Text('Диагностика получения уведомлений'),
             subtitle: Text(describeKopilkaListener(listenerDiagnostics)),
           ),
+          if (listenerError != null)
+            ListTile(
+              leading: const Icon(Icons.warning_amber_rounded,
+                color: Colors.orangeAccent),
+              title: const Text('Ошибка подключения службы'),
+              subtitle: Text(listenerError!),
+            ),
           ListTile(
             leading: const Icon(Icons.account_balance_outlined),
             title: const Text('События от каждого банка'),

@@ -203,114 +203,7 @@ class HubService {
   /// Reject malformed supplied digests instead of silently disabling checks.
   static String? parseSha256Digest(Object? raw) {
     if (raw is! String ||
-        !RegExp(r'^sha256:[a-fA-F0-9]{64}
-  /// A previous release may still serve Windows while the newest is Android
-  /// only, but never mix older assets into a newer OS version's choices.
-  static List<HubAsset> latestPublishedAssets(
-      String repo, List<dynamic> releases, String? projectId) {
-    final selected = <HubAsset>[];
-    final coveredPlatforms = <String>{};
-    for (final raw in releases) {
-      if (raw is! Map<String, dynamic>) continue;
-      final release = raw;
-      if (release['draft'] == true || release['prerelease'] == true) continue;
-      final tag = (release['tag_name'] ?? '').toString();
-      if (projectId != null && !releaseMatchesProject(tag, projectId)) {
-        continue;
-      }
-      final notes = release['body']?.toString().trim();
-      final publishedVersion = publishedVersionFromRelease(tag, notes);
-      final thisRelease = <HubAsset>[];
-      for (final rawAsset in (release['assets'] as List? ?? [])) {
-        if (rawAsset is! Map<String, dynamic>) continue;
-        if (!isPublishedReleaseAsset(rawAsset)) continue;
-        final name = (rawAsset['name'] ?? '').toString();
-        final platform = assetPlatform(name);
-        final url = (rawAsset['browser_download_url'] ?? '').toString();
-        if (platform == null || coveredPlatforms.contains(platform) ||
-            !isTrustedReleaseAssetUrl(repo, url,
-                expectedName: name, expectedTag: tag)) {
-          continue;
-        }
-        final digest = parseSha256Digest(rawAsset['digest']);
-        if (rawAsset['digest'] != null && digest == null) continue;
-        thisRelease.add(HubAsset(name, url, platform, publishedVersion,
-            releaseNotes: notes, sha256Digest: digest));
-      }
-      selected.addAll(thisRelease);
-      coveredPlatforms.addAll(thisRelease.map((asset) => asset.platform));
-      if (coveredPlatforms.contains('android') &&
-          coveredPlatforms.contains('windows')) {
-        break;
-      }
-    }
-    return selected;
-  }
-
-  static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
-    try {
-      // Third-party cards need published releases, not private CI metadata.
-      // Skipping Actions halves their anonymous GitHub API requests.
-      final responses = await Future.wait([
-        http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=5'), headers: _headers)
-          .timeout(const Duration(seconds: 12)),
-        if (projectId != null)
-          http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
-            .timeout(const Duration(seconds: 12)),
-      ]);
-      final assets = <HubAsset>[];
-      String? version, workflow, actionsUrl;
-      if (responses[0].statusCode == 200) {
-        final releases = jsonDecode(responses[0].body) as List;
-        assets.addAll(latestPublishedAssets(repo, releases, projectId));
-        for (final asset in assets) {
-          if (asset.platform == currentPlatform) {
-            version = asset.version;
-            break;
-          }
-        }
-      }
-      if (responses.length > 1 && responses[1].statusCode == 200) {
-        final runs = (jsonDecode(responses[1].body) as Map<String, dynamic>)['workflow_runs'] as List? ?? [];
-        final relevantRuns = runs.cast<Map<String, dynamic>>().where(
-          (run) => workflowMatchesProject(
-            run['name']?.toString(), projectId, currentPlatform,
-          ),
-        ).toList();
-        if (relevantRuns.isNotEmpty) {
-          final run = relevantRuns.first;
-          workflow = '${run['status'] ?? 'unknown'} / ${run['conclusion'] ?? 'pending'}';
-          // Link the latest relevant run, even if it failed. A previous
-          // successful run must not hide the current build failure.
-          actionsUrl = run['html_url']?.toString();
-        }
-      }
-      return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,
-        assets: assets, error: apiStatusError(
-          responses[0].statusCode,
-          responses.length > 1 ? responses[1].statusCode : 200));
-    } catch (e) {
-      return ProjectStatus(error: 'Ошибка сети: $e');
-    }
-  }
-}
-
-/// Favorites are local to each installation. The project catalog is shared online.
-class HubFavorites {
-  static final ValueNotifier<Set<String>> ids = ValueNotifier(<String>{});
-  static Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    ids.value = prefs.getStringList('favorites')?.toSet() ?? <String>{};
-  }
-  static Future<void> toggle(String id) async {
-    final next = Set<String>.from(ids.value);
-    if (!next.add(id)) next.remove(id);
-    ids.value = next;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('favorites', next.toList());
-  }
-}
-).hasMatch(raw)) {
+        !RegExp(r'^sha256:[a-fA-F0-9]{64}$').hasMatch(raw)) {
       return null;
     }
     return raw.substring(7).toLowerCase();
@@ -345,8 +238,10 @@ class HubFavorites {
                 expectedName: name, expectedTag: tag)) {
           continue;
         }
+        final digest = parseSha256Digest(rawAsset['digest']);
+        if (rawAsset['digest'] != null && digest == null) continue;
         thisRelease.add(HubAsset(name, url, platform, publishedVersion,
-            releaseNotes: notes));
+            releaseNotes: notes, sha256Digest: digest));
       }
       selected.addAll(thisRelease);
       coveredPlatforms.addAll(thisRelease.map((asset) => asset.platform));

@@ -2,6 +2,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/media_feed_query.dart';
 
 void main() {
+  test('interleaved feed continues after one category is exhausted', () {
+    const tags = <String>['futanari', 'transgender'];
+    expect(nextAvailableMediaFeedPage(1, tags, <String>{}), 1);
+    expect(nextAvailableMediaFeedPage(1, tags, <String>{'futanari'}), 2);
+    expect(nextAvailableMediaFeedPage(3, tags, <String>{'futanari'}), 4);
+    expect(nextAvailableMediaFeedPage(4, tags, <String>{'transgender'}), 5);
+    expect(nextAvailableMediaFeedPage(5, tags, tags.toSet()), isNull);
+    expect(nextAvailableMediaFeedPage(1, <String>[], <String>{}), isNull);
+    expect(nextAvailableMediaFeedPage(0, tags, <String>{}), isNull);
+  });
+
   test('image CDN fallback candidates are ordered, unique and HTTPS-only', () {
     final post = <String, dynamic>{
       'preview_file_url': 'https://cdn.example/preview.jpg',

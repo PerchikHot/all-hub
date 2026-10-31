@@ -210,7 +210,7 @@ class HubService {
       final release = raw;
       if (release['draft'] == true || release['prerelease'] == true) continue;
       final tag = (release['tag_name'] ?? '').toString();
-      if (!releaseMatchesProject(tag, projectId)) continue;
+      if (projectId != null && !releaseMatchesProject(tag, projectId)) continue;
       final notes = release['body']?.toString().trim();
       final publishedVersion = publishedVersionFromRelease(tag, notes);
       final thisRelease = <HubAsset>[];

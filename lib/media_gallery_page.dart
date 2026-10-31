@@ -574,7 +574,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: _FeedFallbackImage(
-                    key: ValueKey('feed-${id}-${highQuality}'),
+                    key: ValueKey('feed-$id-$highQuality'),
                     post: post,
                     highQuality: highQuality,
                     fit: showEntireImage ? BoxFit.contain : BoxFit.cover,

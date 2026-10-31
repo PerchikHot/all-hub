@@ -96,6 +96,12 @@ bool isBankTransactionNotification(String title, String body) {
     r'парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s+безопасности',
     caseSensitive: false,
   );
+  // Match the native listener's extra OTP variants. A payment amount next
+  // to a confirmation code is never proof of a completed transaction.
+  final additionalCredentials = RegExp(
+    r'(?:код|code)\s*(?:для\s+)?(?:операции|перевода|оплаты|payment|transfer)|\b(?:security|confirmation|verification)\s+code\b|(?:sms|смс)[-\s]*(?:парол[ья]|password)',
+    caseSensitive: false,
+  );
   // A declined, cancelled, failed or still pending payment is not a completed expense.
   // Keep these alerts out of manual import suggestions; never delete them
   // from the Android notification tray or change saved transactions.
@@ -120,6 +126,7 @@ bool isBankTransactionNotification(String title, String body) {
       currency.hasMatch(text) &&
       suggestNotificationAmount(text).isNotEmpty &&
       !sensitive.hasMatch(text) && !credentialWords.hasMatch(text) &&
+      !additionalCredentials.hasMatch(text) &&
       !failedTransaction.hasMatch(text) && !notCompleted.hasMatch(text) &&
       !scheduledTransaction.hasMatch(text);
 }

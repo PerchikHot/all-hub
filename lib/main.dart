@@ -11,6 +11,7 @@ import 'ai_models_page.dart';
 import 'media_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const AllHub());
@@ -95,8 +96,46 @@ class _HomePageState extends State<HomePage> {
   Future<List<Project>> _loadProjects() async {
     final data = await rootBundle.loadString('assets/projects.json');
     final live = await HubService.catalog(data);
-    return live.map((p) => Project(p.id, p.name, p.type, p.description, p.repo)).toList();
+    final result = live.map((p) => Project(p.id, p.name, p.type, p.description, p.repo)).toList();
+    final prefs = await SharedPreferences.getInstance();
+    for (final raw in prefs.getStringList('allhub_custom_repos_v1') ?? <String>[]) {
+      final parts = raw.split('/');
+      if (parts.length != 2 || !RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(parts[0]) ||
+          !RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(parts[1])) continue;
+      if (result.any((p) => p.repo?.toLowerCase() == raw.toLowerCase())) continue;
+      result.add(Project('external-${parts.join('-').toLowerCase()}', parts[1],
+          'GitHub app', 'Добавленный репозиторий GitHub: $raw', raw));
+    }
+    return result;
   }
+  Future<void> addRepository() async {
+    final controller = TextEditingController();
+    final entered = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Добавить репозиторий GitHub'),
+      content: TextField(controller: controller, autofocus: true,
+        decoration: const InputDecoration(hintText: 'owner/repository или ссылка GitHub')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Добавить'))],
+    ));
+    controller.dispose();
+    if (!mounted || entered == null || entered.isEmpty) return;
+    final parsed = Uri.tryParse(entered);
+    final candidate = parsed != null && parsed.host.toLowerCase() == 'github.com' && parsed.scheme == 'https'
+        ? parsed.pathSegments.take(2).join('/') : entered;
+    final valid = RegExp(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$').hasMatch(candidate) &&
+        !candidate.split('/').contains('..');
+    if (!valid) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Укажи owner/repo или ссылку https://github.com/owner/repo')));
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('allhub_custom_repos_v1') ?? <String>[];
+    if (!saved.any((v) => v.toLowerCase() == candidate.toLowerCase())) {
+      await prefs.setStringList('allhub_custom_repos_v1', [...saved, candidate]);
+    }
+    await refresh();
+  }
+
   Future<void> open(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
@@ -155,6 +194,9 @@ class _HomePageState extends State<HomePage> {
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[
           TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(onPressed: addRepository, icon: const Icon(Icons.add_link),
+            label: const Text('Добавить приложение из GitHub')),
           const SizedBox(height: 12),
           Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'Все' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
           const SizedBox(height: 16),

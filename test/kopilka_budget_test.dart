@@ -2,6 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('daily budget allowance includes today and handles month boundaries', () {
+    expect(kopilkaDailyBudgetAllowance(100, 410, DateTime(2026, 10, 1)), 10);
+    expect(kopilkaDailyBudgetAllowance(200, 300, DateTime(2026, 10, 31)), 100);
+    expect(kopilkaDailyBudgetAllowance(0, 280, DateTime(2027, 2, 1)), 10);
+    expect(kopilkaDailyBudgetAllowance(0, 290, DateTime(2028, 2, 1)), 10);
+    expect(kopilkaDailyBudgetAllowance(350, 300, DateTime(2026, 10, 20)), 0);
+    expect(kopilkaDailyBudgetAllowance(100, 0, DateTime(2026, 10, 1)), isNull);
+    expect(kopilkaDailyBudgetAllowance(double.nan, 300, DateTime(2026, 10, 1)), isNull);
+  });
+
   test('monthly budget is optional and never blocks transactions', () {
     expect(kopilkaMonthlyBudgetProgress(500, 0), isNull);
     expect(kopilkaMonthlyBudgetProgress(500, -1), isNull);

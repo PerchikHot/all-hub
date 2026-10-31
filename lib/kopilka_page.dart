@@ -630,12 +630,16 @@ Map<String, KopilkaAccountFlow> summarizeKopilkaAccountFlows(
       // Incomplete or self-transfers are not silently allocated to accounts.
       if (source is! String || target is! String ||
           source == target || !flows.containsKey(source) ||
-          !flows.containsKey(target)) continue;
+          !flows.containsKey(target)) {
+        continue;
+      }
       flows[source]!.transfersOut += amount;
       flows[target]!.transfersIn += amount;
     } else if (kind == 'income' || kind == 'expense') {
       final account = entry['bank'];
-      if (account is! String || !flows.containsKey(account)) continue;
+      if (account is! String || !flows.containsKey(account)) {
+        continue;
+      }
       if (kind == 'income') {
         flows[account]!.income += amount;
       } else {
@@ -700,6 +704,20 @@ double? kopilkaMonthlyBudgetProgress(double spent, double limit) {
     return null;
   }
   return (spent / limit).clamp(0.0, 1.0);
+}
+
+/// The remaining budget spread across today and the remaining calendar days.
+/// This is a planning hint, not an authorization to spend money. Transfers
+/// never enter [spent]; invalid or disabled budgets produce no suggestion.
+double? kopilkaDailyBudgetAllowance(double spent, double limit, DateTime now) {
+  if (!spent.isFinite || !limit.isFinite || limit <= 0 || spent < 0) {
+    return null;
+  }
+  final daysInMonth = DateTime.utc(now.year, now.month + 1, 0).day;
+  if (now.day < 1 || now.day > daysInMonth) return null;
+  final remainingDays = daysInMonth - now.day + 1;
+  final remaining = limit - spent;
+  return remaining <= 0 ? 0.0 : remaining / remainingDays;
 }
 
 class KopilkaPage extends StatefulWidget {
@@ -1109,6 +1127,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyBalance = monthlyIncome - monthlyExpenses;
     final budgetProgress = kopilkaMonthlyBudgetProgress(monthlyExpenses, monthlyBudget);
+    final dailyBudgetAllowance = kopilkaDailyBudgetAllowance(monthlyExpenses, monthlyBudget, now);
     final monthlyCategories = summarizeKopilkaExpenses(monthlyEntries);
     final monthlyAccountFlows = summarizeKopilkaAccountFlows(monthlyEntries, banks);
     final sortedCategories = monthlyCategories.entries.toList()
@@ -1275,6 +1294,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 : 'Осталось по лимиту: ${money(monthlyBudget - monthlyExpenses)}',
                 style: TextStyle(color: monthlyExpenses > monthlyBudget
                   ? const Color(0xFFFF9DA8) : const Color(0xFFA8E8D5))),
+              if (dailyBudgetAllowance != null) ...[
+                const SizedBox(height: 8),
+                Text('Ориентир на оставшиеся дни месяца: ${money(dailyBudgetAllowance)} в день',
+                  style: const TextStyle(color: Colors.white70)),
+              ],
             ],
             const SizedBox(height: 6),
             const Text('Только подтверждённые расходы текущего месяца. Не ограничивает банковские операции.',

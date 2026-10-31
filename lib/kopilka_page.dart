@@ -580,6 +580,21 @@ String describeKopilkaBankEvents(Map<String, dynamic>? diagnostics) {
   return 'События по банкам (без текста): $counts. Ноль — проверь разрешение, энергосбережение и версию банковского приложения.';
 }
 
+/// Counts explain why the listener saw bank events but the import queue is empty.
+/// No notification text or authentication codes are exposed.
+String describeKopilkaImportGate(Map<String, dynamic>? diagnostics) {
+  if (diagnostics == null) {
+    return 'Счётчики отбора доступны в отдельной Android APK Копилки.';
+  }
+  final accepted = diagnostics['accepted'];
+  final filtered = diagnostics['filtered'];
+  if (accepted is! int || accepted < 0 || filtered is! int || filtered < 0) {
+    return 'Счётчики отбора появятся после обновления отдельной APK Копилки.';
+  }
+  return 'Отобрано для проверки: $accepted · отклонено фильтром: $filtered. '
+      'Отклонённые сообщения не сохраняются.';
+}
+
 /// Categories are chosen explicitly during confirmation, never inferred from
 /// private bank notification text. Older entries stay in "Без категории".
 const kopilkaExpenseCategories = <String>[
@@ -1232,6 +1247,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             leading: const Icon(Icons.account_balance_outlined),
             title: const Text('События от каждого банка'),
             subtitle: Text(describeKopilkaBankEvents(listenerDiagnostics)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.filter_alt_outlined),
+            title: const Text('Отбор уведомлений для импорта'),
+            subtitle: Text(describeKopilkaImportGate(listenerDiagnostics)),
           ),
           if (pendingNotifications.isNotEmpty)
             ExpansionTile(

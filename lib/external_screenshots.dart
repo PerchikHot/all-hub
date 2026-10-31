@@ -18,14 +18,14 @@ class ExternalScreenshots {
 
   static Future<Directory> _directory() async {
     final support = await getApplicationSupportDirectory();
-    return Directory(support.path + Platform.pathSeparator + 'external_screenshots');
+    return Directory('${support.path}${Platform.pathSeparator}external_screenshots');
   }
 
   static Future<List<String>> load(String projectId) async {
     if (!_validId(projectId)) return [];
     final prefs = await SharedPreferences.getInstance();
     final directory = await _directory();
-    final prefix = directory.path + Platform.pathSeparator;
+    final prefix = '${directory.path}${Platform.pathSeparator}';
     final paths = prefs.getStringList('$_prefix$projectId') ?? <String>[];
     final result = <String>[];
     for (final path in paths.take(maxScreenshots)) {
@@ -65,9 +65,7 @@ class ExternalScreenshots {
     try {
       for (var index = 0; index < sources.length; index++) {
         final (source, extension) = sources[index];
-        final target = File(directory.path + Platform.pathSeparator +
-            '$projectId-' + DateTime.now().microsecondsSinceEpoch.toString() +
-            '-$index.$extension');
+        final target = File('${directory.path}${Platform.pathSeparator}$projectId-${DateTime.now().microsecondsSinceEpoch}-$index.$extension');
         await source.copy(target.path);
         added.add(target.path);
       }
@@ -153,8 +151,7 @@ class _ExternalScreenshotGalleryState extends State<ExternalScreenshotGallery> {
         Row(children: [
           const Expanded(child: Text('Скриншоты (только на устройстве)',
             style: TextStyle(fontWeight: FontWeight.w600))),
-          Text(paths.length.toString() + '/' +
-            ExternalScreenshots.maxScreenshots.toString()),
+          Text('${paths.length}/${ExternalScreenshots.maxScreenshots}'),
           IconButton(tooltip: 'Добавить скриншоты',
             icon: const Icon(Icons.add_photo_alternate_outlined),
             onPressed: paths.length >= ExternalScreenshots.maxScreenshots

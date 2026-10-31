@@ -191,7 +191,7 @@ class _HomePageState extends State<HomePage> {
         title: Text(merge ? 'Объединить публичные каталоги' : 'Импорт публичных репозиториев'),
         content: SizedBox(width: 540, child: TextField(
           controller: controller, maxLines: 8, minLines: 4,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Вставь JSON-каталог All Hub',
             helperText: merge ? 'Добавит новые репозитории, сохранив текущие.' : 'Импорт заменит только список сторонних репозиториев.'),
         )),

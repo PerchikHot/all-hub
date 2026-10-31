@@ -611,10 +611,18 @@ String describeKopilkaBankEvents(Map<String, dynamic>? diagnostics) {
   final raw = diagnostics?['bankEvents'];
   if (raw is! Map) return 'По каждому банку: данные появятся после подключения Android-службы.';
   const banks = ['Т-Банк', 'Газпромбанк', 'Ozon Банк'];
+  final accepted = diagnostics?['bankAccepted'];
+  final filtered = diagnostics?['bankFiltered'];
   final counts = banks.map((bank) {
     final value = raw[bank];
     final count = value is int && value >= 0 ? value : 0;
-    return '$bank: $count';
+    // Older APKs only expose observed counts; preserve that fallback.
+    if (accepted is! Map || filtered is! Map) return '$bank: $count';
+    final a = accepted[bank];
+    final f = filtered[bank];
+    final acceptedCount = a is int && a >= 0 ? a : 0;
+    final filteredCount = f is int && f >= 0 ? f : 0;
+    return '$bank: $count (на проверку: $acceptedCount, отсеяно: $filteredCount)';
   }).join(' · ');
   return 'События по банкам (без текста): $counts. Ноль — проверь разрешение, энергосбережение и версию банковского приложения.';
 }

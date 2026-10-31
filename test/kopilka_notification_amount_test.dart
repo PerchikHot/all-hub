@@ -400,6 +400,16 @@ void main() {
     expect(summary, contains('Газпромбанк: 2'));
     expect(summary, contains('Ozon Банк: 0'));
     expect(summary, isNot(contains('123456')));
+    final detailed = describeKopilkaBankEvents({
+      'bankEvents': {'Т-Банк': 9, 'Газпромбанк': 5, 'Ozon Банк': 2},
+      'bankAccepted': {'Т-Банк': 2, 'Газпромбанк': 1, 'Ozon Банк': 0},
+      'bankFiltered': {'Т-Банк': 7, 'Газпромбанк': 4, 'Ozon Банк': 2},
+      'body': 'Код подтверждения 123456',
+    });
+    expect(detailed, contains('Т-Банк: 9 (на проверку: 2, отсеяно: 7)'));
+    expect(detailed, contains('Газпромбанк: 5 (на проверку: 1, отсеяно: 4)'));
+    expect(detailed, contains('Ozon Банк: 2 (на проверку: 0, отсеяно: 2)'));
+    expect(detailed, isNot(contains('123456')));
     expect(describeKopilkaBankEvents({
       'bankEvents': {'Т-Банк': -5, 'Газпромбанк': 'bad'},
     }), contains('Т-Банк: 0'));

@@ -625,11 +625,12 @@ class _HomePageState extends State<HomePage> {
                           if (!await confirmExternalInstall(project)) {
                             return;
                           }
-                          await ProjectLauncher.installAndroidApk(i.downloadUrl!,
-                            projectId: project.id,
-                            externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null,
-                            sha256Digest: i.sha256Digest);
+                          await ProjectLauncher.runInstallExclusive(project.id,
+                            () => ProjectLauncher.installAndroidApk(i.downloadUrl!,
+                              projectId: project.id,
+                              externalRepo: project.id.startsWith('external-')
+                                  ? project.repo : null,
+                              sha256Digest: i.sha256Digest));
                         } catch (e) {
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));
@@ -656,19 +657,22 @@ class _HomePageState extends State<HomePage> {
                           onPressed: isNewerLocal ? null : () async {
                             try {
                               if (!await confirmExternalInstall(project)) return;
-                              final uri = Uri.parse(i.downloadUrl!);
-                              if (uri.path.toLowerCase().endsWith('.zip')) {
-                                await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
-                                  externalRepo: project.id.startsWith('external-') ? project.repo : null,
-                                  sha256Digest: i.sha256Digest);
-                              } else if (uri.path.toLowerCase().endsWith('.exe')) {
-                                await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
-                                  externalRepo: project.id.startsWith('external-') ? project.repo : null,
-                                  sha256Digest: i.sha256Digest);
-                              } else {
-                                throw StateError('Формат обновления Windows не поддерживается');
-                              }
-                              await ProjectLauncher.recordInstalledVersion(project.id, i.version);
+                              await ProjectLauncher.runInstallExclusive(project.id, () async {
+                                final uri = Uri.parse(i.downloadUrl!);
+                                if (uri.path.toLowerCase().endsWith('.zip')) {
+                                  await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
+                                    externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                    sha256Digest: i.sha256Digest);
+                                } else if (uri.path.toLowerCase().endsWith('.exe')) {
+                                  await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
+                                    externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                    sha256Digest: i.sha256Digest);
+                                } else {
+                                  throw StateError('Формат обновления Windows не поддерживается');
+                                }
+                                await ProjectLauncher.recordInstalledVersion(project.id, i.version);
+                              });
+                              if (context.mounted) setState(() {});
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Обновление установлено. Можно запускать приложение.')));

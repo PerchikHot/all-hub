@@ -352,7 +352,9 @@ class ProjectLauncher {
   /// Check GitHub's published SHA-256 digest before activating an installer.
   /// Older releases without a digest retain existing container checks.
   static Future<void> verifyDownloadedDigest(File file, String? expected) async {
-    if (expected == null) return;
+    if (expected == null) {
+      return;
+    }
     if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(expected)) {
       throw const FormatException('Некорректная контрольная сумма SHA-256');
     }

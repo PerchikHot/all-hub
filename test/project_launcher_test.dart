@@ -57,6 +57,8 @@ void main() {
 
   test('installer binds official and manually registered APK package names', () async {
     SharedPreferences.setMockInitialValues({});
+    expect(await ProjectLauncher.expectedAndroidPackageName('all-hub'),
+        'com.example.all_hub');
     expect(await ProjectLauncher.expectedAndroidPackageName('shadow-rp'),
         'com.shadowrp.app');
     expect(await ProjectLauncher.expectedAndroidPackageName('kopilka'),

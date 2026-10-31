@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:all_hub/external_repositories.dart';
 
 void main() {
@@ -30,6 +32,27 @@ void main() {
     ]) {
       expect(ExternalRepository.parse(value), isNull, reason: value);
     }
+  });
+
+  test('public repository verification rejects private and missing repos', () async {
+    final repo = ExternalRepository.parse('Example/Widget')!;
+    final valid = MockClient((request) async {
+      expect(request.url.toString(),
+          'https://api.github.com/repos/Example/Widget');
+      return http.Response('{"full_name":"Example/Widget","private":false,"archived":false}', 200);
+    });
+    await ExternalRepositoryStore.verifyPublic(repo, client: valid);
+
+    final privateClient = MockClient((request) async =>
+        http.Response('{"full_name":"Example/Widget","private":true}', 200));
+    await expectLater(
+        ExternalRepositoryStore.verifyPublic(repo, client: privateClient),
+        throwsStateError);
+    final missingClient = MockClient((request) async =>
+        http.Response('{"message":"Not Found"}', 404));
+    await expectLater(
+        ExternalRepositoryStore.verifyPublic(repo, client: missingClient),
+        throwsStateError);
   });
 
   test('local repository catalog is deduplicated, removable and bounded', () async {

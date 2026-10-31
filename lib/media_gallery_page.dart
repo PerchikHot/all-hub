@@ -657,7 +657,10 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
       fit: widget.fit,
       filterQuality: FilterQuality.medium,
       memCacheWidth: widget.highQuality ? 900 : 420,
-      maxWidthDiskCache: widget.highQuality ? 900 : 420,
+      // Disk resizing decodes only one frame of some GIFs. Cache original
+      // animation bytes instead, while retaining the bounded memory cache.
+      maxWidthDiskCache: isAnimatedFeedAssetUrl(url)
+          ? null : (widget.highQuality ? 900 : 420),
       fadeInDuration: Duration.zero,
       placeholder: (context, _) => const Center(
         child: Icon(Icons.image_outlined, color: Colors.white24)),

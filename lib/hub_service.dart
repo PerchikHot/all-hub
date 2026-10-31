@@ -159,7 +159,8 @@ class HubService {
   /// Only install packages from the requested repository's GitHub release.
   /// The API response is network data, not an authorization to download
   /// executables from arbitrary domains or another project's release.
-  static bool isTrustedReleaseAssetUrl(String repo, String url, {String? expectedName}) {
+  static bool isTrustedReleaseAssetUrl(String repo, String url,
+      {String? expectedName, String? expectedTag}) {
     final repositoryParts = repo.split('/');
     final uri = Uri.tryParse(url);
     if (repositoryParts.length != 2 || uri == null ||
@@ -173,6 +174,7 @@ class HubService {
         parts[1].toLowerCase() != repositoryParts[1].toLowerCase() ||
         parts[2] != 'releases' || parts[3] != 'download' ||
         (expectedName != null && parts.last != expectedName) ||
+        (expectedTag != null && parts[4] != expectedTag) ||
         parts.skip(4).any((part) => part.isEmpty ||
             part == '.' || part == '..' ||
             part.contains('/') || part.contains('\\'))) {
@@ -219,7 +221,8 @@ class HubService {
         final platform = assetPlatform(name);
         final url = (rawAsset['browser_download_url'] ?? '').toString();
         if (platform == null || coveredPlatforms.contains(platform) ||
-            !isTrustedReleaseAssetUrl(repo, url, expectedName: name)) {
+            !isTrustedReleaseAssetUrl(repo, url,
+                expectedName: name, expectedTag: tag)) {
           continue;
         }
         thisRelease.add(HubAsset(name, url, platform, publishedVersion,
@@ -228,7 +231,9 @@ class HubService {
       selected.addAll(thisRelease);
       coveredPlatforms.addAll(thisRelease.map((asset) => asset.platform));
       if (coveredPlatforms.contains('android') &&
-          coveredPlatforms.contains('windows')) break;
+          coveredPlatforms.contains('windows')) {
+        break;
+      }
     }
     return selected;
   }

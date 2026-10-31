@@ -55,6 +55,56 @@ void main() {
         throwsStateError);
   });
 
+
+  test('portable catalog backup round-trips and rejects unsafe entries', () {
+    final backup = ExternalRepositoryStore.exportBackup([
+      ExternalRepository.parse('Example/One')!,
+      ExternalRepository.parse('Another/Two')!,
+    ]);
+    expect(ExternalRepositoryStore.parseBackup(backup)
+        .map((repo) => repo.fullName).toList(), ['Example/One', 'Another/Two']);
+    for (final bad in [
+      '{}',
+      '{"format":"veyrion-public-repositories","version":2,"repositories":[]}',
+      '{"format":"veyrion-public-repositories","version":1,"repositories":["A/Repo","a/repo"]}',
+      '{"format":"veyrion-public-repositories","version":1,"repositories":["A/Repo/releases"]}',
+      '{"format":"veyrion-public-repositories","version":1,"repositories":["https://github.com/A/Repo"]}',
+      '{"format":"veyrion-public-repositories","version":1,"repositories":[123]}',
+      ' ' * 8193,
+    ]) {
+      expect(() => ExternalRepositoryStore.parseBackup(bad),
+          throwsFormatException, reason: bad.substring(0, bad.length > 80 ? 80 : bad.length));
+    }
+  });
+
+  test('backup import verifies all repositories before atomic replacement', () async {
+    SharedPreferences.setMockInitialValues({
+      ExternalRepositoryStore.storageKey: ['Original/Keep'],
+    });
+    final backup = ExternalRepositoryStore.exportBackup([
+      ExternalRepository.parse('Example/One')!,
+      ExternalRepository.parse('Example/Two')!,
+    ]);
+    final rejected = MockClient((request) async {
+      final name = request.url.pathSegments.last;
+      return http.Response(
+        '{"full_name":"Example/$name","private":${name == 'Two'}}', 200);
+    });
+    await expectLater(
+        ExternalRepositoryStore.importBackup(backup, client: rejected),
+        throwsStateError);
+    expect((await ExternalRepositoryStore.load()).single.fullName,
+        'Original/Keep');
+
+    final approved = MockClient((request) async {
+      final name = request.url.pathSegments.last;
+      return http.Response('{"full_name":"Example/$name","private":false}', 200);
+    });
+    expect(await ExternalRepositoryStore.importBackup(backup, client: approved), 2);
+    expect((await ExternalRepositoryStore.load()).map((e) => e.fullName).toList(),
+        ['Example/One', 'Example/Two']);
+  });
+
   test('local repository catalog is deduplicated, removable and bounded', () async {
     SharedPreferences.setMockInitialValues({
       ExternalRepositoryStore.storageKey: [

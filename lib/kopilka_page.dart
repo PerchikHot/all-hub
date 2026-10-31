@@ -607,6 +607,45 @@ Map<String, double> summarizeKopilkaExpenses(
   return totals;
 }
 
+/// Read-only monthly account movement; transfers are not income or expense.
+/// This reflects only locally confirmed entries, not actual bank balances.
+class KopilkaAccountFlow {
+  double income = 0;
+  double expense = 0;
+  double transfersIn = 0;
+  double transfersOut = 0;
+  double get net => income - expense + transfersIn - transfersOut;
+}
+
+Map<String, KopilkaAccountFlow> summarizeKopilkaAccountFlows(
+    Iterable<Map<String, dynamic>> transactions, Iterable<String> accounts) {
+  final flows = {for (final account in accounts) account: KopilkaAccountFlow()};
+  for (final entry in transactions) {
+    final amount = safeKopilkaAmount(entry);
+    if (!amount.isFinite || amount <= 0) continue;
+    final kind = entry['kind'];
+    if (kind == 'transfer') {
+      final source = entry['from'];
+      final target = entry['to'];
+      // Incomplete or self-transfers are not silently allocated to accounts.
+      if (source is! String || target is! String ||
+          source == target || !flows.containsKey(source) ||
+          !flows.containsKey(target)) continue;
+      flows[source]!.transfersOut += amount;
+      flows[target]!.transfersIn += amount;
+    } else if (kind == 'income' || kind == 'expense') {
+      final account = entry['bank'];
+      if (account is! String || !flows.containsKey(account)) continue;
+      if (kind == 'income') {
+        flows[account]!.income += amount;
+      } else {
+        flows[account]!.expense += amount;
+      }
+    }
+  }
+  return flows;
+}
+
 /// Read-only estimate based only on operations entered by the user.
 /// It never assumes a future salary amount or changes account balances.
 class KopilkaSalaryForecast {
@@ -1071,6 +1110,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final monthlyBalance = monthlyIncome - monthlyExpenses;
     final budgetProgress = kopilkaMonthlyBudgetProgress(monthlyExpenses, monthlyBudget);
     final monthlyCategories = summarizeKopilkaExpenses(monthlyEntries);
+    final monthlyAccountFlows = summarizeKopilkaAccountFlows(monthlyEntries, banks);
     final sortedCategories = monthlyCategories.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     // Reuse the same filtered list for display and summary. Transfers between
@@ -1292,6 +1332,24 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               const SizedBox(height: 4),
               LinearProgressIndicator(value: monthlyExpenses > 0
                 ? (item.value / monthlyExpenses).clamp(0.0, 1.0) : 0),
+            ],
+          ]),
+        )),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Движение по счетам за месяц',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            const Text('По подтверждённым операциям. Внутренние переводы показаны отдельно и не считаются доходом или расходом.',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
+            for (final bank in banks) ...[
+              const SizedBox(height: 12),
+              Text(bank, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text('Поступления: ${money(monthlyAccountFlows[bank]!.income)} · Расходы: ${money(monthlyAccountFlows[bank]!.expense)}'),
+              Text('Переводы: +${money(monthlyAccountFlows[bank]!.transfersIn)} / −${money(monthlyAccountFlows[bank]!.transfersOut)}'),
+              Text('Изменение: ${money(monthlyAccountFlows[bank]!.net)}',
+                style: const TextStyle(color: Color(0xFFA8C5FF))),
             ],
           ]),
         )),

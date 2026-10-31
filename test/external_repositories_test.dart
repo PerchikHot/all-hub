@@ -105,6 +105,50 @@ void main() {
         ['Example/One', 'Example/Two']);
   });
 
+  test('merge import preserves old catalog and verifies only new sources', () async {
+    SharedPreferences.setMockInitialValues({
+      ExternalRepositoryStore.storageKey: ['Original/Keep'],
+    });
+    final backup = ExternalRepositoryStore.exportBackup([
+      ExternalRepository.parse('Original/Keep')!,
+      ExternalRepository.parse('Example/New')!,
+    ]);
+    final rejected = MockClient((request) async {
+      expect(request.url.path, '/repos/Example/New');
+      return http.Response('{"full_name":"Example/New","private":true}', 200);
+    });
+    await expectLater(
+        ExternalRepositoryStore.mergeBackup(backup, client: rejected),
+        throwsStateError);
+    expect((await ExternalRepositoryStore.load()).single.fullName, 'Original/Keep');
+
+    var requests = 0;
+    final approved = MockClient((request) async {
+      requests++;
+      expect(request.url.path, '/repos/Example/New');
+      return http.Response('{"full_name":"Example/New","private":false}', 200);
+    });
+    expect(await ExternalRepositoryStore.mergeBackup(backup, client: approved), 1);
+    expect(requests, 1);
+    expect((await ExternalRepositoryStore.load()).map((r) => r.fullName).toList(),
+        ['Original/Keep', 'Example/New']);
+    expect(await ExternalRepositoryStore.mergeBackup(backup, client: approved), 0);
+    expect(requests, 1);
+  });
+
+  test('merge rejects overflow without modifying existing entries', () async {
+    SharedPreferences.setMockInitialValues({
+      ExternalRepositoryStore.storageKey:
+          List.generate(30, (index) => 'Existing/Repo$index'),
+    });
+    final backup = ExternalRepositoryStore.exportBackup([
+      ExternalRepository.parse('Example/New')!,
+    ]);
+    await expectLater(ExternalRepositoryStore.mergeBackup(backup),
+        throwsFormatException);
+    expect((await ExternalRepositoryStore.load()).length, 30);
+  });
+
   test('local repository catalog is deduplicated, removable and bounded', () async {
     SharedPreferences.setMockInitialValues({
       ExternalRepositoryStore.storageKey: [

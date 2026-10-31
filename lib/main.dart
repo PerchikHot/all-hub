@@ -641,13 +641,20 @@ class _HomePageState extends State<HomePage> {
                     FutureBuilder<String?>(
                       future: ProjectLauncher.installedVersion(project.id),
                       builder: (context, installed) {
-                        final available = installed.data != null &&
-                            comparePublishedVersions(installed.data!, i.version ?? '') == -1;
-                        if (!available) return const SizedBox.shrink();
+                        final hasInstalledVersion = installed.data != null;
+                        final comparison = hasInstalledVersion && i.version != null
+                            ? comparePublishedVersions(installed.data!, i.version!)
+                            : null;
+                        // Always expose the update action on Windows: legacy
+                        // installations have no stored version and previously
+                        // made the button disappear completely.
+                        final isCurrent = comparison == 0;
+                        final isNewerLocal = comparison == 1;
                         return FilledButton.icon(
                           icon: const Icon(Icons.system_update_alt_rounded),
-                          label: Text('Обновить: ${installed.data} → ${i.version}'),
-                          onPressed: () async {
+                          label: Text(isCurrent ? 'Переустановить текущую версию' : isNewerLocal ? 'Установлена более новая версия' : 'Обновить приложение${i.version == null ? '' : ' до ${i.version}'}'),
+                          
+                          onPressed: isNewerLocal ? null : () async {
                             try {
                               if (!await confirmExternalInstall(project)) return;
                               final uri = Uri.parse(i.downloadUrl!);

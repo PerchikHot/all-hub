@@ -370,6 +370,14 @@ class ProjectLauncher {
     }
   }
 
+  /// A system installer intent being launched is NOT proof of installation,
+  /// but false/null must be surfaced instead of marking the update successful.
+  static void requireAndroidInstallerOpened(bool? opened) {
+    if (opened != true) {
+      throw StateError('Не удалось открыть системный установщик Android');
+    }
+  }
+
   /// Downloads a published APK directly, then asks Android to install it.
   /// Android always requires user confirmation; this cannot silently install apps.
   static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo, String? sha256Digest}) async {
@@ -416,9 +424,7 @@ class ProjectLauncher {
         // that as a successful update.
         final opened = await _channel.invokeMethod<bool>(
           'installApk', {'path': apk.path});
-        if (opened != true) {
-          throw StateError('Не удалось открыть системный установщик Android');
-        }
+        requireAndroidInstallerOpened(opened);
       } finally {
         if (await temporary.exists()) await temporary.delete();
       }

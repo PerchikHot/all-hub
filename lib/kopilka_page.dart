@@ -654,6 +654,15 @@ KopilkaSalaryForecast forecastKopilkaToPayday(
       currentBalance.isFinite ? currentBalance - projected : 0.0);
 }
 
+/// A disabled budget (0) never blocks operations or changes bank balances.
+/// This is a local planning limit, not a bank-enforced spending cap.
+double? kopilkaMonthlyBudgetProgress(double spent, double limit) {
+  if (!spent.isFinite || !limit.isFinite || limit <= 0 || spent < 0) {
+    return null;
+  }
+  return (spent / limit).clamp(0.0, 1.0);
+}
+
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
   @override
@@ -671,6 +680,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final pendingNotifications = <Map<String, dynamic>>[];
   int visiblePendingCount = 10;
   double goal = 100000;
+  double monthlyBudget = 0; // Disabled until explicitly configured.
   int paydayDay = 10;
   final banks = const ['Т-Банк', 'Газпромбанк', 'Ozon Банк', 'Наличные'];
   @override
@@ -706,8 +716,12 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final safeGoal = storedGoal is num && storedGoal.isFinite && storedGoal > 0
         ? storedGoal.toDouble() : 100000.0;
     final storedPayday = prefs.get('kopilka_payday_day_v1');
+    final storedBudget = prefs.get('kopilka_monthly_budget_v1');
     setState(() {
       goal = safeGoal;
+      monthlyBudget = storedBudget is num && storedBudget.isFinite &&
+          storedBudget >= 0 && storedBudget <= 1000000000000
+          ? storedBudget.toDouble() : 0;
       paydayDay = storedPayday is int && storedPayday >= 1 && storedPayday <= 31
           ? storedPayday : 10;
       loading = false;
@@ -816,6 +830,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
     await prefs.setDouble('kopilka_goal_v1', goal);
+    await prefs.setDouble('kopilka_monthly_budget_v1', monthlyBudget);
     await prefs.setInt('kopilka_payday_day_v1', paydayDay);
   }
 
@@ -972,6 +987,37 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     if (result != null) { setState(() => goal = result); await _save(); }
   }
 
+  Future<void> _editMonthlyBudget() async {
+    final controller = TextEditingController(
+      text: monthlyBudget == 0 ? '0' : monthlyBudget.toStringAsFixed(2));
+    final result = await showDialog<double>(context: context, builder: (ctx) =>
+      AlertDialog(
+        title: const Text('Лимит расходов на месяц'),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(
+            labelText: 'Рубли', helperText: '0 — отключить лимит. Переводы не учитываются.'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+          FilledButton(onPressed: () {
+            final value = double.tryParse(controller.text.trim()
+                .replaceAll(' ', '').replaceAll(',', '.'));
+            if (value != null && value.isFinite && value >= 0 &&
+                value <= 1000000000000) {
+              Navigator.pop(ctx, value);
+            }
+          }, child: const Text('Сохранить')),
+        ],
+      ));
+    controller.dispose();
+    if (result != null && mounted) {
+      setState(() => monthlyBudget = result);
+      await _save();
+    }
+  }
+
   Future<void> _editPayday() async {
     final controller = TextEditingController(text: paydayDay.toString());
     final result = await showDialog<int>(context: context, builder: (ctx) =>
@@ -1023,6 +1069,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final monthlyExpenses = monthlyEntries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (sum, e) => sum + safeKopilkaAmount(e));
     final monthlyBalance = monthlyIncome - monthlyExpenses;
+    final budgetProgress = kopilkaMonthlyBudgetProgress(monthlyExpenses, monthlyBudget);
     final monthlyCategories = summarizeKopilkaExpenses(monthlyEntries);
     final sortedCategories = monthlyCategories.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1050,6 +1097,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       appBar: AppBar(title: const Row(children: [Icon(Icons.savings_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 10), Text('КОПИЛКА', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2))]), actions: [
         IconButton(tooltip: 'Цель', icon: const Icon(Icons.flag_outlined), onPressed: _editGoal),
         IconButton(tooltip: 'День зарплаты', icon: const Icon(Icons.calendar_month_outlined), onPressed: _editPayday),
+        IconButton(tooltip: 'Лимит месяца', icon: const Icon(Icons.tune_outlined), onPressed: _editMonthlyBudget),
       ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add,
         icon: const Icon(Icons.add), label: const Text('Операция')),
@@ -1169,6 +1217,35 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               style: const TextStyle(color: Colors.white70)),
           ],
         ))),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Бюджет месяца',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (budgetProgress == null)
+              const Text('Лимит отключён. Задай сумму, чтобы отслеживать расходы.'),
+            if (budgetProgress != null) ...[
+              Text('Потрачено: ${money(monthlyExpenses)} из ${money(monthlyBudget)}'),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(value: budgetProgress),
+              const SizedBox(height: 8),
+              Text(monthlyExpenses > monthlyBudget
+                ? 'Лимит превышен на ${money(monthlyExpenses - monthlyBudget)}'
+                : 'Осталось по лимиту: ${money(monthlyBudget - monthlyExpenses)}',
+                style: TextStyle(color: monthlyExpenses > monthlyBudget
+                  ? const Color(0xFFFF9DA8) : const Color(0xFFA8E8D5))),
+            ],
+            const SizedBox(height: 6),
+            const Text('Только подтверждённые расходы текущего месяца. Не ограничивает банковские операции.',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(
+              onPressed: _editMonthlyBudget,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Изменить лимит'),
+            )),
+          ]),
+        )),
         Card(child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -43,6 +43,11 @@ void main() {
       'Payment 300 RUB on hold',
       'Payment 300 RUB not processed',
       'Код безопасности для оплаты 500 ₽',
+      'Код для оплаты 500 ₽: 1234',
+      'Код перевода 500 ₽: 1234',
+      'Confirmation code for payment 200 RUB',
+      'Security code for transfer 400 RUB',
+      'СМС-пароль для оплаты 100 ₽',
     ]) {
       expect(isBankTransactionNotification('Т-Банк', body), isFalse,
           reason: body);

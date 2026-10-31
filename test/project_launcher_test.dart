@@ -1,8 +1,27 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
 import 'package:all_hub/external_repositories.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('manual Android package binding validates IDs and stays local', () async {
+    SharedPreferences.setMockInitialValues({});
+    final id = ExternalRepository.parse('ExampleOrg/Widget-App')!.projectId;
+    expect(ProjectLauncher.isValidAndroidPackageName('com.example.widget'), isTrue);
+    for (final invalid in [
+      '', 'widget', 'com..widget', '.com.widget',
+      'com.widget/', 'com.widget;rm', 'com.widget with space',
+    ]) {
+      expect(ProjectLauncher.isValidAndroidPackageName(invalid), isFalse,
+          reason: invalid);
+    }
+    expect(await ProjectLauncher.setExternalPackageName(
+        id, 'com.example.widget'), isTrue);
+    expect(await ProjectLauncher.externalPackageName(id), 'com.example.widget');
+    expect(() => ProjectLauncher.setExternalPackageName(
+        'all-hub', 'com.example.widget'), throwsArgumentError);
+  });
+
   test('external installer accepts only a matching public release URL', () {
     final repo = ExternalRepository.parse('ExampleOrg/Widget-App')!;
     const good = 'https://github.com/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Android.apk';

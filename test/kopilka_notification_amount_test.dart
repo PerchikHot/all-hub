@@ -29,6 +29,28 @@ void main() {
         'Платеж 400 ₽ требует подтверждения'), isFalse);
   });
 
+  test('native-filtered unposted alerts also stay out of Dart import', () {
+    for (final body in [
+      'Оплата 500 ₽ не одобрена',
+      'Перевод 200 ₽ не состоялся',
+      'Платёж 300 ₽: отказано банком',
+      'Ошибка перевода 400 ₽',
+      'Оплата 100 ₽ заблокирована',
+      'Списание 150 ₽ приостановлено',
+      'Оплата 125 ₽ заморожена',
+      'Перевод 200 ₽ планируется завтра',
+      'Payment 300 RUB awaiting approval',
+      'Payment 300 RUB on hold',
+      'Payment 300 RUB not processed',
+      'Код безопасности для оплаты 500 ₽',
+    ]) {
+      expect(isBankTransactionNotification('Т-Банк', body), isFalse,
+          reason: body);
+    }
+    expect(isBankTransactionNotification('Газпромбанк',
+        'Оплата 500 ₽ выполнена'), isTrue);
+  });
+
   test('reviewing one bank notification twice never creates duplicate postings', () {
     final entries = <Map<String, dynamic>>[
       {'kind': 'expense', 'amount': 250.0, 'notificationKey': 'tx-1'},

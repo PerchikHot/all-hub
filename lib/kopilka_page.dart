@@ -708,7 +708,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final storedPayday = prefs.get('kopilka_payday_day_v1');
     setState(() {
       goal = safeGoal;
-      paydayDay = storedPayday != null && storedPayday >= 1 && storedPayday <= 31
+      paydayDay = storedPayday is int && storedPayday >= 1 && storedPayday <= 31
           ? storedPayday : 10;
       loading = false;
     });

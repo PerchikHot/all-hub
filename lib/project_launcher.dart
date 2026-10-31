@@ -23,10 +23,16 @@ class ProjectLauncher {
       'eclipse-arena': 'Eclipse-Arena-',
     };
     final repo = repos[id];
+    // Match the same strict origin rule as third-party GitHub assets.
+    // Never trust a normalized :443 authority or embedded credentials.
+    if (!RegExp(r'^https://github\.com/', caseSensitive: false).hasMatch(url)) {
+      return false;
+    }
     final uri = Uri.tryParse(url);
     if (repo == null || !['apk', 'exe', 'zip'].contains(extension) ||
         uri == null || uri.scheme != 'https' ||
         uri.host.toLowerCase() != 'github.com' ||
+        uri.authority.toLowerCase() != 'github.com' || uri.hasPort ||
         uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
       return false;
     }

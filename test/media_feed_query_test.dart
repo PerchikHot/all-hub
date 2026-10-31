@@ -13,6 +13,15 @@ void main() {
     expect(nextAvailableMediaFeedPage(0, tags, <String>{}), isNull);
   });
 
+  test('GIF disk cache preserves animation while stills may be resized', () {
+    expect(isAnimatedFeedAssetUrl('https://cdn.example/12.gif'), isTrue);
+    expect(isAnimatedFeedAssetUrl('https://cdn.example/12.GIF'), isTrue);
+    expect(isAnimatedFeedAssetUrl('https://cdn.example/12.gif?size=full'), isTrue);
+    expect(isAnimatedFeedAssetUrl('https://cdn.example/12.jpg'), isFalse);
+    expect(isAnimatedFeedAssetUrl('https://cdn.example/12.gif.jpg'), isFalse);
+    expect(isAnimatedFeedAssetUrl('http://cdn.example/12.gif'), isFalse);
+  });
+
   test('GIF gallery plays the animated file before a static preview', () {
     final post = <String, dynamic>{
       'id': 12,

@@ -60,6 +60,7 @@ jobs:
           python3 -m pip install --quiet Pillow
           python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD"
           python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify
+          python3 -m unittest discover -s "$GITHUB_WORKSPACE/tools" -p "test_verify_packaged_icon.py" -v
           cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
           cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
           # Install a local-only Android notification listener for supported banks.

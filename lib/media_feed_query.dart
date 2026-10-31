@@ -62,8 +62,12 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
     if (value is! String) continue;
     final uri = Uri.tryParse(value);
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty || uri.hasFragment) continue;
-    if (seen.add(value)) urls.add(value);
+        uri.userInfo.isNotEmpty || uri.hasFragment) {
+      continue;
+    }
+    if (seen.add(value)) {
+      urls.add(value);
+    }
   }
   return urls;
 }

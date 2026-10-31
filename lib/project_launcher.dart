@@ -193,6 +193,13 @@ class ProjectLauncher {
     return name != null && isValidAndroidPackageName(name) ? name : null;
   }
 
+  /// Bind installation to the expected Android package whenever known.
+  /// Public GitHub repositories are not proof of APK package identity.
+  static Future<String?> expectedAndroidPackageName(String id) async {
+    if (!isValidProjectId(id)) return null;
+    return packages[id] ?? await externalPackageName(id);
+  }
+
   /// Serialize installs so repeated taps cannot race on staging/backup files.
   static String? _installationInProgress;
 
@@ -441,8 +448,12 @@ class ProjectLauncher {
         // Android owns the final install confirmation. A false/null result
         // means the system installer could not even be opened; never report
         // that as a successful update.
+        final expectedPackage = await expectedAndroidPackageName(projectId);
         final opened = await _channel.invokeMethod<bool>(
-          'installApk', {'path': apk.path});
+          'installApk', {
+            'path': apk.path,
+            if (expectedPackage != null) 'expectedPackageName': expectedPackage,
+          });
         requireAndroidInstallerOpened(opened);
       } finally {
         if (await temporary.exists()) await temporary.delete();

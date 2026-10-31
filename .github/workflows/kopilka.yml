@@ -18,6 +18,8 @@ on:
       - 'test/kopilka_budget_test.dart'
       - 'test/kopilka_notification_date_test.dart'
       - '.github/workflows/kopilka.yml'
+      - 'assets/icons/kopilka.webp'
+      - 'tools/generate_launcher_icon.py'
 
 jobs:
   android:

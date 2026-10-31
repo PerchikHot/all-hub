@@ -1,5 +1,6 @@
 import 'project_launcher.dart';
 import 'external_repositories.dart';
+import 'external_artwork.dart';
 import 'version_status.dart';
 import 'media_browser_page.dart';
 import 'kopilka_page.dart';
@@ -264,8 +265,22 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     await ExternalRepositoryStore.remove(external);
+    await ExternalArtwork.remove(external.projectId);
     if (mounted) {
       await refresh();
+    }
+  }
+
+  Future<void> chooseExternalArtwork(Project project) async {
+    if (!project.id.startsWith('external-')) return;
+    try {
+      final selected = await ExternalArtwork.choose(project.id);
+      if (selected && mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось выбрать обложку: $e')));
+      }
     }
   }
 
@@ -439,7 +454,11 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 16),
         for (final project in (tab == 0 ? filtered : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
           if (project.id.startsWith('external-'))
-            HubProjectHeader(title: project.name, type: project.type, repo: project.repo)
+            FutureBuilder<String?>(
+              future: ExternalArtwork.load(project.id),
+              builder: (context, artwork) => HubProjectHeader(
+                title: project.name, type: project.type, repo: project.repo,
+                localBannerPath: artwork.data))
           else
             ProjectCover(id: project.id, title: project.name, type: project.type),
           Padding(
@@ -449,6 +468,11 @@ class _HomePageState extends State<HomePage> {
               Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
+            if (project.id.startsWith('external-'))
+              Align(alignment: Alignment.centerRight, child: TextButton.icon(
+                onPressed: () => chooseExternalArtwork(project),
+                icon: const Icon(Icons.image_outlined),
+                label: const Text('Своя обложка (локально)'))),
             if (project.id.startsWith('external-'))
               Align(alignment: Alignment.centerRight, child: TextButton.icon(
                 onPressed: () => removeRepository(project),

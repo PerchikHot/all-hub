@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
@@ -5,6 +6,31 @@ import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('update manager serializes installs and releases lock on failure', () async {
+    final gate = Completer<void>();
+    final first = ProjectLauncher.runInstallExclusive('shadow-rp', () async {
+      await gate.future;
+      return 42;
+    });
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('kopilka', () async => 0),
+      throwsStateError,
+    );
+    gate.complete();
+    expect(await first, 42);
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('kopilka', () async {
+        throw StateError('failed update');
+      }),
+      throwsStateError,
+    );
+    expect(await ProjectLauncher.runInstallExclusive('kopilka', () async => 7), 7);
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('../outside', () async => 0),
+      throwsArgumentError,
+    );
+  });
+
   test('published SHA-256 digest rejects modified download before install', () async {
     final dir = await Directory.systemTemp.createTemp('allhub-digest-');
     try {

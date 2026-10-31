@@ -180,7 +180,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> importRepositoryBackup() async {
+  Future<void> importRepositoryBackup({bool merge = false}) async {
     final clipboard = await Clipboard.getData('text/plain');
     if (!mounted) {
       return;
@@ -188,12 +188,12 @@ class _HomePageState extends State<HomePage> {
     final controller = TextEditingController(text: clipboard?.text ?? '');
     final source = await showDialog<String>(context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Импорт публичных репозиториев'),
+        title: Text(merge ? 'Объединить публичные каталоги' : 'Импорт публичных репозиториев'),
         content: SizedBox(width: 540, child: TextField(
           controller: controller, maxLines: 8, minLines: 4,
           decoration: const InputDecoration(
             hintText: 'Вставь JSON-каталог All Hub',
-            helperText: 'Импорт заменит только список сторонних репозиториев.'),
+            helperText: merge ? 'Добавит новые репозитории, сохранив текущие.' : 'Импорт заменит только список сторонних репозиториев.'),
         )),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx),
@@ -210,22 +210,28 @@ class _HomePageState extends State<HomePage> {
       final parsed = ExternalRepositoryStore.parseBackup(source);
       final approved = await showDialog<bool>(context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Заменить каталог?'),
-          content: Text('Будут проверены ${parsed.length} публичных '
-            'GitHub-репозиториев. Текущий список будет заменён только '
-            'после успешной проверки всех адресов. '
-            'Установленные приложения и их данные останутся без изменений.'),
+          title: Text(merge ? 'Добавить новые репозитории?' : 'Заменить каталог?'),
+          content: Text(merge
+            ? 'Будут добавлены только новые из ${parsed.length} записей. '
+              'Все новые адреса проверяются до сохранения. '
+              'Существующие репозитории, обложки и установленные приложения не удаляются.'
+            : 'Будут проверены ${parsed.length} публичных '
+              'GitHub-репозиториев. Текущий список будет заменён только '
+              'после успешной проверки всех адресов. '
+              'Установленные приложения и их данные останутся без изменений.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Отмена')),
             FilledButton(onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Проверить и импортировать')),
+              child: Text(merge ? 'Проверить и добавить' : 'Проверить и импортировать')),
           ],
         ));
       if (approved != true || !mounted) {
         return;
       }
-      final count = await ExternalRepositoryStore.importBackup(source);
+      final count = merge
+          ? await ExternalRepositoryStore.mergeBackup(source)
+          : await ExternalRepositoryStore.importBackup(source);
       if (!mounted) {
         return;
       }
@@ -234,7 +240,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Импортировано репозиториев: $count')));
+        content: Text(merge ? 'Добавлено новых репозиториев: $count' : 'Импортировано репозиториев: $count')));
     } catch (e) {
       if (!mounted) {
         return;
@@ -434,7 +440,10 @@ class _HomePageState extends State<HomePage> {
               label: const Text('Копировать каталог')),
             OutlinedButton.icon(onPressed: importRepositoryBackup,
               icon: const Icon(Icons.restore_outlined),
-              label: const Text('Импорт каталога')),
+              label: const Text('Заменить каталог')),
+            OutlinedButton.icon(onPressed: () => importRepositoryBackup(merge: true),
+              icon: const Icon(Icons.library_add_outlined),
+              label: const Text('Объединить каталоги')),
           ]),
           const SizedBox(height: 12),
           if (Platform.isAndroid) ...[

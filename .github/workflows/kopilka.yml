@@ -113,7 +113,7 @@ jobs:
                           (listenerPrefs.getInt("bank_count_" + bankId, 0) + 1)
                               .coerceAtMost(100000000)).apply()
                   // Group summaries are duplicates, not individual payments.
-                  if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+                  if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
                       listenerPrefs.edit().putInt("filtered_count",
                           (listenerPrefs.getInt("filtered_count", 0) + 1)
                               .coerceAtMost(100000000)).apply()

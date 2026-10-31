@@ -79,6 +79,9 @@ void main() {
       'https://github.com/PerchikHot/Eclipse-Arena-/releases/download/eclipse-arena-windows/EclipseArena.exe',
       'exe'), isTrue);
     for (final url in [
+      'https://github.com:443/PerchikHot/all-hub/releases/download/all-hub-v1/App-Android.apk',
+      'https://github.com:8443/PerchikHot/all-hub/releases/download/all-hub-v1/App-Android.apk',
+      'https://user@github.com/PerchikHot/all-hub/releases/download/all-hub-v1/App-Android.apk',
       'https://github.com/PerchikHot/all-hub/releases/download/kopilka-latest/Kopilka-Android.apk',
       'https://github.com/attacker/all-hub/releases/download/all-hub-v1.0.0/payload.apk',
       'https://github.com/PerchikHot/all-hub/releases/download/all-hub-latest/payload.apk?x=1',

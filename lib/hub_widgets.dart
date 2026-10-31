@@ -51,7 +51,8 @@ class HubBanner extends StatelessWidget {
 class HubProjectHeader extends StatelessWidget {
   final String title;
   final String type;
-  const HubProjectHeader({super.key, required this.title, required this.type});
+  final String? repo;
+  const HubProjectHeader({super.key, required this.title, required this.type, this.repo});
   @override
   Widget build(BuildContext context) {
     final isGame = type.toLowerCase().contains('game');
@@ -66,8 +67,66 @@ class HubProjectHeader extends StatelessWidget {
           : isMod ? const [Color(0xFF173F67), Color(0xFF2C205E)]
           : const [Color(0xFF2B4C82), Color(0xFF34205F)]),
       ),
-      child: Stack(children: [
+      clipBehavior: Clip.antiAlias,
+      child: Stack(fit: StackFit.expand, children: [
+        // Optional public GitHub social preview; no repository credentials.
+        // Keep the Veyrion gradient if GitHub has no image or the user is offline.
+        if (repo != null && RegExp(r'^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+
+        Positioned(left: 16, bottom: 14, child: Text(title.toUpperCase(),
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 21, letterSpacing: 0.7))),
+      ]),
+    );
+  }
+}
+
+class HubAvatar extends StatelessWidget {
+  final double size;
+  const HubAvatar({super.key, this.size = 48});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size, height: size,
+    child: CustomPaint(painter: _VeyrionEmblemPainter()),
+  );
+}
+
+/// Temporary blue-eyed Veyrion placeholder; not a replacement for the approved OC art.
+class _VeyrionEmblemPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 100, size.height / 100);
+    final hood = Path()
+      ..moveTo(50, 6)
+      ..cubicTo(22, 7, 9, 32, 10, 74)
+      ..quadraticBezierTo(50, 101, 90, 74)
+      ..cubicTo(91, 32, 78, 7, 50, 6)
+      ..close();
+    canvas.drawPath(hood, Paint()..color = const Color(0xFF050716));
+    canvas.drawPath(hood, Paint()..style = PaintingStyle.stroke
+      ..strokeWidth = 3..color = const Color(0xFF53C9FF));
+    final eye = Paint()..color = const Color(0xFF53C9FF);
+    canvas.drawOval(const Rect.fromLTWH(24, 52, 21, 8), eye);
+    canvas.drawOval(const Rect.fromLTWH(55, 52, 21, 8), eye);
+    canvas.restore();
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+).hasMatch(repo!))
+          Image.network(
+            Uri.https('opengraph.githubassets.com', '/1/$repo').toString(),
+            fit: BoxFit.cover, cacheWidth: 900,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        const DecoratedBox(decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [Color(0x660A1225), Color(0xE80A1225)]))),
         Positioned(right: 22, top: 13, child: Icon(icon, size: 82, color: Colors.white.withValues(alpha: 0.18))),
+        if (repo != null)
+          const Positioned(left: 16, top: 10, child: Text('GITHUB  •  PUBLIC',
+            style: TextStyle(color: hubAccent, fontSize: 10,
+              fontWeight: FontWeight.w800, letterSpacing: 1.5))),
         Positioned(left: 16, bottom: 14, child: Text(title.toUpperCase(),
           style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 21, letterSpacing: 0.7))),
       ]),

@@ -30,6 +30,26 @@ void main() {
     }
   });
 
+  test('resumable APKs are isolated by project and release', () {
+    const first = 'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v0.7.0%2B645/AllHub-Android.apk';
+    const second = 'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v0.7.0%2B651/AllHub-Android.apk';
+    const kopilka = 'https://github.com/PerchikHot/all-hub/releases/download/kopilka-latest/Kopilka-Android.apk';
+    final key = ProjectLauncher.androidApkCacheName('all-hub', first);
+    expect(key, endsWith('.apk'));
+    expect(key.contains('/'), isFalse);
+    expect(key.contains('\\\\'), isFalse);
+    expect(key, isNot(ProjectLauncher.androidApkCacheName('all-hub', second)));
+    expect(key, isNot(ProjectLauncher.androidApkCacheName('kopilka', kopilka)));
+    expect(() => ProjectLauncher.androidApkCacheName('all-hub', kopilka), throwsArgumentError);
+  });
+
+  test('portable Windows executable requires MZ header', () {
+    expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d, 0x5a, 0, 0]), isTrue);
+    expect(ProjectLauncher.hasWindowsExecutableHeader([0x50, 0x4b]), isFalse);
+    expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d]), isFalse);
+    expect(ProjectLauncher.hasWindowsExecutableHeader([]), isFalse);
+  });
+
   test('Android APK resumes only from a matching bounded HTTP range', () {
     expect(ProjectLauncher.isSafeApkContentRange('bytes 1024-2047/4096', 1024), isTrue);
     expect(ProjectLauncher.isSafeApkContentRange('bytes 0-1023/1024', 0), isTrue);

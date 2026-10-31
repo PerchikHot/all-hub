@@ -1,7 +1,27 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
+import 'package:all_hub/external_repositories.dart';
 
 void main() {
+  test('external installer accepts only a matching public release URL', () {
+    final repo = ExternalRepository.parse('ExampleOrg/Widget-App')!;
+    const good = 'https://github.com/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Android.apk';
+    expect(ProjectLauncher.isTrustedExternalDownload(
+        repo.projectId, repo.fullName, good, 'apk'), isTrue);
+    for (final bad in [
+      'https://github.com/other/Widget-App/releases/download/v1.2.3/Widget-Android.apk',
+      'https://github.com/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Android.apk?token=abc',
+      'http://github.com/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Android.apk',
+      'https://evil.example/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Android.apk',
+      'https://github.com/ExampleOrg/Widget-App/releases/download/v1.2.3/Widget-Windows.exe',
+    ]) {
+      expect(ProjectLauncher.isTrustedExternalDownload(
+          repo.projectId, repo.fullName, bad, 'apk'), isFalse, reason: bad);
+    }
+    expect(ProjectLauncher.isTrustedExternalDownload(
+        'external-wrong-id', repo.fullName, good, 'apk'), isFalse);
+  });
+
   test('installer accepts only the matching project release and platform', () {
     expect(ProjectLauncher.isTrustedProjectDownload(
       'all-hub',

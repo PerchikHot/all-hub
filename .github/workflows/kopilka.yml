@@ -150,11 +150,15 @@ jobs:
                   val additionalUnposted = Regex(
                       """не\s+(?:одобрен[а-яё]*|состоял[а-яё]*)|отказан[а-яё]*|ошибка\s+(?:оплаты|перевода)|заблокирован[а-яё]*|приостановлен[а-яё]*|заморожен[а-яё]*|планиру[ею]тся|будет\s+(?:оплат[а-яё]*|провед[её]н[а-яё]*)|ожида[её]т\s+подтверждени|\bawaiting\s+approval\b|\bon\s+hold\b|\bnot\s+(?:completed|processed|approved|confirmed)\b""",
                       RegexOption.IGNORE_CASE)
+                  // Block OTP and payment confirmation alerts before saving text.
                   val credentials = Regex(
                       """парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s*[:№]|код\s+безопасности|(?:ваш|your)\s+(?:код|code)""",
                       RegexOption.IGNORE_CASE)
                   // Mirror the Dart import gate: a currency word alone is
                   // not evidence of a posted transaction amount.
+                  val additionalCredentials = Regex(
+                      """(?:код|code)\s*(?:для\s+)?(?:операции|перевода|оплаты|payment|transfer)|\b(?:security|confirmation|verification)\s+code\b|(?:sms|смс)[-\s]*(?:парол[ья]|password)""",
+                      RegexOption.IGNORE_CASE)
                   val amount = Regex(
                       """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
                       RegexOption.IGNORE_CASE)
@@ -163,6 +167,7 @@ jobs:
                       !amount.containsMatchIn(combined) ||
                       sensitive.containsMatchIn(combined) ||
                       credentials.containsMatchIn(combined) ||
+                      additionalCredentials.containsMatchIn(combined) ||
                       notPosted.containsMatchIn(combined) ||
                       additionalUnposted.containsMatchIn(combined)) {
                       listenerPrefs.edit().putInt("filtered_count",

@@ -24,6 +24,7 @@ jobs:
           python3 -m pip install --quiet Pillow
           python3 tools/generate_launcher_icon.py --project all_hub
           python3 tools/generate_launcher_icon.py --project all_hub --verify
+          python3 -m unittest discover -s tools -p 'test_verify_packaged_icon.py' -v
       - name: Configure Android permissions and launcher
         run: |
           rm -f test/widget_test.dart

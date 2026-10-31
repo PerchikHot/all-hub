@@ -17,7 +17,7 @@ String buildMediaFeedTags(String category, String query) {
 /// Put the file type and the most selective user tag on the server; check
 /// category and any remaining terms locally before showing a result.
 String buildMediaFeedRequestTags(String category, String query, String kind) {
-  final terms = query.trim().split(RegExp(r'\\s+'))
+  final terms = query.trim().split(RegExp(r'\s+'))
       .where((term) => term.isNotEmpty).toList();
   if (kind == 'gif') {
     final first = terms.where((term) =>
@@ -33,10 +33,10 @@ String buildMediaFeedRequestTags(String category, String query, String kind) {
 /// restrictive searches, but it will not return misleading matches.
 bool matchesMediaFeedQuery(Map<String, dynamic> post, String query) {
   final tags = (post['tag_string'] ?? '').toString()
-      .toLowerCase().split(RegExp(r'\\s+')).toSet();
+      .toLowerCase().split(RegExp(r'\s+')).toSet();
   final rating = (post['rating'] ?? '').toString().toLowerCase();
   final extension = (post['file_ext'] ?? '').toString().toLowerCase();
-  for (final raw in query.toLowerCase().split(RegExp(r'\\s+'))) {
+  for (final raw in query.toLowerCase().split(RegExp(r'\s+'))) {
     if (raw.isEmpty) continue;
     final excluded = raw.startsWith('-');
     final term = excluded ? raw.substring(1) : raw;

@@ -529,7 +529,8 @@ class _HomePageState extends State<HomePage> {
                           }
                           await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
                             externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null);
+                                ? project.repo : null,
+                            sha256Digest: i.sha256Digest);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
@@ -563,7 +564,8 @@ class _HomePageState extends State<HomePage> {
                           }
                           await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
                             externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null);
+                                ? project.repo : null,
+                            sha256Digest: i.sha256Digest);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

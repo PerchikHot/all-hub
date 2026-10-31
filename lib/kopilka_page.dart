@@ -607,6 +607,53 @@ Map<String, double> summarizeKopilkaExpenses(
   return totals;
 }
 
+/// Read-only estimate based only on operations entered by the user.
+/// It never assumes a future salary amount or changes account balances.
+class KopilkaSalaryForecast {
+  final DateTime nextPayday;
+  final int daysRemaining;
+  final int observedDays;
+  final double dailyExpenses;
+  final double projectedExpenses;
+  final double projectedBalance;
+  const KopilkaSalaryForecast(this.nextPayday, this.daysRemaining,
+      this.observedDays, this.dailyExpenses, this.projectedExpenses,
+      this.projectedBalance);
+}
+
+KopilkaSalaryForecast forecastKopilkaToPayday(
+  Iterable<Map<String, dynamic>> transactions, DateTime now,
+  int paydayDay, double currentBalance,
+) {
+  final today = DateTime.utc(now.year, now.month, now.day);
+  DateTime payday(int year, int month) {
+    final lastDay = DateTime.utc(year, month + 1, 0).day;
+    return DateTime.utc(year, month, paydayDay.clamp(1, lastDay));
+  }
+  var next = payday(today.year, today.month);
+  if (!next.isAfter(today)) next = payday(today.year, today.month + 1);
+  final days = next.difference(today).inDays;
+  final firstAllowed = today.subtract(const Duration(days: 29));
+  DateTime? firstRecorded;
+  var expenses = 0.0;
+  for (final entry in transactions) {
+    final parsed = DateTime.tryParse((entry['date'] ?? '').toString());
+    if (parsed == null) continue;
+    final date = DateTime.utc(parsed.year, parsed.month, parsed.day);
+    if (date.isBefore(firstAllowed) || date.isAfter(today)) continue;
+    if (firstRecorded == null || date.isBefore(firstRecorded)) {
+      firstRecorded = date;
+    }
+    if (entry['kind'] == 'expense') expenses += safeKopilkaAmount(entry);
+  }
+  final observedDays = firstRecorded == null
+      ? 0 : today.difference(firstRecorded).inDays + 1;
+  final daily = observedDays == 0 ? 0.0 : expenses / observedDays;
+  final projected = daily * days;
+  return KopilkaSalaryForecast(next, days, observedDays, daily, projected,
+      currentBalance.isFinite ? currentBalance - projected : 0.0);
+}
+
 class KopilkaPage extends StatefulWidget {
   const KopilkaPage({super.key});
   @override
@@ -624,6 +671,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   final pendingNotifications = <Map<String, dynamic>>[];
   int visiblePendingCount = 10;
   double goal = 100000;
+  int paydayDay = 10;
   final banks = const ['Т-Банк', 'Газпромбанк', 'Ozon Банк', 'Наличные'];
   @override
   void initState() {
@@ -657,7 +705,13 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final storedGoal = prefs.get('kopilka_goal_v1');
     final safeGoal = storedGoal is num && storedGoal.isFinite && storedGoal > 0
         ? storedGoal.toDouble() : 100000.0;
-    setState(() { goal = safeGoal; loading = false; });
+    final storedPayday = prefs.getInt('kopilka_payday_day_v1');
+    setState(() {
+      goal = safeGoal;
+      paydayDay = storedPayday != null && storedPayday >= 1 && storedPayday <= 31
+          ? storedPayday : 10;
+      loading = false;
+    });
   }
 
   Future<void> _refreshNotifications() async {
@@ -762,6 +816,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
     await prefs.setDouble('kopilka_goal_v1', goal);
+    await prefs.setInt('kopilka_payday_day_v1', paydayDay);
   }
 
   double _sum(String bank) => entries.fold<double>(0, (sum, e) {
@@ -917,6 +972,38 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     if (result != null) { setState(() => goal = result); await _save(); }
   }
 
+  Future<void> _editPayday() async {
+    final controller = TextEditingController(text: paydayDay.toString());
+    final result = await showDialog<int>(context: context, builder: (ctx) =>
+      AlertDialog(
+        title: const Text('День зарплаты'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Число месяца от 1 до 31',
+            helperText: 'Для коротких месяцев берётся последний день',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () {
+            final value = int.tryParse(controller.text.trim());
+            if (value != null && value >= 1 && value <= 31) {
+              Navigator.pop(ctx, value);
+            }
+          }, child: const Text('Сохранить')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result != null && mounted) {
+      setState(() => paydayDay = result);
+      await _save();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = banks.fold<double>(0, (s, b) => s + _sum(b));
@@ -925,6 +1012,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final expenses = entries.where((e) => e['kind'] == 'expense')
       .fold<double>(0, (s, e) => s + safeKopilkaAmount(e));
     final now = DateTime.now();
+    final salaryForecast = forecastKopilkaToPayday(
+      entries, now, paydayDay, total);
     final monthlyEntries = entries.where((e) {
       final date = DateTime.tryParse((e['date'] ?? '').toString());
       return date != null && date.year == now.year && date.month == now.month;
@@ -960,6 +1049,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(title: const Row(children: [Icon(Icons.savings_outlined, color: Color(0xFFA8C5FF)), SizedBox(width: 10), Text('КОПИЛКА', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2))]), actions: [
         IconButton(tooltip: 'Цель', icon: const Icon(Icons.flag_outlined), onPressed: _editGoal),
+        IconButton(tooltip: 'День зарплаты', icon: const Icon(Icons.calendar_month_outlined), onPressed: _editPayday),
       ]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add,
         icon: const Icon(Icons.add), label: const Text('Операция')),
@@ -1079,6 +1169,32 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               style: const TextStyle(color: Colors.white70)),
           ],
         ))),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Прогноз до зарплаты',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Следующая дата: ${salaryForecast.nextPayday.day.toString().padLeft(2, '0')}.${salaryForecast.nextPayday.month.toString().padLeft(2, '0')}.${salaryForecast.nextPayday.year} • ${salaryForecast.daysRemaining} дн.'),
+            if (salaryForecast.observedDays == 0)
+              const Text('Недостаточно записей за последние 30 дней для оценки расходов.',
+                style: TextStyle(color: Colors.white70))
+            else ...[
+              Text('Средние расходы: ${money(salaryForecast.dailyExpenses)} в день (наблюдений: ${salaryForecast.observedDays} дн.)'),
+              Text('Ожидаемые расходы: ${money(salaryForecast.projectedExpenses)}'),
+              Text('Расчётный остаток: ${money(salaryForecast.projectedBalance)}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+            const SizedBox(height: 6),
+            const Text('Оценка по внесённым операциям, без будущих доходов. Не является банковским балансом.',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(
+              onPressed: _editPayday,
+              icon: const Icon(Icons.edit_calendar_outlined),
+              label: Text('День зарплаты: $paydayDay'),
+            )),
+          ]),
+        )),
         Card(child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

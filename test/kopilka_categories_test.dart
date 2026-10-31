@@ -33,4 +33,43 @@ void main() {
     expect(kopilkaExpenseCategory({'category': 'unknown'}), 'Без категории');
     expect(summarizeKopilkaExpenses([]), isEmpty);
   });
+
+  test('salary forecast excludes transfers and income, uses observed days', () {
+    final forecast = forecastKopilkaToPayday([
+      {'kind': 'expense', 'amount': 500, 'date': '2026-10-26T12:00:00'},
+      {'kind': 'income', 'amount': 1000, 'date': '2026-10-28T12:00:00'},
+      {'kind': 'transfer', 'amount': 9000, 'date': '2026-10-29T12:00:00'},
+      {'kind': 'expense', 'amount': -200, 'date': '2026-10-30T12:00:00'},
+      {'kind': 'expense', 'amount': 800, 'date': '2026-11-01T12:00:00'},
+    ], DateTime(2026, 10, 30), 10, 2000);
+    expect(forecast.nextPayday, DateTime.utc(2026, 11, 10));
+    expect(forecast.daysRemaining, 11);
+    expect(forecast.observedDays, 5);
+    expect(forecast.dailyExpenses, 100);
+    expect(forecast.projectedExpenses, 1100);
+    expect(forecast.projectedBalance, 900);
+  });
+
+  test('payday 31 uses last calendar day in a short month', () {
+    final february = forecastKopilkaToPayday(
+      [], DateTime(2026, 2, 27), 31, 2500);
+    expect(february.nextPayday, DateTime.utc(2026, 2, 28));
+    expect(february.daysRemaining, 1);
+    expect(february.observedDays, 0);
+    expect(february.projectedBalance, 2500);
+    final nextMonth = forecastKopilkaToPayday(
+      [], DateTime(2026, 2, 28), 31, 2500);
+    expect(nextMonth.nextPayday, DateTime.utc(2026, 3, 31));
+  });
+
+  test('forecast ignores invalid and older legacy dates', () {
+    final forecast = forecastKopilkaToPayday([
+      {'kind': 'expense', 'amount': 900, 'date': 'invalid'},
+      {'kind': 'expense', 'amount': 300, 'date': '2026-01-01'},
+      {'kind': 'expense', 'amount': double.nan, 'date': '2026-10-30'},
+    ], DateTime(2026, 10, 30), 10, 100);
+    expect(forecast.observedDays, 1);
+    expect(forecast.dailyExpenses, 0);
+    expect(forecast.projectedBalance, 100);
+  });
 }

@@ -2,6 +2,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('three banks: posted payment wording and amount extraction', () {
+    for (final alert in [
+      'Платёж 1 250,50 ₽ выполнен',
+      'Платеж 300 RUB исполнен',
+      'Оплачено 299 руб.',
+      'Платёж 1 рубль проведён',
+    ]) {
+      expect(isBankTransactionNotification('Т-Банк', alert), isTrue,
+          reason: alert);
+      expect(suggestNotificationKind(alert), 'expense');
+    }
+    expect(suggestNotificationAmount('Платёж 1 250,50 ₽. Остаток 4 000 ₽'),
+        '1250.50');
+    expect(isBankTransactionNotification('Газпромбанк',
+        'Платёж 350 ₽ не подтверждён'), isFalse);
+    expect(isBankTransactionNotification('Ozon Банк',
+        'Платеж 400 ₽ требует подтверждения'), isFalse);
+  });
+
   test('reviewing one bank notification twice never creates duplicate postings', () {
     final entries = <Map<String, dynamic>>[
       {'kind': 'expense', 'amount': 250.0, 'notificationKey': 'tx-1'},

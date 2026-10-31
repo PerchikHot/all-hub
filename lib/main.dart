@@ -12,7 +12,6 @@ import 'ai_models_page.dart';
 import 'media_search_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const AllHub());
@@ -192,7 +191,7 @@ class _HomePageState extends State<HomePage> {
     return await showDialog<bool>(context: context, builder: (ctx) =>
       AlertDialog(
         title: const Text('Установить стороннее приложение?'),
-        content: Text('Источник: ${project.repo}\\n\\n'
+        content: Text('Источник: ${project.repo}\n\n'
           'All Hub проверяет адрес релиза, но не может гарантировать '
           'безопасность APK/EXE. Устанавливай только из доверенного '
           'репозитория. Android отдельно запросит подтверждение установки.'),

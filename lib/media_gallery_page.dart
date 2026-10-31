@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 import 'media_feed_query.dart';
+import 'media_feed_cache.dart';
 import 'media_favorites.dart';
 import 'multi_engine_search_page.dart';
 
@@ -20,6 +21,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final queryController = TextEditingController();
   final scroll = ScrollController();
   final posts = <Map<String, dynamic>>[];
+  // Session-only LRU: no searches or feed metadata are persisted to disk.
+  final pageCache = MediaFeedMemoryCache(maxEntries: 16);
+  bool bypassPageCache = false;
+  bool showingCachedPage = false;
   final favoritePosts = <Map<String, dynamic>>[];
   final favoriteIds = <String>{};
   bool favoritesOnly = false;
@@ -248,8 +253,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     super.dispose();
   }
 
-  Future<void> search() async {
+  Future<void> search({bool bypassCache = false}) async {
     final q = queryController.text.trim();
+    bypassPageCache = bypassCache;
     favoritesOnly = false;
     searchGeneration++;
     setState(() {
@@ -265,6 +271,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       hasMore = true;
       error = '';
       accessDenied = false;
+      showingCachedPage = false;
     });
     loading = false;
     // Keep pull-to-refresh active until the first network response arrives.
@@ -310,18 +317,30 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         'limit': '$pageSize',
         'page': '$sourcePage',
       });
-      final response = await http.get(uri).timeout(const Duration(seconds: 18));
-      if (response.statusCode == 403) {
-        throw const _FeedAccessDenied();
+      // Reopening a filter reuses recent pages without another API request.
+      // Pull-to-refresh bypasses memory; never cache HTTP errors.
+      final cached = bypassPageCache ? null : pageCache.read(uri);
+      final List<dynamic> data;
+      if (cached != null) {
+        data = cached;
+      } else {
+        final response = await http.get(uri).timeout(const Duration(seconds: 18));
+        if (response.statusCode == 403) {
+          throw const _FeedAccessDenied();
+        }
+        if (response.statusCode == 429) {
+          throw const _FeedRateLimited();
+        }
+        if (response.statusCode != 200) {
+          throw Exception('HTTP ${response.statusCode}');
+        }
+        final decoded = jsonDecode(response.body);
+        if (decoded is! List) {
+          throw const FormatException('Неверный ответ сервера');
+        }
+        data = decoded;
+        pageCache.store(uri, data.whereType<Map<String, dynamic>>());
       }
-      if (response.statusCode == 429) {
-        throw const _FeedRateLimited();
-      }
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
-      }
-      final data = jsonDecode(response.body);
-      if (data is! List) throw const FormatException('Неверный ответ сервера');
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
       // The API can repeat an ID inside one response. De-duplicate before
       // rendering, not only after merging the page into seenPostIds.
@@ -332,6 +351,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         query: requestedQuery,
       );
       setState(() {
+        if (cached != null) showingCachedPage = true;
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;
         for (final post in newPosts) {
@@ -483,7 +503,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           const Spacer(),
           const Text('HD'),
           Switch.adaptive(value: highQuality, onChanged: (value) { setState(() => highQuality = value); _saveFeedPreferences(); }),
-          IconButton(tooltip: 'Обновить', onPressed: search, icon: const Icon(Icons.refresh)),
+          IconButton(tooltip: 'Обновить из сети', onPressed: () => search(bypassCache: true), icon: const Icon(Icons.refresh)),
         ]),
       ]),
     ),
@@ -526,7 +546,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         alignment: Alignment.centerLeft,
         child: Text(favoritesOnly
           ? 'Сохранено в избранном: ${favoritePosts.length} (локально)'
-          : 'Загружено изображений: ${posts.length}',
+          : 'Загружено изображений: ${posts.length}${showingCachedPage ? ' · кэш сеанса' : ''}',
           style: const TextStyle(color: Colors.white70)),
       ),
     ),
@@ -549,7 +569,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ]),
     ),
     Expanded(child: RefreshIndicator(
-      onRefresh: search,
+      onRefresh: () => search(bypassCache: true),
       child: MasonryGridView.builder(
         controller: scroll,
         physics: const AlwaysScrollableScrollPhysics(),

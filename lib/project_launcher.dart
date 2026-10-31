@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'external_repositories.dart';
+import 'hub_service.dart';
 import 'version_status.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
@@ -37,6 +39,30 @@ class ProjectLauncher {
         parts[5].isNotEmpty &&
         !parts[5].contains('/') && !parts[5].contains('\\\\') &&
         parts[5].toLowerCase().endsWith('.$extension');
+  }
+
+  /// Third-party apps are opt-in. A saved repository authorizes ONLY its own
+  /// published GitHub release URLs, not arbitrary redirects or other hosts.
+  static bool isTrustedExternalDownload(
+      String id, String repo, String url, String extension) {
+    final external = ExternalRepository.parse(repo);
+    final uri = Uri.tryParse(url);
+    if (external == null || external.projectId != id ||
+        !['apk', 'exe', 'zip'].contains(extension) || uri == null ||
+        uri.pathSegments.length != 6) {
+      return false;
+    }
+    final parts = uri.pathSegments;
+    final filename = parts.last;
+    if (parts[4].isEmpty || parts[4].length > 100 ||
+        filename.length > 200 ||
+        !filename.toLowerCase().endsWith('.$extension') ||
+        HubService.assetPlatform(filename) !=
+            (extension == 'apk' ? 'android' : 'windows')) {
+      return false;
+    }
+    return HubService.isTrustedReleaseAssetUrl(external.fullName, url,
+        expectedName: filename, expectedTag: parts[4]);
   }
 
   /// Isolate resumable APK files by project, release and asset. Otherwise an
@@ -298,10 +324,13 @@ class ProjectLauncher {
 
   /// Downloads a published APK directly, then asks Android to install it.
   /// Android always requires user confirmation; this cannot silently install apps.
-  static Future<void> installAndroidApk(String url, {String? projectId}) async {
+  static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo}) async {
     if (!Platform.isAndroid) throw UnsupportedError('Android only');
     final uri = Uri.tryParse(url);
-    if (uri == null || projectId == null || !isTrustedProjectDownload(projectId, url, 'apk')) {
+    if (uri == null || projectId == null ||
+        !(externalRepo == null
+            ? isTrustedProjectDownload(projectId, url, 'apk')
+            : isTrustedExternalDownload(projectId, externalRepo, url, 'apk'))) {
       throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
     }
     activeDownloadProject.value = projectId;
@@ -309,7 +338,10 @@ class ProjectLauncher {
     final client = http.Client();
     try {
       final cache = await getTemporaryDirectory();
-      final cacheName = androidApkCacheName(projectId, url);
+      final cacheName = externalRepo == null
+          ? androidApkCacheName(projectId, url)
+          : ('${projectId}_${uri.pathSegments[4]}_${uri.pathSegments[5]}')
+              .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
       final apk = File('${cache.path}${Platform.pathSeparator}$cacheName');
       final temporary = File('${apk.path}.download');
       try {
@@ -343,13 +375,15 @@ class ProjectLauncher {
 
   // Installs a standalone Windows EXE from a published GitHub release.
   // Portable ZIP distributions require their full folder and are not handled here.
-  static Future<void> installWindowsExe(String id, String url) async {
+  static Future<void> installWindowsExe(String id, String url, {String? externalRepo}) async {
     if (!Platform.isWindows) throw UnsupportedError('Windows only');
     if (!isValidProjectId(id)) {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || !isTrustedProjectDownload(id, url, 'exe')) {
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'exe')
+        : isTrustedExternalDownload(id, externalRepo, url, 'exe'))) {
       throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
     }
     final client = http.Client();
@@ -403,13 +437,15 @@ class ProjectLauncher {
 
   /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
   /// Files are extracted to a staging directory and activated only after validation.
-  static Future<void> installWindowsZip(String id, String url) async {
+  static Future<void> installWindowsZip(String id, String url, {String? externalRepo}) async {
     if (!Platform.isWindows) throw UnsupportedError('Windows only');
     if (!isValidProjectId(id)) {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || !isTrustedProjectDownload(id, url, 'zip')) {
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'zip')
+        : isTrustedExternalDownload(id, externalRepo, url, 'zip'))) {
       throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
     }
     final root = await getApplicationSupportDirectory();

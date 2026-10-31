@@ -183,6 +183,20 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 }
 
 
+/// Preserve the Android notification's actual posting time when a user
+/// confirms it later. This keeps weekly analytics and 30-minute transfer
+/// suggestions accurate. Only the OS-supplied millisecond timestamp is used;
+/// text in the notification never controls transaction dates.
+DateTime kopilkaConfirmedNotificationDate(
+    Map<String, dynamic>? notification, DateTime confirmedAt) {
+  final raw = notification?['time'];
+  if (raw is! int || raw < 946684800000 ||
+      raw > confirmedAt.millisecondsSinceEpoch + 5 * 60 * 1000) {
+    return confirmedAt;
+  }
+  return DateTime.fromMillisecondsSinceEpoch(raw);
+}
+
 /// Prevent duplicate financial postings when two review dialogs are open or
 /// a native notification is delivered again before its key is archived.
 /// This reads only saved operation IDs; it never changes existing entries.
@@ -1157,7 +1171,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       final value = parseKopilkaAmount(amount.text)!;
       setState(() => entries.insert(0, {
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
-        'note': note.text.trim(), 'date': DateTime.now().toIso8601String(),
+        'note': note.text.trim(),
+        'date': kopilkaConfirmedNotificationDate(
+            notification, DateTime.now()).toIso8601String(),
         if (kind == 'expense') 'category': category,
         if (notification != null) 'notificationKey': key,
       }));

@@ -1,9 +1,28 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_launcher.dart';
 import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('published SHA-256 digest rejects modified download before install', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-digest-');
+    try {
+      final file = File('${dir.path}/test.bin');
+      await file.writeAsString('abc');
+      const expected = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+      await ProjectLauncher.verifyDownloadedDigest(file, expected);
+      await file.writeAsString('abd');
+      await expectLater(ProjectLauncher.verifyDownloadedDigest(file, expected),
+          throwsFormatException);
+      await expectLater(ProjectLauncher.verifyDownloadedDigest(file, 'bad'),
+          throwsFormatException);
+      await ProjectLauncher.verifyDownloadedDigest(file, null);
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   test('manual Android package binding validates IDs and stays local', () async {
     SharedPreferences.setMockInitialValues({});
     final id = ExternalRepository.parse('ExampleOrg/Widget-App')!.projectId;

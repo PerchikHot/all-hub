@@ -28,8 +28,12 @@ class ExternalRepository {
         return null;
       }
       value = uri.path;
-      if (value.startsWith('/')) value = value.substring(1);
-      if (value.endsWith('/')) value = value.substring(0, value.length - 1);
+      if (value.startsWith('/')) {
+        value = value.substring(1);
+      }
+      if (value.endsWith('/')) {
+        value = value.substring(0, value.length - 1);
+      }
     }
     final parts = value.split('/');
     if (parts.length != 2) return null;
@@ -57,7 +61,9 @@ class ExternalRepositoryStore {
       final repo = ExternalRepository.parse(raw);
       if (repo != null && seen.add(repo.fullName.toLowerCase())) {
         result.add(repo);
-        if (result.length == maxRepositories) break;
+        if (result.length == maxRepositories) {
+          break;
+        }
       }
     }
     return result;
@@ -91,7 +97,9 @@ class ExternalRepositoryStore {
         throw StateError('Репозиторий не подтверждён как публичный и доступный');
       }
     } finally {
-      if (client == null) ownClient.close();
+      if (client == null) {
+        ownClient.close();
+      }
     }
   }
 

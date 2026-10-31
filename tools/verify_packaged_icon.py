@@ -11,7 +11,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
-from PIL import Image, ImageChops
+from PIL import Image
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets" / "icons"
 
@@ -41,7 +41,7 @@ def verify_apk(apk: Path, project: str, required_libs: tuple[str, ...] = ()) -> 
                     if image.size != expected.size:
                         continue
                     actual = image.convert("RGBA")
-                    if ImageChops.difference(actual, expected).getbbox() is None:
+                    if actual.tobytes() == expected.tobytes():
                         return name
             except (OSError, ValueError):
                 continue

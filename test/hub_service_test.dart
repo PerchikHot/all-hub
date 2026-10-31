@@ -89,6 +89,24 @@ void main() {
     expect(assets, isEmpty);
   });
 
+  test('release downloads require the canonical GitHub HTTPS authority', () {
+    const repo = 'PerchikHot/all-hub';
+    const suffix = '/PerchikHot/all-hub/releases/download/all-hub-v1/App-Android.apk';
+    expect(HubService.isTrustedReleaseAssetUrl(repo,
+        'https://github.com$suffix'), isTrue);
+    for (final prefix in [
+      'https://github.com:443',
+      'https://github.com:8443',
+      'https://github.com.',
+      'https://github.com.evil.test',
+      'https://user@github.com',
+      'http://github.com',
+    ]) {
+      expect(HubService.isTrustedReleaseAssetUrl(repo, '$prefix$suffix'),
+          isFalse, reason: prefix);
+    }
+  });
+
   test('release and CI HTTP errors are shown separately', () {
     expect(HubService.apiStatusError(200, 200), isNull);
     expect(HubService.apiStatusError(403, 200), contains('релизам'));

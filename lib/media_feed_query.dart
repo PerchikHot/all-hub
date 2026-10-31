@@ -27,7 +27,8 @@ bool isVisibleFeedPost(
   final tags = (post['tag_string'] ?? '').toString().split(RegExp(r'\s+'));
   if (!tags.contains(selectedTag)) return false;
   if (kind == 'gif') {
-    return (post['file_ext'] ?? '').toString().toLowerCase() == 'gif';
+    // Do not fill the animated gallery with static JPG thumbnails.
+    return mediaFeedAnimatedUrl(post) != null;
   }
   return true;
 }
@@ -47,16 +48,46 @@ bool shouldContinueMediaFeed({
   return fetched >= pageSize || requestedPage < categoryCount;
 }
 
+/// True only for a GIF that has a usable animated HTTPS asset. Danbooru
+/// often returns a static JPG preview even when file_ext is GIF.
+String? mediaFeedAnimatedUrl(Map<String, dynamic> post) {
+  if ((post['file_ext'] ?? '').toString().toLowerCase() != 'gif') {
+    return null;
+  }
+  final size = post['file_size'];
+  // A malformed size must not bypass the limit when it is supplied.
+  if (size != null && (size is! num || !size.isFinite ||
+      size < 0 || size > 24 * 1024 * 1024)) {
+    return null;
+  }
+  for (final key in ['file_url', 'large_file_url', 'sample_url']) {
+    final value = post[key];
+    if (value is! String) continue;
+    final uri = Uri.tryParse(value);
+    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty && !uri.hasFragment &&
+        uri.path.toLowerCase().endsWith('.gif')) {
+      return value;
+    }
+  }
+  return null;
+}
+
 /// Ordered, unique HTTPS candidates. A CDN may return HTTP 403 for a
 /// thumbnail while its sample or original remains available.
 List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
   required bool highQuality,
 }) {
+  // For GIF posts the API usually supplies a static JPG preview. Prefer
+  // the actual animated asset in both HD and compact views; otherwise the
+  // GIF tab silently looks like a still-image gallery. Large originals are
+  // not auto-played in the masonry feed to avoid unbounded memory/network use.
+  final animated = mediaFeedAnimatedUrl(post);
   final keys = highQuality
       ? ['large_file_url', 'file_url', 'sample_url', 'preview_file_url']
       : ['preview_file_url', 'sample_url', 'large_file_url', 'file_url'];
-  final urls = <String>[];
-  final seen = <String>{};
+  final urls = <String>[if (animated != null) animated];
+  final seen = <String>{if (animated != null) animated};
   for (final key in keys) {
     final value = post[key];
     if (value is! String) continue;

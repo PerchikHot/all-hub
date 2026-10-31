@@ -32,9 +32,9 @@ class ExternalArtwork {
   }
 
   static bool _startsWith(List<int> bytes, List<int> prefix) {
-    if (bytes.length < prefix.length) return false;
+    if (bytes.length < prefix.length) { return false; }
     for (var i = 0; i < prefix.length; i++) {
-      if (bytes[i] != prefix[i]) return false;
+      if (bytes[i] != prefix[i]) { return false; }
     }
     return true;
   }
@@ -48,10 +48,10 @@ class ExternalArtwork {
   }
 
   static Future<String?> load(String projectId) async {
-    if (!_validId(projectId)) return null;
+    if (!_validId(projectId)) { return null; }
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('$_prefix$projectId');
-    if (path == null) return null;
+    if (path == null) { return null; }
     final directory = await _directory();
     // Never follow arbitrary paths from a corrupt preferences file.
     if (!path.startsWith('${directory.path}${Platform.pathSeparator}')) {
@@ -63,13 +63,13 @@ class ExternalArtwork {
   /// Import a chosen image into private app storage so temporary picker paths
   /// and Android document permissions are not needed for future launches.
   static Future<bool> choose(String projectId) async {
-    if (!_validId(projectId)) throw ArgumentError('Invalid project ID');
+    if (!_validId(projectId)) { throw ArgumentError('Invalid project ID'); }
     final selection = await FilePicker.platform.pickFiles(
       type: FileType.image, allowMultiple: false, withData: false);
-    if (selection == null || selection.files.isEmpty) return false;
+    if (selection == null || selection.files.isEmpty) { return false; }
     final chosen = selection.files.single;
     final path = chosen.path;
-    if (path == null) throw const FormatException('Файл недоступен');
+    if (path == null) { throw const FormatException('Файл недоступен'); }
     final ext = (chosen.extension ?? '').toLowerCase();
     final source = File(path);
     final size = await source.length();
@@ -98,7 +98,7 @@ class ExternalArtwork {
   }
 
   static Future<void> remove(String projectId) async {
-    if (!_validId(projectId)) return;
+    if (!_validId(projectId)) { return; }
     final previous = await load(projectId);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_prefix$projectId');

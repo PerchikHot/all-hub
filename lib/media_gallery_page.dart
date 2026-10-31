@@ -576,7 +576,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
                   child: _FeedFallbackImage(
                     key: ValueKey('feed-$id-$highQuality'),
                     post: post,
-                    highQuality: highQuality,
+                    // GIF originals over 6 MB use previews in the grid.
+                    // The viewer still opens the original animation on tap.
+                    highQuality: mediaFeedAnimatedUrl(post) == null && highQuality,
                     fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
                   ),
                 ),

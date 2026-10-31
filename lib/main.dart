@@ -637,6 +637,46 @@ class _HomePageState extends State<HomePage> {
                         }
                       },
                     ),
+                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null)
+                    FutureBuilder<String?>(
+                      future: ProjectLauncher.installedVersion(project.id),
+                      builder: (context, installed) {
+                        final available = installed.data != null &&
+                            comparePublishedVersions(installed.data!, i.version ?? '') == -1;
+                        if (!available) return const SizedBox.shrink();
+                        return FilledButton.icon(
+                          icon: const Icon(Icons.system_update_alt_rounded),
+                          label: Text('Обновить: ${installed.data} → ${i.version}'),
+                          onPressed: () async {
+                            try {
+                              if (!await confirmExternalInstall(project)) return;
+                              final uri = Uri.parse(i.downloadUrl!);
+                              if (uri.path.toLowerCase().endsWith('.zip')) {
+                                await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
+                                  externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                  sha256Digest: i.sha256Digest);
+                              } else if (uri.path.toLowerCase().endsWith('.exe')) {
+                                await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
+                                  externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                  sha256Digest: i.sha256Digest);
+                              } else {
+                                throw StateError('Формат обновления Windows не поддерживается');
+                              }
+                              await ProjectLauncher.recordInstalledVersion(project.id, i.version);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Обновление установлено. Можно запускать приложение.')));
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Ошибка обновления: $e')));
+                              }
+                            }
+                          },
+                        );
+                      },
+                    ),
                   if (tab == 0 && Platform.isWindows && i.downloadUrl != null &&
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.exe'))
                     OutlinedButton.icon(

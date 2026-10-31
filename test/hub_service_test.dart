@@ -4,7 +4,7 @@ import 'package:all_hub/hub_service.dart';
 
 void main() {
   test('release SHA-256 digest is propagated and malformed digests rejected', () {
-    final digest = 'a' * 64;
+    final digest = List.filled(64, 'a').join();
     expect(HubService.parseSha256Digest('sha256:$digest'), digest);
     expect(HubService.parseSha256Digest('sha256:abc'), isNull);
     final release = [{

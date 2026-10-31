@@ -124,6 +124,15 @@ String? mediaFeedAnimatedUrl(Map<String, dynamic> post) {
   return null;
 }
 
+/// Keep autoplay in the masonry feed bounded, even when HD is enabled.
+/// Large or unknown-size GIFs show their static preview until opened.
+bool shouldAutoplayFeedGif(Map<String, dynamic> post) {
+  if (mediaFeedAnimatedUrl(post) == null) return false;
+  final size = post['file_size'];
+  return size is num && size.isFinite && size >= 0 &&
+      size <= 6 * 1024 * 1024;
+}
+
 /// Ordered, unique HTTPS candidates. A CDN may return HTTP 403 for a
 /// thumbnail while its sample or original remains available.
 List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
@@ -134,11 +143,15 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
   // GIF tab silently looks like a still-image gallery. Large originals are
   // not auto-played in the masonry feed to avoid unbounded memory/network use.
   final animated = mediaFeedAnimatedUrl(post);
+  // Large GIF originals can consume tens of MB per visible masonry tile.
+  // Animate only bounded assets in the feed; the full GIF remains available
+  // on tap in MediaBrowserPage. Missing sizes are treated conservatively.
+  final autoplay = highQuality || shouldAutoplayFeedGif(post);
   final keys = highQuality
       ? ['large_file_url', 'file_url', 'sample_url', 'preview_file_url']
       : ['preview_file_url', 'sample_url', 'large_file_url', 'file_url'];
-  final urls = <String>[if (animated != null) animated];
-  final seen = <String>{if (animated != null) animated};
+  final urls = <String>[if (autoplay && animated != null) animated];
+  final seen = <String>{if (autoplay && animated != null) animated};
   for (final key in keys) {
     final value = post[key];
     if (value is! String) continue;

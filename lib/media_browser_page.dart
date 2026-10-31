@@ -52,6 +52,12 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   String? savedFile;
 
 
+  /// Flutter can render still images and animated GIFs on Windows without
+  /// handing private browsing to an external application.
+  bool isDirectImage(Uri uri) =>
+      ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']
+          .any(uri.path.toLowerCase().endsWith);
+
   bool isMedia(Uri uri) {
     final path = uri.path.toLowerCase();
     return ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.mov']
@@ -62,6 +68,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   void initState() {
     super.initState();
     currentUrl = widget.url.toString();
+    if (!Platform.isAndroid) loading = false;
     if (Platform.isAndroid) {
       browser = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -231,10 +238,31 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           'Последний файл: $savedFile', maxLines: 2, overflow: TextOverflow.ellipsis)),
       Expanded(child: browser != null
           ? WebViewWidget(controller: browser!)
-          : Center(child: FilledButton(
-              onPressed: () => launchUrl(widget.url, mode: LaunchMode.externalApplication),
-              child: const Text('Открыть в системном браузере'),
-            ))),
+          : isDirectImage(widget.url)
+              ? ClipRect(child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 6,
+                  child: Center(child: Image.network(
+                    widget.url.toString(),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) => progress == null
+                        ? child
+                        : Center(child: CircularProgressIndicator(
+                            value: progress.expectedTotalBytes == null ? null
+                                : progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!,
+                          )),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Center(child: Text(
+                          'Изображение недоступно. Проверь ссылку или соединение.',
+                        )),
+                  )),
+                ))
+              : Center(child: FilledButton(
+                  onPressed: () => launchUrl(widget.url,
+                    mode: LaunchMode.externalApplication),
+                  child: const Text('Открыть страницу в системном браузере'),
+                ))),
     ]),
   );
 }

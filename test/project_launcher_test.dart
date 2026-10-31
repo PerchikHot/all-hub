@@ -18,8 +18,9 @@ void main() {
     expect(await ProjectLauncher.setExternalPackageName(
         id, 'com.example.widget'), isTrue);
     expect(await ProjectLauncher.externalPackageName(id), 'com.example.widget');
-    expect(() => ProjectLauncher.setExternalPackageName(
-        'all-hub', 'com.example.widget'), throwsArgumentError);
+    await expectLater(
+        ProjectLauncher.setExternalPackageName('all-hub', 'com.example.widget'),
+        throwsArgumentError);
   });
 
   test('external installer accepts only a matching public release URL', () {

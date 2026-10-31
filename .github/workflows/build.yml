@@ -22,7 +22,8 @@ jobs:
       - name: Generate branded Android launcher icons
         run: |
           python3 -m pip install --quiet Pillow
-          python3 tools/generate_launcher_icon.py
+          python3 tools/generate_launcher_icon.py --project all_hub
+          python3 tools/generate_launcher_icon.py --project all_hub --verify
       - name: Configure Android permissions and launcher
         run: |
           rm -f test/widget_test.dart
@@ -184,6 +185,7 @@ jobs:
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-release.apk
           test -s "$APK"
+          unzip -l "$APK" | grep -E 'res/mipmap-[^/]+/ic_launcher[^/]*\.png'
           unzip -l "$APK" | grep -F 'lib/arm64-v8a/liballhub_llama.so'
           unzip -l "$APK" | grep -F 'lib/arm64-v8a/libc++_shared.so'
           unzip -l "$APK" | grep -F 'lib/arm64-v8a/libllama.so'
@@ -206,7 +208,8 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --quiet Pillow
-          python tools/generate_launcher_icon.py
+          python tools/generate_launcher_icon.py --project all_hub
+          python tools/generate_launcher_icon.py --project all_hub --verify
           if (!(Test-Path 'windows/runner/resources/app_icon.ico')) { throw 'Windows icon generation failed' }
       - name: Remove generated template test
         run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
@@ -219,6 +222,8 @@ jobs:
         run: |
           $release = 'build/windows/x64/runner/Release'
           if (!(Test-Path "$release/all_hub.exe")) { throw 'Windows executable missing' }
+          python -m pip install --quiet pefile
+          python -c "import pefile; p=pefile.PE(r'$release/all_hub.exe'); assert any(e.id==14 for e in p.DIRECTORY_ENTRY_RESOURCE.entries), 'EXE icon missing'"
           if (!(Test-Path "$release/flutter_windows.dll")) { throw 'Flutter runtime missing' }
           if (!(Test-Path "$release/data")) { throw 'Windows data assets missing' }
           Compress-Archive -Path "$release/*" -DestinationPath 'AllHub-Windows-portable.zip' -Force

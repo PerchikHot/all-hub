@@ -55,6 +55,9 @@ jobs:
           mkdir -p /tmp/kopilka_build
           cd /tmp/kopilka_build
           flutter create --platforms=android --project-name kopilka_app --org com.veyrion .
+          python3 -m pip install --quiet Pillow
+          python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD"
+          python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify
           cp "$GITHUB_WORKSPACE/lib/kopilka_page.dart" lib/kopilka_page.dart
           cp "$GITHUB_WORKSPACE/lib/kopilka_main.dart" lib/main.dart
           # Install a local-only Android notification listener for supported banks.
@@ -366,6 +369,7 @@ jobs:
           flutter analyze
           flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep -E 'res/mipmap-[^/]+/ic_launcher[^/]*\.png'
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
       - name: Upload standalone APK
@@ -418,6 +422,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $project | Out-Null
           Set-Location $project
           flutter create --platforms=windows --project-name kopilka_app --org com.veyrion .
+          python -m pip install --quiet Pillow pefile
+          python "$env:GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$project"
+          python "$env:GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$project" --verify
           Copy-Item "$env:GITHUB_WORKSPACE/lib/kopilka_page.dart" "lib/kopilka_page.dart"
           Copy-Item "$env:GITHUB_WORKSPACE/lib/kopilka_main.dart" "lib/main.dart"
           flutter pub add shared_preferences
@@ -451,6 +458,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Kopilka Windows build failed' }
           $release = Join-Path $project 'build/windows/x64/runner/Release'
           if (!(Test-Path "$release/kopilka_app.exe")) { throw 'Kopilka EXE missing' }
+          python -c "import pefile; p=pefile.PE(r'$release/kopilka_app.exe'); assert any(e.id==14 for e in p.DIRECTORY_ENTRY_RESOURCE.entries), 'Kopilka EXE icon missing'"
           if (!(Test-Path "$release/flutter_windows.dll")) { throw 'Flutter runtime missing' }
           if (!(Test-Path "$release/data")) { throw 'Flutter assets missing' }
           Compress-Archive -Path "$release/*" -DestinationPath "$env:GITHUB_WORKSPACE/Kopilka-Windows-portable.zip" -Force

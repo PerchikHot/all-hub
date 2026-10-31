@@ -3,6 +3,59 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('newest installable release wins separately for Android and Windows', () {
+    Map<String, dynamic> asset(String tag, String name,
+        {int size = 500, String state = 'uploaded'}) => {
+      'name': name, 'size': size, 'state': state,
+      'browser_download_url':
+          'https://github.com/PerchikHot/all-hub/releases/download/$tag/$name',
+    };
+    final releases = [
+      {'tag_name': 'all-hub-v3', 'assets': [
+        asset('all-hub-v3', 'AllHub-Android.apk'),
+        asset('all-hub-v3', 'AllHub-Windows.zip', size: 0),
+      ]},
+      {'tag_name': 'all-hub-v2', 'assets': [
+        asset('all-hub-v2', 'AllHub-Android.apk'),
+        asset('all-hub-v2', 'AllHub-Windows.zip'),
+      ]},
+      {'tag_name': 'all-hub-v1', 'assets': [
+        asset('all-hub-v1', 'AllHub-Windows.zip'),
+      ]},
+    ];
+    final selected = HubService.latestPublishedAssets(
+        'PerchikHot/all-hub', releases, 'all-hub');
+    expect(selected.length, 2);
+    expect(selected.singleWhere((a) => a.platform == 'android').version,
+        contains('3'));
+    expect(selected.singleWhere((a) => a.platform == 'windows').version,
+        contains('2'));
+    expect(selected.any((a) => a.url.contains('all-hub-v1')), isFalse);
+  });
+
+  test('untrusted and draft releases cannot replace a valid installer', () {
+    final selected = HubService.latestPublishedAssets(
+      'PerchikHot/all-hub', [
+        {'tag_name': 'all-hub-v4', 'draft': true, 'assets': [
+          {'name': 'AllHub-Android.apk', 'size': 500, 'state': 'uploaded',
+           'browser_download_url':
+               'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v4/AllHub-Android.apk'},
+        ]},
+        {'tag_name': 'all-hub-v3', 'assets': [
+          {'name': 'AllHub-Android.apk', 'size': 500, 'state': 'uploaded',
+           'browser_download_url': 'https://evil.example/app.apk'},
+        ]},
+        {'tag_name': 'all-hub-v2', 'assets': [
+          {'name': 'AllHub-Android.apk', 'size': 500, 'state': 'uploaded',
+           'browser_download_url':
+               'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v2/AllHub-Android.apk'},
+        ]},
+      ], 'all-hub',
+    );
+    expect(selected.length, 1);
+    expect(selected.single.url, contains('all-hub-v2'));
+  });
+
   test('release and CI HTTP errors are shown separately', () {
     expect(HubService.apiStatusError(200, 200), isNull);
     expect(HubService.apiStatusError(403, 200), contains('релизам'));

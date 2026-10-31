@@ -42,6 +42,26 @@ void main() {
         kind: 'gif', seenIds: <String>{}), isTrue);
   });
 
+  test('large GIFs use preview in the feed but full animation in viewer', () {
+    final post = <String, dynamic>{
+      'id': 314,
+      'file_ext': 'gif',
+      'file_size': 12 * 1024 * 1024,
+      'file_url': 'https://cdn.example/314.gif',
+      'preview_file_url': 'https://cdn.example/314-preview.jpg',
+    };
+    expect(shouldAutoplayFeedGif(post), isFalse);
+    expect(mediaFeedImageCandidates(post, highQuality: false).first,
+        'https://cdn.example/314-preview.jpg');
+    expect(mediaFeedImageCandidates(post, highQuality: true).first,
+        'https://cdn.example/314.gif');
+    expect(shouldAutoplayFeedGif({...post, 'file_size': 5 * 1024 * 1024}),
+        isTrue);
+    expect(mediaFeedImageCandidates({...post, 'file_size': 5 * 1024 * 1024},
+        highQuality: false).first, 'https://cdn.example/314.gif');
+    expect(shouldAutoplayFeedGif({...post, 'file_size': null}), isFalse);
+  });
+
   test('GIF tab excludes static previews and oversized animated assets', () {
     final post = <String, dynamic>{
       'id': 13,

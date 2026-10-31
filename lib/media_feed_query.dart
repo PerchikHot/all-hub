@@ -48,6 +48,14 @@ bool shouldContinueMediaFeed({
   return fetched >= pageSize || requestedPage < categoryCount;
 }
 
+/// CachedNetworkImage disk resizing may transcode an animated GIF into a
+/// single still frame. Keep the original GIF bytes in the disk cache.
+bool isAnimatedFeedAssetUrl(String url) {
+  final uri = Uri.tryParse(url);
+  return uri != null && uri.scheme == 'https' &&
+      uri.path.toLowerCase().endsWith('.gif');
+}
+
 /// True only for a GIF that has a usable animated HTTPS asset. Danbooru
 /// often returns a static JPG preview even when file_ext is GIF.
 String? mediaFeedAnimatedUrl(Map<String, dynamic> post) {

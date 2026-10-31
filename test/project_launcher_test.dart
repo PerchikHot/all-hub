@@ -55,6 +55,20 @@ void main() {
     expect(() => ProjectLauncher.requireAndroidInstallerOpened(null), throwsStateError);
   });
 
+  test('installer binds official and manually registered APK package names', () async {
+    SharedPreferences.setMockInitialValues({});
+    expect(await ProjectLauncher.expectedAndroidPackageName('shadow-rp'),
+        'com.shadowrp.app');
+    expect(await ProjectLauncher.expectedAndroidPackageName('kopilka'),
+        'com.veyrion.kopilka_app');
+    final repo = ExternalRepository.parse('ExampleOrg/Widget-App')!;
+    expect(await ProjectLauncher.expectedAndroidPackageName(repo.projectId), isNull);
+    await ProjectLauncher.setExternalPackageName(repo.projectId, 'com.example.widget');
+    expect(await ProjectLauncher.expectedAndroidPackageName(repo.projectId),
+        'com.example.widget');
+    expect(await ProjectLauncher.expectedAndroidPackageName('../bad'), isNull);
+  });
+
   test('manual Android package binding validates IDs and stays local', () async {
     SharedPreferences.setMockInitialValues({});
     final id = ExternalRepository.parse('ExampleOrg/Widget-App')!.projectId;

@@ -59,6 +59,11 @@ void main() {
     expect(suggestKopilkaOwnTransfers(
       entries, ['Т-Банк', 'Газпромбанк', 'Ozon Банк']), isEmpty);
     entries.removeLast();
+    entries.add({'kind': 'expense', 'bank': 'Газпромбанк', 'amount': 2000,
+      'date': '2026-10-31T10:01:00'});
+    expect(suggestKopilkaOwnTransfers(
+      entries, ['Т-Банк', 'Газпромбанк', 'Ozon Банк']), isEmpty);
+    entries.removeLast();
     entries[1]['date'] = '2026-10-31T11:00:00';
     expect(suggestKopilkaOwnTransfers(
       entries, ['Т-Банк', 'Газпромбанк', 'Ozon Банк']), isEmpty);

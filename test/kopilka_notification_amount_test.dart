@@ -2,6 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('listener import counters never reveal notification contents', () {
+    expect(describeKopilkaImportGate(null), contains('отдельной Android APK'));
+    expect(describeKopilkaImportGate({'accepted': 3, 'filtered': 8}),
+        contains('Отобрано для проверки: 3 · отклонено фильтром: 8'));
+    expect(describeKopilkaImportGate({'accepted': -1, 'filtered': 0}),
+        contains('после обновления'));
+  });
+
   test('three banks: posted payment wording and amount extraction', () {
     for (final alert in [
       'Платёж 1 250,50 ₽ выполнен',

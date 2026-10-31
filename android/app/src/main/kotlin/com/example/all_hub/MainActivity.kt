@@ -80,6 +80,19 @@ class MainActivity : FlutterActivity() {
                             if (apk == null || !apk.isFile || !apk.name.endsWith(".apk")) {
                                 result.error("APK", "APK file is missing", null)
                             } else {
+                                // A GitHub release URL is not proof that its APK belongs to
+                                // the selected app. Check the package archive before invoking
+                                // Android's user-confirmed system installer.
+                                val expected = call.argument<String>("expectedPackageName")
+                                val archive = packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+                                    ?: throw IllegalArgumentException("Invalid APK package archive")
+                                if (archive.packageName.isNullOrBlank()) {
+                                    throw IllegalArgumentException("APK has no package name")
+                                }
+                                if (!expected.isNullOrBlank() && archive.packageName != expected) {
+                                    throw IllegalArgumentException(
+                                        "APK package mismatch: expected $expected, got ${archive.packageName}")
+                                }
                                 val uri = FileProvider.getUriForFile(
                                     this, "${applicationContext.packageName}.fileprovider", apk)
                                 val intent = Intent(Intent.ACTION_VIEW).apply {

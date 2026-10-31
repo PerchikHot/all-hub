@@ -156,14 +156,13 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
             title.length > 200 || body.length > 2048) {
           return false;
         }
-        // Native Android listeners supply a known bank label. A malformed
-        // or spoofed source must never appear as a trustworthy bank operation.
-        // Older local test fixtures without a bank label remain reviewable.
+        // Only the standalone Android listener may label a supported bank.
+        // A missing label is not evidence of a real bank transaction:
+        // reject old/forged queue entries instead of offering an import.
         final sourceBank = e['bank'];
-        if (sourceBank != null &&
-            (sourceBank is! String ||
-             !const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}
-                 .contains(sourceBank))) {
+        if (sourceBank is! String ||
+            !const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}
+                .contains(sourceBank)) {
           return false;
         }
         if (!isBankTransactionNotification(title, body)) {

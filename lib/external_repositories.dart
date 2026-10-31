@@ -112,6 +112,66 @@ class ExternalRepositoryStore {
     }
   }
 
+  /// Portable backup contains only public repository identifiers, never
+  /// credentials, installed packages, downloaded files or app data.
+  static String exportBackup(List<ExternalRepository> repositories) {
+    if (repositories.length > maxRepositories) {
+      throw StateError('Слишком много репозиториев для резервной копии');
+    }
+    return jsonEncode({
+      'format': 'veyrion-public-repositories',
+      'version': 1,
+      'repositories': repositories.map((repo) => repo.fullName).toList(),
+    });
+  }
+
+  /// Fail closed on malformed/oversized backups. Do not silently discard
+  /// entries: users must know exactly what would replace their catalog.
+  static List<ExternalRepository> parseBackup(String source) {
+    if (source.isEmpty || source.length > 8192) {
+      throw const FormatException('Неверный размер резервной копии');
+    }
+    final dynamic decoded = jsonDecode(source);
+    if (decoded is! Map<String, dynamic> ||
+        decoded['format'] != 'veyrion-public-repositories' ||
+        decoded['version'] != 1 ||
+        decoded['repositories'] is! List) {
+      throw const FormatException('Неподдерживаемый формат каталога');
+    }
+    final raw = decoded['repositories'] as List;
+    if (raw.length > maxRepositories) {
+      throw const FormatException('Превышен лимит репозиториев');
+    }
+    final seen = <String>{};
+    final result = <ExternalRepository>[];
+    for (final value in raw) {
+      if (value is! String) {
+        throw const FormatException('Неверная запись репозитория');
+      }
+      final repo = ExternalRepository.parse(value);
+      if (repo == null || value != repo.fullName ||
+          !seen.add(repo.fullName.toLowerCase())) {
+        throw const FormatException('Повторяющийся или неверный репозиторий');
+      }
+      result.add(repo);
+    }
+    return result;
+  }
+
+  /// Verify every repository before replacing the saved list. Any HTTP error,
+  /// private/archived repository or malformed entry leaves the old list intact.
+  static Future<int> importBackup(String source, {http.Client? client}) async {
+    final repositories = parseBackup(source);
+    for (final repo in repositories) {
+      await verifyPublic(repo, client: client);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final saved = await prefs.setStringList(storageKey,
+        repositories.map((repo) => repo.fullName).toList());
+    if (!saved) throw StateError('Не удалось сохранить каталог');
+    return repositories.length;
+  }
+
   static Future<bool> add(ExternalRepository repo) async {
     final current = await load();
     if (current.any((item) =>

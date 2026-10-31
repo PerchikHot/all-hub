@@ -1506,10 +1506,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               const SizedBox(height: 9),
               Row(children: [
                 SizedBox(width: 56, child: Text(
-                  DateTime(now.year, now.month, now.day - 6 + index)
-                      .day.toString().padLeft(2, '0') + '.' +
-                  DateTime(now.year, now.month, now.day - 6 + index)
-                      .month.toString().padLeft(2, '0'))),
+                  '${DateTime(now.year, now.month, now.day - 6 + index).day.toString().padLeft(2, '0')}.${DateTime(now.year, now.month, now.day - 6 + index).month.toString().padLeft(2, '0')}')),
                 Expanded(child: LinearProgressIndicator(
                   value: weeklyPeak > 0
                     ? (weeklyExpenses[index] / weeklyPeak).clamp(0.0, 1.0)

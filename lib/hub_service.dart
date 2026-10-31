@@ -242,11 +242,14 @@ class HubService {
 
   static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
     try {
+      // Third-party cards need published releases, not private CI metadata.
+      // Skipping Actions halves their anonymous GitHub API requests.
       final responses = await Future.wait([
         http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=5'), headers: _headers)
           .timeout(const Duration(seconds: 12)),
-        http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
-          .timeout(const Duration(seconds: 12)),
+        if (projectId != null)
+          http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
+            .timeout(const Duration(seconds: 12)),
       ]);
       final assets = <HubAsset>[];
       String? version, workflow, actionsUrl;
@@ -260,7 +263,7 @@ class HubService {
           }
         }
       }
-      if (responses[1].statusCode == 200) {
+      if (responses.length > 1 && responses[1].statusCode == 200) {
         final runs = (jsonDecode(responses[1].body) as Map<String, dynamic>)['workflow_runs'] as List? ?? [];
         final relevantRuns = runs.cast<Map<String, dynamic>>().where(
           (run) => workflowMatchesProject(
@@ -277,7 +280,8 @@ class HubService {
       }
       return ProjectStatus(version: version, workflow: workflow, actionsUrl: actionsUrl,
         assets: assets, error: apiStatusError(
-          responses[0].statusCode, responses[1].statusCode));
+          responses[0].statusCode,
+          responses.length > 1 ? responses[1].statusCode : 200));
     } catch (e) {
       return ProjectStatus(error: 'Ошибка сети: $e');
     }

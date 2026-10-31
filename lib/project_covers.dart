@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'project_icons.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:io';
@@ -307,6 +308,8 @@ class _ProjectCoverState extends State<ProjectCover> {
             }),
         ],
 
+        if (localFile == null && webCovers.isEmpty)
+          Center(child: VeyrionProjectIcon(id: widget.id, size: 94)),
         const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
           colors: [Color(0x22000000), Color(0xCC080D20)]))),

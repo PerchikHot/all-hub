@@ -147,7 +147,7 @@ jobs:
                   // Recover the pending queue without touching saved transactions.
                   val current = try {
                       JSONArray(prefs.getString("queue", "[]"))
-                  } catch (_: org.json.JSONException) {
+                  } catch (ignored: org.json.JSONException) {
                       JSONArray()
                   }
                   val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}:${body.hashCode()}"

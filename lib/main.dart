@@ -27,8 +27,8 @@ class Project {
 
 class GithubInfo {
   final String? version, downloadUrl, workflowStatus, actionsUrl;
-  final String? error, releaseNotes;
-  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.actionsUrl, this.error, this.releaseNotes});
+  final String? error, releaseNotes, sha256Digest;
+  const GithubInfo({this.version, this.downloadUrl, this.workflowStatus, this.actionsUrl, this.error, this.releaseNotes, this.sha256Digest});
 }
 
 class GithubApi {
@@ -49,6 +49,7 @@ class GithubApi {
       actionsUrl: result.actionsUrl,
       error: result.error,
       releaseNotes: available.isEmpty ? null : available.first.releaseNotes,
+      sha256Digest: available.isEmpty ? null : available.first.sha256Digest,
     );
   }
 }
@@ -497,7 +498,8 @@ class _HomePageState extends State<HomePage> {
                           await ProjectLauncher.installAndroidApk(i.downloadUrl!,
                             projectId: project.id,
                             externalRepo: project.id.startsWith('external-')
-                                ? project.repo : null);
+                                ? project.repo : null,
+                            sha256Digest: i.sha256Digest);
                         } catch (e) {
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));

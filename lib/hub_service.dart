@@ -163,10 +163,18 @@ class HubService {
   static bool isTrustedReleaseAssetUrl(String repo, String url,
       {String? expectedName, String? expectedTag}) {
     final repositoryParts = repo.split('/');
+    // Uri normalizes explicit default ports (:443), which can make an
+    // unexpected authority look identical to github.com. Require the exact
+    // HTTPS origin before parsing release asset URLs.
+    if (!RegExp(r'^https://github\.com/', caseSensitive: false).hasMatch(url)) {
+      return false;
+    }
     final uri = Uri.tryParse(url);
     if (repositoryParts.length != 2 || uri == null ||
         uri.scheme != 'https' || uri.host.toLowerCase() != 'github.com' ||
-        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
+        uri.authority.toLowerCase() != 'github.com' ||
+        uri.userInfo.isNotEmpty || uri.hasPort ||
+        uri.hasQuery || uri.hasFragment) {
       return false;
     }
     final parts = uri.pathSegments;

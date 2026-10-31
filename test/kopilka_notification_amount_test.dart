@@ -68,16 +68,16 @@ void main() {
 
   test('pending bank notifications require a stable unique unreviewed key', () {
     final alerts = <dynamic>[
-      {'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
-      {'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
-      {'key': 'b', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
-      {'key': 'c', 'title': 'Банк', 'body': 'Код подтверждения оплаты 500 ₽'},
+      {'bank': 'Т-Банк', 'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'bank': 'Т-Банк', 'key': 'a', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'bank': 'Т-Банк', 'key': 'b', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
+      {'bank': 'Т-Банк', 'key': 'c', 'title': 'Банк', 'body': 'Код подтверждения оплаты 500 ₽'},
       {'title': 'Банк', 'body': 'Оплата 100 ₽'},
       'malformed',
       {42: 'invalid native key'},
-      {'key': 123, 'title': 'Т-Банк', 'body': 'Оплата 200 ₽'},
-      {'key': '   ', 'title': 'Т-Банк', 'body': 'Оплата 300 ₽'},
-      {'key': ' b ', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
+      {'bank': 'Т-Банк', 'key': 123, 'title': 'Т-Банк', 'body': 'Оплата 200 ₽'},
+      {'bank': 'Т-Банк', 'key': '   ', 'title': 'Т-Банк', 'body': 'Оплата 300 ₽'},
+      {'bank': 'Т-Банк', 'key': ' b ', 'title': 'Ozon Банк', 'body': 'Перевод 2 000 ₽'},
     ];
     expect(filterPendingBankNotifications(alerts, <String>{}).map((e) => e['key']).toList(),
       ['a', 'b']);
@@ -86,7 +86,7 @@ void main() {
     expect(filterPendingBankNotifications(alerts, <String>{'b'}).map((e) => e['key']).toList(),
       ['a']);
     final padded = <dynamic>[
-      {'key': '  tx-42  ', 'title': 'Т-Банк', 'body': 'Оплата 125 ₽'},
+      {'bank': 'Т-Банк', 'key': '  tx-42  ', 'title': 'Т-Банк', 'body': 'Оплата 125 ₽'},
     ];
     expect(filterPendingBankNotifications(padded, <String>{}).single['key'], 'tx-42');
     expect(filterPendingBankNotifications(padded, <String>{'tx-42'}), isEmpty);
@@ -98,6 +98,7 @@ void main() {
       {'key': 't', 'bank': 'Т-Банк', 'title': 'Т-Банк', 'body': 'Оплата 100 ₽'},
       {'key': 'g', 'bank': 'Газпромбанк', 'title': 'Газпромбанк', 'body': 'Оплата 200 ₽'},
       {'key': 'o', 'bank': 'Ozon Банк', 'title': 'Ozon Банк', 'body': 'Оплата 300 ₽'},
+      {'key': 'missing', 'title': 'Т-Банк', 'body': 'Оплата 400 ₽'},
       {'key': 'fake', 'bank': 'Неизвестный банк', 'title': 'Т-Банк', 'body': 'Оплата 400 ₽'},
       {'key': 'object', 'bank': {'name': 'Т-Банк'}, 'title': 'Т-Банк', 'body': 'Оплата 500 ₽'},
     ];
@@ -106,18 +107,18 @@ void main() {
   });
 
   test('oversized or non-text native bank alerts are not imported', () {
-    final valid = {'key': 'ok', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'};
+    final valid = {'bank': 'Т-Банк', 'key': 'ok', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'};
     final alerts = <dynamic>[
-      {'key': 'large-key-${List.filled(260, 'x').join()}',
+      {'bank': 'Т-Банк', 'key': 'large-key-${List.filled(260, 'x').join()}',
        'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
-      {'key': 'line\nbreak', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
-      {'key': 'tab\tkey', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'bank': 'Т-Банк', 'key': 'line\nbreak', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
+      {'bank': 'Т-Банк', 'key': 'tab\tkey', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'},
       {'key': 'bad-title', 'title': {'bank': 'Т-Банк'},
        'body': 'Оплата 250 ₽'},
-      {'key': 'bad-body', 'title': 'Т-Банк', 'body': ['Оплата 250 ₽']},
-      {'key': 'long-title', 'title': List.filled(201, 'x').join(),
+      {'bank': 'Т-Банк', 'key': 'bad-body', 'title': 'Т-Банк', 'body': ['Оплата 250 ₽']},
+      {'bank': 'Т-Банк', 'key': 'long-title', 'title': List.filled(201, 'x').join(),
        'body': 'Оплата 250 ₽'},
-      {'key': 'long-body', 'title': 'Т-Банк',
+      {'bank': 'Т-Банк', 'key': 'long-body', 'title': 'Т-Банк',
        'body': 'Оплата 250 ₽${List.filled(2050, 'x').join()}'},
       valid,
     ];

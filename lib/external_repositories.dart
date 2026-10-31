@@ -168,7 +168,9 @@ class ExternalRepositoryStore {
     final prefs = await SharedPreferences.getInstance();
     final saved = await prefs.setStringList(storageKey,
         repositories.map((repo) => repo.fullName).toList());
-    if (!saved) throw StateError('Не удалось сохранить каталог');
+    if (!saved) {
+      throw StateError('Не удалось сохранить каталог');
+    }
     return repositories.length;
   }
 

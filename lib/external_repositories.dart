@@ -174,6 +174,32 @@ class ExternalRepositoryStore {
     return repositories.length;
   }
 
+  /// Merge a portable catalog without removing existing entries or artwork.
+  /// Verify only new public sources before a single atomic preferences write.
+  /// No partial import is saved when a repository is private, unavailable,
+  /// duplicated, or the combined catalog exceeds the local capacity.
+  static Future<int> mergeBackup(String source, {http.Client? client}) async {
+    final incoming = parseBackup(source);
+    final current = await load();
+    final known = current.map((repo) => repo.fullName.toLowerCase()).toSet();
+    final additions = incoming.where((repo) =>
+        !known.contains(repo.fullName.toLowerCase())).toList();
+    if (current.length + additions.length > maxRepositories) {
+      throw const FormatException('В объединённом каталоге больше 30 репозиториев');
+    }
+    for (final repo in additions) {
+      await verifyPublic(repo, client: client);
+    }
+    if (additions.isEmpty) return 0;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = await prefs.setStringList(storageKey, [
+      ...current.map((repo) => repo.fullName),
+      ...additions.map((repo) => repo.fullName),
+    ]);
+    if (!saved) throw StateError('Не удалось сохранить объединённый каталог');
+    return additions.length;
+  }
+
   static Future<bool> add(ExternalRepository repo) async {
     final current = await load();
     if (current.any((item) =>

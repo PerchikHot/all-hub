@@ -1,4 +1,5 @@
 import 'project_launcher.dart';
+import 'external_repositories.dart';
 import 'version_status.dart';
 import 'media_browser_page.dart';
 import 'kopilka_page.dart';
@@ -33,7 +34,8 @@ class GithubInfo {
 
 class GithubApi {
   static Future<GithubInfo> inspect(String repo, {String? projectId}) async {
-    final result = await HubService.inspect(repo, projectId: projectId);
+    final result = await HubService.inspect(repo,
+        projectId: projectId?.startsWith('external-') == true ? null : projectId);
     final available = result.assets.where((a) {
       if (a.platform != currentPlatform) return false;
       final name = a.name.toLowerCase();
@@ -97,43 +99,111 @@ class _HomePageState extends State<HomePage> {
     final data = await rootBundle.loadString('assets/projects.json');
     final live = await HubService.catalog(data);
     final result = live.map((p) => Project(p.id, p.name, p.type, p.description, p.repo)).toList();
-    final prefs = await SharedPreferences.getInstance();
-    for (final raw in prefs.getStringList('allhub_custom_repos_v1') ?? <String>[]) {
-      final parts = raw.split('/');
-      if (parts.length != 2 || !RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(parts[0]) ||
-          !RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(parts[1])) continue;
-      if (result.any((p) => p.repo?.toLowerCase() == raw.toLowerCase())) continue;
-      result.add(Project('external-${parts.join('-').toLowerCase()}', parts[1],
-          'GitHub app', 'Добавленный репозиторий GitHub: $raw', raw));
+    for (final external in await ExternalRepositoryStore.load()) {
+      if (result.any((p) =>
+          p.repo?.toLowerCase() == external.fullName.toLowerCase())) {
+        continue;
+      }
+      result.add(Project(external.projectId, external.name,
+          'GitHub app', 'Публичный репозиторий: ${external.fullName}',
+          external.fullName));
     }
     return result;
   }
   Future<void> addRepository() async {
     final controller = TextEditingController();
-    final entered = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Добавить репозиторий GitHub'),
-      content: TextField(controller: controller, autofocus: true,
-        decoration: const InputDecoration(hintText: 'owner/repository или ссылка GitHub')),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Добавить'))],
-    ));
+    final entered = await showDialog<String>(context: context, builder: (ctx) =>
+      AlertDialog(
+        title: const Text('Добавить публичный GitHub-репозиторий'),
+        content: TextField(controller: controller, autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'owner/repository или https://github.com/owner/repository')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Проверить и добавить')),
+        ],
+      ),
+    );
     controller.dispose();
-    if (!mounted || entered == null || entered.isEmpty) return;
-    final parsed = Uri.tryParse(entered);
-    final candidate = parsed != null && parsed.host.toLowerCase() == 'github.com' && parsed.scheme == 'https'
-        ? parsed.pathSegments.take(2).join('/') : entered;
-    final valid = RegExp(r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$').hasMatch(candidate) &&
-        !candidate.split('/').contains('..');
-    if (!valid) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Укажи owner/repo или ссылку https://github.com/owner/repo')));
+    if (!mounted || entered == null || entered.isEmpty) {
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getStringList('allhub_custom_repos_v1') ?? <String>[];
-    if (!saved.any((v) => v.toLowerCase() == candidate.toLowerCase())) {
-      await prefs.setStringList('allhub_custom_repos_v1', [...saved, candidate]);
+    final external = ExternalRepository.parse(entered);
+    if (external == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Укажи точный owner/repo или адрес публичного репозитория')));
+      return;
     }
-    await refresh();
+    try {
+      await ExternalRepositoryStore.verifyPublic(external);
+      final added = await ExternalRepositoryStore.add(external);
+      if (!mounted) {
+        return;
+      }
+      await refresh();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(added ? 'Репозиторий добавлен: ${external.fullName}'
+            : 'Репозиторий уже есть в каталоге')));
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось добавить репозиторий: $e')));
+    }
+  }
+
+  Future<void> removeRepository(Project project) async {
+    final external = ExternalRepository.parse(project.repo ?? '');
+    if (external == null || external.projectId != project.id) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) =>
+      AlertDialog(
+        title: const Text('Удалить из каталога?'),
+        content: Text('Репозиторий ${external.fullName} исчезнет из списка. '
+          'Установленные приложения и их данные не удаляются.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Убрать из каталога')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    await ExternalRepositoryStore.remove(external);
+    if (mounted) {
+      await refresh();
+    }
+  }
+
+  Future<bool> confirmExternalInstall(Project project) async {
+    if (!project.id.startsWith('external-')) {
+      return true;
+    }
+    return await showDialog<bool>(context: context, builder: (ctx) =>
+      AlertDialog(
+        title: const Text('Установить стороннее приложение?'),
+        content: Text('Источник: ${project.repo}\\n\\n'
+          'All Hub проверяет адрес релиза, но не может гарантировать '
+          'безопасность APK/EXE. Устанавливай только из доверенного '
+          'репозитория. Android отдельно запросит подтверждение установки.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Понимаю, продолжить')),
+        ],
+      ),
+    ) ?? false;
   }
 
   Future<void> open(String url) async {
@@ -238,6 +308,11 @@ class _HomePageState extends State<HomePage> {
               Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
+            if (project.id.startsWith('external-'))
+              Align(alignment: Alignment.centerRight, child: TextButton.icon(
+                onPressed: () => removeRepository(project),
+                icon: const Icon(Icons.remove_circle_outline),
+                label: const Text('Убрать из каталога'))),
             if (project.id == 'kopilka') Padding(
               padding: const EdgeInsets.only(top: 12),
               child: FilledButton.icon(
@@ -364,7 +439,13 @@ class _HomePageState extends State<HomePage> {
                               await ProjectLauncher.installedVersion(project.id), i.version)) {
                             throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
                           }
-                          await ProjectLauncher.installAndroidApk(i.downloadUrl!, projectId: project.id);
+                          if (!await confirmExternalInstall(project)) {
+                            return;
+                          }
+                          await ProjectLauncher.installAndroidApk(i.downloadUrl!,
+                            projectId: project.id,
+                            externalRepo: project.id.startsWith('external-')
+                                ? project.repo : null);
                         } catch (e) {
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));
@@ -389,7 +470,12 @@ class _HomePageState extends State<HomePage> {
                               await ProjectLauncher.installedVersion(project.id), i.version)) {
                             throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
                           }
-                          await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!);
+                          if (!await confirmExternalInstall(project)) {
+                            return;
+                          }
+                          await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
+                            externalRepo: project.id.startsWith('external-')
+                                ? project.repo : null);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('EXE установлен и привязан. Нажми «Открыть».')));
@@ -418,7 +504,12 @@ class _HomePageState extends State<HomePage> {
                               await ProjectLauncher.installedVersion(project.id), i.version)) {
                             throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
                           }
-                          await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!);
+                          if (!await confirmExternalInstall(project)) {
+                            return;
+                          }
+                          await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
+                            externalRepo: project.id.startsWith('external-')
+                                ? project.repo : null);
                           await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

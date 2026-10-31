@@ -184,6 +184,49 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> configureExternalPackage(Project project) async {
+    if (!project.id.startsWith('external-')) {
+      return;
+    }
+    final existing = await ProjectLauncher.externalPackageName(project.id);
+    if (!mounted) {
+      return;
+    }
+    final controller = TextEditingController(text: existing ?? '');
+    final packageName = await showDialog<String>(context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Запуск установленного Android-приложения'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'com.example.app',
+            helperText: 'Укажи package ID приложения. Доступ только к запуску, не к его данным.'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Сохранить')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || packageName == null) {
+      return;
+    }
+    try {
+      await ProjectLauncher.setExternalPackageName(project.id, packageName);
+      if (mounted) {
+        await refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось сохранить package ID: $e')));
+      }
+    }
+  }
+
   Future<bool> confirmExternalInstall(Project project) async {
     if (!project.id.startsWith('external-')) {
       return true;
@@ -312,6 +355,11 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () => removeRepository(project),
                 icon: const Icon(Icons.remove_circle_outline),
                 label: const Text('Убрать из каталога'))),
+            if (Platform.isAndroid && project.id.startsWith('external-'))
+              Align(alignment: Alignment.centerRight, child: OutlinedButton.icon(
+                onPressed: () => configureExternalPackage(project),
+                icon: const Icon(Icons.app_registration_outlined),
+                label: const Text('Указать package ID для запуска'))),
             if (project.id == 'kopilka') Padding(
               padding: const EdgeInsets.only(top: 12),
               child: FilledButton.icon(

@@ -22,24 +22,24 @@ class ExternalScreenshots {
   }
 
   static Future<List<String>> load(String projectId) async {
-    if (!_validId(projectId)) return [];
+    if (!_validId(projectId)) { return []; }
     final prefs = await SharedPreferences.getInstance();
     final directory = await _directory();
     final prefix = '${directory.path}${Platform.pathSeparator}';
     final paths = prefs.getStringList('$_prefix$projectId') ?? <String>[];
     final result = <String>[];
     for (final path in paths.take(maxScreenshots)) {
-      if (path.startsWith(prefix) && await File(path).exists()) result.add(path);
+      if (path.startsWith(prefix) && await File(path).exists()) { result.add(path); }
     }
     return result;
   }
 
   /// A cancelled or invalid picker selection leaves the existing list intact.
   static Future<int> choose(String projectId) async {
-    if (!_validId(projectId)) throw ArgumentError('Invalid project ID');
+    if (!_validId(projectId)) { throw ArgumentError('Invalid project ID'); }
     final selection = await FilePicker.platform.pickFiles(
       type: FileType.image, allowMultiple: true, withData: false);
-    if (selection == null || selection.files.isEmpty) return 0;
+    if (selection == null || selection.files.isEmpty) { return 0; }
     final existing = await load(projectId);
     if (selection.files.length + existing.length > maxScreenshots) {
       throw const FormatException('Максимум 6 скриншотов на приложение');
@@ -76,33 +76,33 @@ class ExternalScreenshots {
       return added.length;
     } catch (_) {
       for (final path in added) {
-        try { await File(path).delete(); } on FileSystemException { }
+        try { await File(path).delete(); } on FileSystemException { /* Best-effort cleanup only. */ }
       }
       rethrow;
     }
   }
 
   static Future<void> removeAt(String projectId, int index) async {
-    if (!_validId(projectId)) return;
+    if (!_validId(projectId)) { return; }
     final current = await load(projectId);
-    if (index < 0 || index >= current.length) return;
+    if (index < 0 || index >= current.length) { return; }
     final removed = current.removeAt(index);
     final prefs = await SharedPreferences.getInstance();
     if (!await prefs.setStringList('$_prefix$projectId', current)) {
       throw StateError('Не удалось изменить скриншоты');
     }
-    try { await File(removed).delete(); } on FileSystemException { }
+    try { await File(removed).delete(); } on FileSystemException { /* Best-effort cleanup only. */ }
   }
 
   static Future<void> removeAll(String projectId) async {
-    if (!_validId(projectId)) return;
+    if (!_validId(projectId)) { return; }
     final current = await load(projectId);
     final prefs = await SharedPreferences.getInstance();
     if (!await prefs.remove('$_prefix$projectId')) {
       throw StateError('Не удалось удалить список скриншотов');
     }
     for (final path in current) {
-      try { await File(path).delete(); } on FileSystemException { }
+      try { await File(path).delete(); } on FileSystemException { /* Best-effort cleanup only. */ }
     }
   }
 }
@@ -123,10 +123,12 @@ class _ExternalScreenshotGalleryState extends State<ExternalScreenshotGallery> {
   Future<void> _change(Future<void> Function() operation) async {
     try {
       await operation();
-      if (mounted) setState(_reload);
+      if (mounted) { setState(_reload); }
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Скриншоты: $error')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Скриншоты: $error')));
+      }
     }
   }
 

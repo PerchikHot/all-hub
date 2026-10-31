@@ -411,7 +411,14 @@ class ProjectLauncher {
         await verifyDownloadedDigest(temporary, sha256Digest);
         if (await apk.exists()) await apk.delete();
         await temporary.rename(apk.path);
-        await _channel.invokeMethod<bool>('installApk', {'path': apk.path});
+        // Android owns the final install confirmation. A false/null result
+        // means the system installer could not even be opened; never report
+        // that as a successful update.
+        final opened = await _channel.invokeMethod<bool>(
+          'installApk', {'path': apk.path});
+        if (opened != true) {
+          throw StateError('Не удалось открыть системный установщик Android');
+        }
       } finally {
         if (await temporary.exists()) await temporary.delete();
       }

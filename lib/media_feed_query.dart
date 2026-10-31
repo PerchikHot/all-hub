@@ -114,3 +114,18 @@ double mediaFeedTileAspectRatio(Map<String, dynamic> post) {
   }
   return (width.toDouble() / height.toDouble()).clamp(0.55, 1.45).toDouble();
 }
+
+/// Find the next page for a category that has not reached the end of its API
+/// results. Each category has its own page sequence in the interleaved feed.
+/// Returning null prevents exhausted categories from starving the other one.
+int? nextAvailableMediaFeedPage(
+  int requestedPage, List<String> enabledTags, Set<String> exhaustedTags,
+) {
+  if (requestedPage < 1 || enabledTags.isEmpty) return null;
+  for (var offset = 0; offset < enabledTags.length; offset++) {
+    final candidate = requestedPage + offset;
+    final tag = enabledTags[(candidate - 1) % enabledTags.length];
+    if (!exhaustedTags.contains(tag)) return candidate;
+  }
+  return null;
+}

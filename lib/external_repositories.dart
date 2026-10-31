@@ -23,7 +23,7 @@ class ExternalRepository {
     if (value.contains('://')) {
       // Uri normalizes explicit :443 away. Check the original authority
       // before parsing so only the exact github.com host is accepted.
-      if (!RegExp(r'^https://github\\.com/', caseSensitive: false)
+      if (!RegExp(r'^https://github\.com/', caseSensitive: false)
           .hasMatch(value)) {
         return null;
       }

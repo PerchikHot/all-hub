@@ -219,7 +219,7 @@ Map<String, dynamic> revisedKopilkaEntry(
 }) {
   if (!['expense', 'income', 'transfer'].contains(kind) ||
       !amount.isFinite || amount <= 0 ||
-      (kind == 'transfer' && bank == destination)) {
+      (kind == 'transfer' && !validKopilkaTransferEndpoints(bank, destination))) {
     throw ArgumentError('Invalid transaction edit');
   }
   final revised = Map<String, dynamic>.from(original);
@@ -254,7 +254,7 @@ int countIncompleteKopilkaTransfers(Iterable<Map<String, dynamic>> entries) {
     if (entry['kind'] != 'transfer') return false;
     final source = (entry['from'] ?? '').toString().trim();
     final destination = (entry['to'] ?? '').toString().trim();
-    return source.isEmpty || destination.isEmpty;
+    return !validKopilkaTransferEndpoints(source, destination);
   }).length;
 }
 
@@ -292,6 +292,15 @@ String canonicalKopilkaAccountLabel(String value) {
     'нал': 'наличные',
   };
   return aliases[label] ?? label;
+}
+
+/// A transfer needs two distinct, nonempty account labels. Known bank aliases
+/// (for example Tinkoff/T-Bank) cannot create a fake self-transfer; distinct
+/// named cards at the same bank remain distinct. Existing data is untouched.
+bool validKopilkaTransferEndpoints(String source, String destination) {
+  final from = canonicalKopilkaAccountLabel(source);
+  final to = canonicalKopilkaAccountLabel(destination);
+  return from.isNotEmpty && to.isNotEmpty && from != to;
 }
 
 /// Local search of already saved transactions; never sends finance data online.
@@ -683,7 +692,8 @@ Map<String, KopilkaAccountFlow> summarizeKopilkaAccountFlows(
       final target = entry['to'];
       // Incomplete or self-transfers are not silently allocated to accounts.
       if (source is! String || target is! String ||
-          source == target || !flows.containsKey(source) ||
+          !validKopilkaTransferEndpoints(source, target) ||
+          !flows.containsKey(source) ||
           !flows.containsKey(target)) {
         continue;
       }

@@ -558,7 +558,6 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           }
           final post = visiblePosts[index];
           final id = (post['id'] ?? '').toString();
-          final url = mediaFeedImageUrl(post, highQuality: highQuality) ?? '';
           return AspectRatio(
             aspectRatio: mediaFeedTileAspectRatio(post),
             child: Stack(children: [
@@ -566,17 +565,11 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
                 onTap: () => openPost(post),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: url,
+                  child: _FeedFallbackImage(
+                    key: ValueKey('feed-${id}-${highQuality}'),
+                    post: post,
+                    highQuality: highQuality,
                     fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
-                    filterQuality: FilterQuality.medium,
-                    memCacheWidth: highQuality ? 900 : 420,
-                    maxWidthDiskCache: highQuality ? 900 : 420,
-                    fadeInDuration: Duration.zero,
-                    placeholder: (context, url) => const Center(
-                      child: Icon(Icons.image_outlined, color: Colors.white24)),
-                    errorWidget: (context, url, error) => const Center(
-                      child: Icon(Icons.broken_image_outlined)),
                   ),
                 ),
               )),
@@ -596,6 +589,70 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       ),
     )),
   ]);
+}
+
+/// Retry the next CDN asset only after an image request fails. This is
+/// bounded by the four URLs supplied by the post, never an infinite retry loop.
+class _FeedFallbackImage extends StatefulWidget {
+  const _FeedFallbackImage({
+    super.key,
+    required this.post,
+    required this.highQuality,
+    required this.fit,
+  });
+  final Map<String, dynamic> post;
+  final bool highQuality;
+  final BoxFit fit;
+
+  @override
+  State<_FeedFallbackImage> createState() => _FeedFallbackImageState();
+}
+
+class _FeedFallbackImageState extends State<_FeedFallbackImage> {
+  int index = 0;
+
+  @override
+  void didUpdateWidget(covariant _FeedFallbackImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.post != widget.post ||
+        oldWidget.highQuality != widget.highQuality) {
+      index = 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = mediaFeedImageCandidates(
+      widget.post, highQuality: widget.highQuality);
+    if (candidates.isEmpty) {
+      return const Center(child: Icon(Icons.broken_image_outlined));
+    }
+    final current = index.clamp(0, candidates.length - 1);
+    final url = candidates[current];
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: widget.fit,
+      filterQuality: FilterQuality.medium,
+      memCacheWidth: widget.highQuality ? 900 : 420,
+      maxWidthDiskCache: widget.highQuality ? 900 : 420,
+      fadeInDuration: Duration.zero,
+      placeholder: (context, _) => const Center(
+        child: Icon(Icons.image_outlined, color: Colors.white24)),
+      errorWidget: (context, failedUrl, error) {
+        if (current + 1 < candidates.length) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && index == current &&
+                candidates[index] == failedUrl) {
+              setState(() => index++);
+            }
+          });
+          return const Center(child: Icon(
+            Icons.downloading_outlined, color: Colors.white38));
+        }
+        return const Center(child: Icon(Icons.broken_image_outlined));
+      },
+    );
+  }
 }
 
 class _FeedRateLimited implements Exception {

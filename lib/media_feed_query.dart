@@ -47,21 +47,31 @@ bool shouldContinueMediaFeed({
   return fetched >= pageSize || requestedPage < categoryCount;
 }
 
-/// Select the first usable HTTPS URL; an invalid preferred URL must not hide
-/// a valid fallback image or create a broken thumbnail.
-String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}) {
+/// Ordered, unique HTTPS candidates. A CDN may return HTTP 403 for a
+/// thumbnail while its sample or original remains available.
+List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
+  required bool highQuality,
+}) {
   final keys = highQuality
       ? ['large_file_url', 'file_url', 'sample_url', 'preview_file_url']
       : ['preview_file_url', 'sample_url', 'large_file_url', 'file_url'];
+  final urls = <String>[];
+  final seen = <String>{};
   for (final key in keys) {
     final value = post[key];
     if (value is! String) continue;
     final uri = Uri.tryParse(value);
-    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty && uri.userInfo.isEmpty) {
-      return value;
-    }
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty || uri.hasFragment) continue;
+    if (seen.add(value)) urls.add(value);
   }
-  return null;
+  return urls;
+}
+
+/// Select the first usable HTTPS URL without hiding valid fallbacks.
+String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}) {
+  final urls = mediaFeedImageCandidates(post, highQuality: highQuality);
+  return urls.isEmpty ? null : urls.first;
 }
 
 /// Remove duplicate IDs within a single API response as well as across pages.

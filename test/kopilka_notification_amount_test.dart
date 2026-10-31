@@ -93,6 +93,18 @@ void main() {
     expect(filterPendingBankNotifications(padded, <String>{' tx-42 '}), isEmpty);
   });
 
+  test('native bank source must be one of three explicitly supported banks', () {
+    final alerts = <dynamic>[
+      {'key': 't', 'bank': 'Т-Банк', 'title': 'Т-Банк', 'body': 'Оплата 100 ₽'},
+      {'key': 'g', 'bank': 'Газпромбанк', 'title': 'Газпромбанк', 'body': 'Оплата 200 ₽'},
+      {'key': 'o', 'bank': 'Ozon Банк', 'title': 'Ozon Банк', 'body': 'Оплата 300 ₽'},
+      {'key': 'fake', 'bank': 'Неизвестный банк', 'title': 'Т-Банк', 'body': 'Оплата 400 ₽'},
+      {'key': 'object', 'bank': {'name': 'Т-Банк'}, 'title': 'Т-Банк', 'body': 'Оплата 500 ₽'},
+    ];
+    expect(filterPendingBankNotifications(alerts, <String>{})
+        .map((e) => e['key']).toList(), ['t', 'g', 'o']);
+  });
+
   test('oversized or non-text native bank alerts are not imported', () {
     final valid = {'key': 'ok', 'title': 'Т-Банк', 'body': 'Оплата 250 ₽'};
     final alerts = <dynamic>[

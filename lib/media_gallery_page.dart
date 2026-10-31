@@ -581,6 +581,21 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
                   ),
                 ),
               )),
+              if (mediaFeedAnimatedUrl(post) != null)
+                Positioned(left: 6, top: 6, child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xD9101B32),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.play_circle_outline, size: 14, color: Colors.white),
+                    SizedBox(width: 3),
+                    Text('GIF', style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold,
+                      fontSize: 11)),
+                  ]),
+                )),
               Positioned(right: 3, top: 3, child: IconButton(
                 tooltip: favoriteIds.contains(id) ? 'Убрать из избранного' : 'В избранное',
                 icon: Icon(favoriteIds.contains(id)

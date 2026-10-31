@@ -33,6 +33,12 @@ jobs:
           permissions = '''<uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
               <queries>
+                <!-- Discover only apps with a public launcher activity; no
+                     QUERY_ALL_PACKAGES or access to private app data. -->
+                <intent>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent>
                 <package android:name="com.shadowrp.app"/>
                 <package android:name="com.perchikhot.novagame"/>
                 <package android:name="com.veyrion.kopilka_app"/>

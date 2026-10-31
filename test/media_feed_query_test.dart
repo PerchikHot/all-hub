@@ -2,6 +2,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/media_feed_query.dart';
 
 void main() {
+  test('image CDN fallback candidates are ordered, unique and HTTPS-only', () {
+    final post = <String, dynamic>{
+      'preview_file_url': 'https://cdn.example/preview.jpg',
+      'sample_url': 'https://cdn.example/sample.jpg',
+      'large_file_url': 'https://cdn.example/sample.jpg',
+      'file_url': 'http://insecure.example/original.jpg',
+    };
+    expect(mediaFeedImageCandidates(post, highQuality: false),
+        ['https://cdn.example/preview.jpg', 'https://cdn.example/sample.jpg']);
+    expect(mediaFeedImageCandidates(post, highQuality: true),
+        ['https://cdn.example/sample.jpg', 'https://cdn.example/preview.jpg']);
+    expect(mediaFeedImageCandidates({
+      'preview_file_url': 'https://user:password@cdn.example/unsafe.jpg',
+      'sample_url': 'https://cdn.example/safe.jpg#fragment',
+      'file_url': 'https://cdn.example/valid.jpg',
+    }, highQuality: false), ['https://cdn.example/valid.jpg']);
+  });
+
   test('feed searches category without silently forcing explicit rating', () {
     expect(buildMediaFeedTags('transgender', ''), 'transgender');
     expect(buildMediaFeedTags('futanari', '  erza_scarlet  '),

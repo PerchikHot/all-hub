@@ -196,6 +196,43 @@ class HubService {
     return null;
   }
 
+  /// Pick installable assets only from the newest *usable* release per OS.
+  /// A previous release may still serve Windows while the newest is Android
+  /// only, but never mix older assets into a newer OS version's choices.
+  static List<HubAsset> latestPublishedAssets(
+      String repo, List<dynamic> releases, String? projectId) {
+    final selected = <HubAsset>[];
+    final coveredPlatforms = <String>{};
+    for (final raw in releases) {
+      if (raw is! Map<String, dynamic>) continue;
+      final release = raw;
+      if (release['draft'] == true || release['prerelease'] == true) continue;
+      final tag = (release['tag_name'] ?? '').toString();
+      if (!releaseMatchesProject(tag, projectId)) continue;
+      final notes = release['body']?.toString().trim();
+      final publishedVersion = publishedVersionFromRelease(tag, notes);
+      final thisRelease = <HubAsset>[];
+      for (final rawAsset in (release['assets'] as List? ?? [])) {
+        if (rawAsset is! Map<String, dynamic>) continue;
+        if (!isPublishedReleaseAsset(rawAsset)) continue;
+        final name = (rawAsset['name'] ?? '').toString();
+        final platform = assetPlatform(name);
+        final url = (rawAsset['browser_download_url'] ?? '').toString();
+        if (platform == null || coveredPlatforms.contains(platform) ||
+            !isTrustedReleaseAssetUrl(repo, url, expectedName: name)) {
+          continue;
+        }
+        thisRelease.add(HubAsset(name, url, platform, publishedVersion,
+            releaseNotes: notes));
+      }
+      selected.addAll(thisRelease);
+      coveredPlatforms.addAll(thisRelease.map((asset) => asset.platform));
+      if (coveredPlatforms.contains('android') &&
+          coveredPlatforms.contains('windows')) break;
+    }
+    return selected;
+  }
+
   static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {
     try {
       final responses = await Future.wait([
@@ -208,26 +245,11 @@ class HubService {
       String? version, workflow, actionsUrl;
       if (responses[0].statusCode == 200) {
         final releases = jsonDecode(responses[0].body) as List;
-        for (final raw in releases) {
-          final release = raw as Map<String, dynamic>;
-          if (release['draft'] == true || release['prerelease'] == true) continue;
-          final tag = (release['tag_name'] ?? 'latest').toString();
-          if (!releaseMatchesProject(tag, projectId)) continue;
-          final notes = release['body']?.toString().trim();
-          final publishedVersion = publishedVersionFromRelease(tag, notes);
-          for (final a in (release['assets'] as List? ?? [])) {
-            final file = a as Map<String, dynamic>;
-            if (!isPublishedReleaseAsset(file)) continue;
-            final name = (file['name'] ?? '').toString();
-            final platform = assetPlatform(name);
-            final url = (file['browser_download_url'] ?? '').toString();
-            if (platform != null &&
-                isTrustedReleaseAssetUrl(repo, url, expectedName: name)) {
-              // A release for another OS must not be shown as an available
-              // update on this device without a matching installer.
-              if (platform == currentPlatform) version ??= publishedVersion;
-              assets.add(HubAsset(name, url, platform, publishedVersion, releaseNotes: notes));
-            }
+        assets.addAll(latestPublishedAssets(repo, releases, projectId));
+        for (final asset in assets) {
+          if (asset.platform == currentPlatform) {
+            version = asset.version;
+            break;
           }
         }
       }

@@ -10,6 +10,7 @@ on:
     paths:
       - 'lib/kopilka_page.dart'
       - 'lib/kopilka_main.dart'
+      - 'kopilka/android/**'
       - 'test/kopilka_notification_amount_test.dart'
       - 'test/kopilka_history_search_test.dart'
       - 'test/kopilka_categories_test.dart'

@@ -37,6 +37,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   static const maxVisiblePosts = 180;
   final seenPostIds = <String>{};
   final seenPostUrls = <String>{};
+  final exhaustedFeedTags = <String>{};
   static const maxImageCacheBytes = 80 * 1024 * 1024;
   String error = '';
   bool accessDenied = false;
@@ -256,6 +257,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       posts.clear();
       seenPostIds.clear();
       seenPostUrls.clear();
+      exhaustedFeedTags.clear();
       page = 1;
       emptyPageRetries = 0;
       fetchedPosts = 0;
@@ -290,8 +292,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         if (requestedFuta) feedTags[0],
         if (requestedTrans) feedTags[1],
       ];
-      final selectedTag = enabledTags[(requestedPage - 1) % enabledTags.length];
-      final sourcePage = ((requestedPage - 1) ~/ enabledTags.length) + 1;
+      final effectivePage = nextAvailableMediaFeedPage(
+          requestedPage, enabledTags, exhaustedFeedTags);
+      if (effectivePage == null) {
+        if (mounted && generation == searchGeneration) {
+          setState(() => hasMore = false);
+        }
+        return;
+      }
+      final selectedTag = enabledTags[(effectivePage - 1) % enabledTags.length];
+      final sourcePage = ((effectivePage - 1) ~/ enabledTags.length) + 1;
       // Search all ratings: forcing rating:explicit hid valid tagged posts.
       final tags = requestedKind == 'gif' && requestedQuery.isEmpty
           ? '$selectedTag filetype:gif'
@@ -334,14 +344,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         if (posts.length > maxVisiblePosts) {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
-        page++;
-        // Sparse GIF results can require scanning several source pages.
-        // Never report an empty search while another page can still be checked.
-        hasMore = shouldContinueMediaFeed(
-          fetched: data.length, pageSize: pageSize,
-          categoryCount: enabledTags.length, requestedPage: requestedPage,
-          emptyRetries: emptyPageRetries, hasPosts: posts.isNotEmpty,
-        );
+        // One sparse category must not stop another category's pagination.
+        if (data.length < pageSize) exhaustedFeedTags.add(selectedTag);
+        page = effectivePage + 1;
+        hasMore = emptyPageRetries < 8 &&
+            nextAvailableMediaFeedPage(
+                page, enabledTags, exhaustedFeedTags) != null;
       });
     } catch (e) {
       if (mounted && generation == searchGeneration) {

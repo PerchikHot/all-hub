@@ -272,10 +272,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> chooseExternalArtwork(Project project) async {
-    if (!project.id.startsWith('external-')) return;
+    if (!project.id.startsWith('external-')) { return; }
     try {
       final selected = await ExternalArtwork.choose(project.id);
-      if (selected && mounted) setState(() {});
+      if (selected && mounted) { setState(() {}); }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

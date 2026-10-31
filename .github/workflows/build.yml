@@ -185,10 +185,10 @@ jobs:
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-release.apk
           test -s "$APK"
-          unzip -l "$APK" | grep -E 'res/mipmap-[^/]+/ic_launcher[^/]*\.png'
-          unzip -l "$APK" | grep -F 'lib/arm64-v8a/liballhub_llama.so'
-          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libc++_shared.so'
-          unzip -l "$APK" | grep -F 'lib/arm64-v8a/libllama.so'
+          python3 tools/verify_packaged_icon.py --project all_hub --apk "$APK" \
+            --require-lib lib/arm64-v8a/liballhub_llama.so \
+            --require-lib lib/arm64-v8a/libc++_shared.so \
+            --require-lib lib/arm64-v8a/libllama.so
       - uses: actions/upload-artifact@v4
         with:
           name: AllHub-Android-release

@@ -705,7 +705,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final storedGoal = prefs.get('kopilka_goal_v1');
     final safeGoal = storedGoal is num && storedGoal.isFinite && storedGoal > 0
         ? storedGoal.toDouble() : 100000.0;
-    final storedPayday = prefs.getInt('kopilka_payday_day_v1');
+    final storedPayday = prefs.get('kopilka_payday_day_v1');
     setState(() {
       goal = safeGoal;
       paydayDay = storedPayday != null && storedPayday >= 1 && storedPayday <= 31

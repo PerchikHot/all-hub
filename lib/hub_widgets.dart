@@ -69,50 +69,8 @@ class HubProjectHeader extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(fit: StackFit.expand, children: [
-        // Optional public GitHub social preview; no repository credentials.
-        // Keep the Veyrion gradient if GitHub has no image or the user is offline.
-        if (repo != null && RegExp(r'^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+
-        Positioned(left: 16, bottom: 14, child: Text(title.toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 21, letterSpacing: 0.7))),
-      ]),
-    );
-  }
-}
-
-class HubAvatar extends StatelessWidget {
-  final double size;
-  const HubAvatar({super.key, this.size = 48});
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: size, height: size,
-    child: CustomPaint(painter: _VeyrionEmblemPainter()),
-  );
-}
-
-/// Temporary blue-eyed Veyrion placeholder; not a replacement for the approved OC art.
-class _VeyrionEmblemPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.scale(size.width / 100, size.height / 100);
-    final hood = Path()
-      ..moveTo(50, 6)
-      ..cubicTo(22, 7, 9, 32, 10, 74)
-      ..quadraticBezierTo(50, 101, 90, 74)
-      ..cubicTo(91, 32, 78, 7, 50, 6)
-      ..close();
-    canvas.drawPath(hood, Paint()..color = const Color(0xFF050716));
-    canvas.drawPath(hood, Paint()..style = PaintingStyle.stroke
-      ..strokeWidth = 3..color = const Color(0xFF53C9FF));
-    final eye = Paint()..color = const Color(0xFF53C9FF);
-    canvas.drawOval(const Rect.fromLTWH(24, 52, 21, 8), eye);
-    canvas.drawOval(const Rect.fromLTWH(55, 52, 21, 8), eye);
-    canvas.restore();
-  }
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-).hasMatch(repo!))
+        // Public GitHub social preview, with the Veyrion gradient as fallback.
+        if (repo != null && RegExp(r'^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$').hasMatch(repo!))
           Image.network(
             Uri.https('opengraph.githubassets.com', '/1/$repo').toString(),
             fit: BoxFit.cover, cacheWidth: 900,

@@ -665,6 +665,71 @@ Map<String, KopilkaAccountFlow> summarizeKopilkaAccountFlows(
   return flows;
 }
 
+/// Possible internal transfers entered as two separate bank notifications.
+/// Read-only: never merge, delete or reclassify money without user approval.
+/// Matches must have equal amounts to the kopeck, distinct known accounts and
+/// timestamps within 30 minutes. Repeated equal-value payments are ambiguous.
+List<Map<String, dynamic>> suggestKopilkaOwnTransfers(
+    List<Map<String, dynamic>> transactions, Iterable<String> accounts) {
+  final known = accounts.toSet();
+  final outgoing = <int>[];
+  final incoming = <int>[];
+  for (var i = 0; i < transactions.length; i++) {
+    final entry = transactions[i];
+    final bank = entry['bank'];
+    final date = entry['date'];
+    if (bank is! String || !known.contains(bank) ||
+        date is! String || DateTime.tryParse(date) == null ||
+        safeKopilkaAmount(entry) <= 0) continue;
+    if (entry['kind'] == 'expense') outgoing.add(i);
+    if (entry['kind'] == 'income') incoming.add(i);
+  }
+  final used = <int>{};
+  final suggestions = <Map<String, dynamic>>[];
+  for (final source in outgoing) {
+    if (used.contains(source)) continue;
+    final debit = transactions[source];
+    final debitTime = DateTime.parse(debit['date'] as String);
+    final debitCents = (safeKopilkaAmount(debit) * 100).round();
+    final candidates = <int>[];
+    for (final target in incoming) {
+      if (used.contains(target)) continue;
+      final credit = transactions[target];
+      if (credit['bank'] == debit['bank']) continue;
+      if ((safeKopilkaAmount(credit) * 100).round() != debitCents) continue;
+      final creditTime = DateTime.parse(credit['date'] as String);
+      if (debitTime.difference(creditTime).abs() >
+          const Duration(minutes: 30)) continue;
+      candidates.add(target);
+    }
+    // Do not guess when multiple matching credits could be the transfer.
+    if (candidates.length != 1) continue;
+    final target = candidates.single;
+    final credit = transactions[target];
+    final creditTime = DateTime.parse(credit['date'] as String);
+    final otherDebits = outgoing.where((index) {
+      if (index == source || used.contains(index)) return false;
+      final other = transactions[index];
+      if (other['bank'] != debit['bank']) return false;
+      if ((safeKopilkaAmount(other) * 100).round() != debitCents) return false;
+      final otherDate = DateTime.tryParse((other['date'] ?? '').toString());
+      return otherDate != null &&
+          otherDate.difference(creditTime).abs() <=
+              const Duration(minutes: 30);
+    });
+    if (otherDebits.isNotEmpty) continue;
+    used.add(source);
+    used.add(target);
+    suggestions.add({
+      'from': debit['bank'], 'to': credit['bank'],
+      'amount': safeKopilkaAmount(debit),
+      'debitIndex': source, 'creditIndex': target,
+    });
+    if (suggestions.length >= 20) break;
+  }
+  return suggestions;
+}
+
 /// Read-only estimate based only on operations entered by the user.
 /// It never assumes a future salary amount or changes account balances.
 class KopilkaSalaryForecast {
@@ -1177,6 +1242,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     // visible in the filtered operation summary for reconciliation.
     final filteredTransfers = filteredEntries.where((entry) => entry['kind'] == 'transfer').length;
     final incompleteTransfers = countIncompleteKopilkaTransfers(filteredEntries);
+    final transferSuggestions = suggestKopilkaOwnTransfers(entries, banks);
     final incompleteSuffix = incompleteTransfers > 0
         ? ' · Неполных переводов: $incompleteTransfers' : '';
     String money(double value) {
@@ -1278,6 +1344,28 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           TextButton.icon(onPressed: _refreshNotifications,
             icon: const Icon(Icons.refresh), label: const Text('Проверить подключение')),
         ])),
+        if (transferSuggestions.isNotEmpty)
+          Card(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Возможные переводы между своими счетами',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              const Text('Совпадение суммы и времени не доказывает перевод. '
+                'Ничего не объединяется автоматически. Проверь операции: '
+                'если это твой перевод, удали обе отдельные записи и добавь '
+                'одну операцию типа «Перевод».',
+                style: TextStyle(color: Colors.white70)),
+              for (final pair in transferSuggestions.take(5))
+                ListTile(
+                  leading: const Icon(Icons.compare_arrows_outlined),
+                  title: Text('${pair['from']} → ${pair['to']}'),
+                  subtitle: Text(money(pair['amount'] as double)),
+                ),
+              if (transferSuggestions.length > 5)
+                Text('Ещё совпадений: ${transferSuggestions.length - 5}'),
+            ]),
+          )),
         const SizedBox(height: 12),
         Card(child: Padding(padding: const EdgeInsets.all(20), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [

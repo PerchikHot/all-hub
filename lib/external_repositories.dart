@@ -23,8 +23,9 @@ class ExternalRepository {
     if (value.contains('://')) {
       final uri = Uri.tryParse(value);
       if (uri == null || uri.scheme != 'https' ||
-          uri.host.toLowerCase() != 'github.com' || uri.userInfo.isNotEmpty ||
-          uri.hasPort || uri.hasQuery || uri.hasFragment) {
+          uri.host.toLowerCase() != 'github.com' ||
+          uri.authority.toLowerCase() != 'github.com' ||
+          uri.userInfo.isNotEmpty || uri.hasPort || uri.hasQuery || uri.hasFragment) {
         return null;
       }
       value = uri.path;

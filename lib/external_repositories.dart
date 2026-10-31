@@ -36,7 +36,9 @@ class ExternalRepository {
       }
     }
     final parts = value.split('/');
-    if (parts.length != 2) return null;
+    if (parts.length != 2) {
+      return null;
+    }
     final owner = parts[0], name = parts[1];
     if (owner.length > 39 || owner.isEmpty ||
         !RegExp(r'^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$').hasMatch(owner) ||

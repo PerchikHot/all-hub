@@ -112,6 +112,13 @@ jobs:
                       .putInt("bank_count_" + bankId,
                           (listenerPrefs.getInt("bank_count_" + bankId, 0) + 1)
                               .coerceAtMost(100000000)).apply()
+                  // Group summaries are duplicates, not individual payments.
+                  if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+                      listenerPrefs.edit().putInt("filtered_count",
+                          (listenerPrefs.getInt("filtered_count", 0) + 1)
+                              .coerceAtMost(100000000)).apply()
+                      return
+                  }
                   val extras = sbn.notification.extras
                   val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
                   val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
@@ -138,8 +145,13 @@ jobs:
                   val notPosted = Regex(
                       """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b|требует\s+подтверждени|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|\bwill\s+be\s+(?:charged|debited|paid)\b""",
                       RegexOption.IGNORE_CASE)
+                  // Keep the native privacy filter aligned with the Dart
+                  // review gate: never persist text of unposted payments.
+                  val additionalUnposted = Regex(
+                      """не\s+(?:одобрен[а-яё]*|состоял[а-яё]*)|отказан[а-яё]*|ошибка\s+(?:оплаты|перевода)|заблокирован[а-яё]*|приостановлен[а-яё]*|заморожен[а-яё]*|планиру[ею]тся|будет\s+(?:оплат[а-яё]*|провед[её]н[а-яё]*)|ожида[её]т\s+подтверждени|\bawaiting\s+approval\b|\bon\s+hold\b|\bnot\s+(?:completed|processed|approved|confirmed)\b""",
+                      RegexOption.IGNORE_CASE)
                   val credentials = Regex(
-                      """парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s*[:№]|(?:ваш|your)\s+(?:код|code)""",
+                      """парол[ья]|password|passcode|\bpin\b|\bcvv\b|\bcvc\b|код\s*[:№]|код\s+безопасности|(?:ваш|your)\s+(?:код|code)""",
                       RegexOption.IGNORE_CASE)
                   // Mirror the Dart import gate: a currency word alone is
                   // not evidence of a posted transaction amount.
@@ -151,7 +163,8 @@ jobs:
                       !amount.containsMatchIn(combined) ||
                       sensitive.containsMatchIn(combined) ||
                       credentials.containsMatchIn(combined) ||
-                      notPosted.containsMatchIn(combined)) {
+                      notPosted.containsMatchIn(combined) ||
+                      additionalUnposted.containsMatchIn(combined)) {
                       listenerPrefs.edit().putInt("filtered_count",
                           (listenerPrefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000)).apply()
                       return

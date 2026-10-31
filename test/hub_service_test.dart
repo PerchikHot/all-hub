@@ -56,6 +56,22 @@ void main() {
     expect(selected.single.url, contains('all-hub-v2'));
   });
 
+  test('asset URLs cannot silently switch to an older release tag', () {
+    const repo = 'PerchikHot/all-hub';
+    const url = 'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v1/AllHub-Android.apk';
+    expect(HubService.isTrustedReleaseAssetUrl(repo, url,
+        expectedName: 'AllHub-Android.apk', expectedTag: 'all-hub-v1'), isTrue);
+    expect(HubService.isTrustedReleaseAssetUrl(repo, url,
+        expectedName: 'AllHub-Android.apk', expectedTag: 'all-hub-v2'), isFalse);
+    final assets = HubService.latestPublishedAssets(repo, [
+      {'tag_name': 'all-hub-v2', 'assets': [
+        {'name': 'AllHub-Android.apk', 'size': 500, 'state': 'uploaded',
+         'browser_download_url': url},
+      ]},
+    ], 'all-hub');
+    expect(assets, isEmpty);
+  });
+
   test('release and CI HTTP errors are shown separately', () {
     expect(HubService.apiStatusError(200, 200), isNull);
     expect(HubService.apiStatusError(403, 200), contains('релизам'));

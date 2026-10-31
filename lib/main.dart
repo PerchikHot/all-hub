@@ -163,12 +163,16 @@ class _HomePageState extends State<HomePage> {
       final catalog = await ExternalRepositoryStore.load();
       await Clipboard.setData(ClipboardData(
         text: ExternalRepositoryStore.exportBackup(catalog)));
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Скопирован каталог: ${catalog.length} репозиториев. '
             'Только публичные адреса, без данных приложений.')));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Не удалось скопировать каталог: $e')));
     }
@@ -176,7 +180,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> importRepositoryBackup() async {
     final clipboard = await Clipboard.getData('text/plain');
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final controller = TextEditingController(text: clipboard?.text ?? '');
     final source = await showDialog<String>(context: context,
       builder: (ctx) => AlertDialog(
@@ -195,7 +201,9 @@ class _HomePageState extends State<HomePage> {
         ],
       ));
     controller.dispose();
-    if (!mounted || source == null) return;
+    if (!mounted || source == null) {
+      return;
+    }
     try {
       final parsed = ExternalRepositoryStore.parseBackup(source);
       final approved = await showDialog<bool>(context: context,
@@ -212,15 +220,23 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Проверить и импортировать')),
           ],
         ));
-      if (approved != true || !mounted) return;
+      if (approved != true || !mounted) {
+        return;
+      }
       final count = await ExternalRepositoryStore.importBackup(source);
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       await refresh();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Импортировано репозиториев: $count')));
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Каталог не изменён: $e')));
     }

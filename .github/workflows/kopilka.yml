@@ -118,7 +118,11 @@ jobs:
                   val expandedText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
                   val body = if (expandedText.isNotBlank()) expandedText else normalText
                   // Never persist oversized or malformed notification payloads.
-                  if (body.isBlank() || body.length > 2048 || title.length > 200) return
+                  if (body.isBlank() || body.length > 2048 || title.length > 200) {
+                      listenerPrefs.edit().putInt("filtered_count",
+                          (listenerPrefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000)).apply()
+                      return
+                  }
                   // Store transaction alerts only. Never retain OTP/login codes,
                   // promotions or balance-only notifications in the local queue.
                   val combined = title + " " + body
@@ -147,7 +151,11 @@ jobs:
                       !amount.containsMatchIn(combined) ||
                       sensitive.containsMatchIn(combined) ||
                       credentials.containsMatchIn(combined) ||
-                      notPosted.containsMatchIn(combined)) return
+                      notPosted.containsMatchIn(combined)) {
+                      listenerPrefs.edit().putInt("filtered_count",
+                          (listenerPrefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000)).apply()
+                      return
+                  }
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                   // A damaged local queue must not crash NotificationListenerService.
                   // Recover the pending queue without touching saved transactions.
@@ -163,7 +171,9 @@ jobs:
                   current.put(JSONObject().put("key", key).put("bank", bank)
                       .put("title", title).put("body", body).put("time", sbn.postTime))
                   while (current.length() > 100) current.remove(0)
-                  prefs.edit().putString("queue", current.toString()).apply()
+                  prefs.edit().putString("queue", current.toString())
+                      .putInt("accepted_count", (prefs.getInt("accepted_count", 0) + 1)
+                          .coerceAtMost(100000000)).apply()
               }
           }
           ''')
@@ -209,6 +219,8 @@ jobs:
                                   } catch (_: Exception) { 0 }
                                   result.success(mapOf(
                                       "queued" to count,
+                                      "accepted" to prefs.getInt("accepted_count", 0),
+                                      "filtered" to prefs.getInt("filtered_count", 0),
                                       "lastSeen" to prefs.getLong("last_seen", 0L),
                                       "lastBank" to (prefs.getString("last_bank", "") ?: ""),
                                       "connected" to prefs.getBoolean("listener_connected", false),

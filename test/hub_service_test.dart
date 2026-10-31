@@ -3,6 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('release SHA-256 digest is propagated and malformed digests rejected', () {
+    final digest = 'a' * 64;
+    expect(HubService.parseSha256Digest('sha256:$digest'), digest);
+    expect(HubService.parseSha256Digest('sha256:abc'), isNull);
+    final release = [{
+      'tag_name': 'all-hub-v4', 'assets': [
+        {'name': 'AllHub-Android.apk', 'size': 4096, 'state': 'uploaded',
+         'digest': 'sha256:$digest',
+         'browser_download_url': 'https://github.com/PerchikHot/all-hub/releases/download/all-hub-v4/AllHub-Android.apk'},
+      ],
+    }];
+    final assets = HubService.latestPublishedAssets('PerchikHot/all-hub', release, 'all-hub');
+    expect(assets.single.sha256Digest, digest);
+    (release.first['assets'] as List).first['digest'] = 'sha256:invalid';
+    expect(HubService.latestPublishedAssets('PerchikHot/all-hub', release, 'all-hub'), isEmpty);
+  });
+
   test('newest installable release wins separately for Android and Windows', () {
     Map<String, dynamic> asset(String tag, String name,
         {int size = 500, String state = 'uploaded'}) => {

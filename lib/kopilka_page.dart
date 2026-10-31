@@ -680,44 +680,44 @@ List<Map<String, dynamic>> suggestKopilkaOwnTransfers(
     final date = entry['date'];
     if (bank is! String || !known.contains(bank) ||
         date is! String || DateTime.tryParse(date) == null ||
-        safeKopilkaAmount(entry) <= 0) continue;
-    if (entry['kind'] == 'expense') outgoing.add(i);
-    if (entry['kind'] == 'income') incoming.add(i);
+        safeKopilkaAmount(entry) <= 0) { continue; }
+    if (entry['kind'] == 'expense') { outgoing.add(i); }
+    if (entry['kind'] == 'income') { incoming.add(i); }
   }
   final used = <int>{};
   final suggestions = <Map<String, dynamic>>[];
   for (final source in outgoing) {
-    if (used.contains(source)) continue;
+    if (used.contains(source)) { continue; }
     final debit = transactions[source];
     final debitTime = DateTime.parse(debit['date'] as String);
     final debitCents = (safeKopilkaAmount(debit) * 100).round();
     final candidates = <int>[];
     for (final target in incoming) {
-      if (used.contains(target)) continue;
+      if (used.contains(target)) { continue; }
       final credit = transactions[target];
-      if (credit['bank'] == debit['bank']) continue;
-      if ((safeKopilkaAmount(credit) * 100).round() != debitCents) continue;
+      if (credit['bank'] == debit['bank']) { continue; }
+      if ((safeKopilkaAmount(credit) * 100).round() != debitCents) { continue; }
       final creditTime = DateTime.parse(credit['date'] as String);
       if (debitTime.difference(creditTime).abs() >
-          const Duration(minutes: 30)) continue;
+          const Duration(minutes: 30)) { continue; }
       candidates.add(target);
     }
     // Do not guess when multiple matching credits could be the transfer.
-    if (candidates.length != 1) continue;
+    if (candidates.length != 1) { continue; }
     final target = candidates.single;
     final credit = transactions[target];
     final creditTime = DateTime.parse(credit['date'] as String);
     final otherDebits = outgoing.where((index) {
-      if (index == source || used.contains(index)) return false;
+      if (index == source || used.contains(index)) { return false; }
       final other = transactions[index];
-      if (other['bank'] != debit['bank']) return false;
-      if ((safeKopilkaAmount(other) * 100).round() != debitCents) return false;
+      if (other['bank'] == credit['bank']) { return false; }
+      if ((safeKopilkaAmount(other) * 100).round() != debitCents) { return false; }
       final otherDate = DateTime.tryParse((other['date'] ?? '').toString());
       return otherDate != null &&
           otherDate.difference(creditTime).abs() <=
               const Duration(minutes: 30);
     });
-    if (otherDebits.isNotEmpty) continue;
+    if (otherDebits.isNotEmpty) { continue; }
     used.add(source);
     used.add(target);
     suggestions.add({
@@ -725,7 +725,7 @@ List<Map<String, dynamic>> suggestKopilkaOwnTransfers(
       'amount': safeKopilkaAmount(debit),
       'debitIndex': source, 'creditIndex': target,
     });
-    if (suggestions.length >= 20) break;
+    if (suggestions.length >= 20) { break; }
   }
   return suggestions;
 }

@@ -622,6 +622,29 @@ Map<String, double> summarizeKopilkaExpenses(
   return totals;
 }
 
+/// Seven calendar days of confirmed expenses, oldest first. Uses UTC
+/// calendar dates to avoid daylight-saving shifts in local time differences.
+/// Income and own-account transfers never inflate the expense trend.
+List<double> kopilkaDailyExpenseTrend(
+    Iterable<Map<String, dynamic>> entries, DateTime now, {int days = 7}) {
+  if (days < 1 || days > 31) {
+    throw ArgumentError.value(days, 'days', 'Expected 1..31');
+  }
+  final totals = List<double>.filled(days, 0);
+  final today = DateTime.utc(now.year, now.month, now.day);
+  for (final entry in entries) {
+    if (entry['kind'] != 'expense') continue;
+    final date = DateTime.tryParse((entry['date'] ?? '').toString());
+    if (date == null) continue;
+    final calendarDay = DateTime.utc(date.year, date.month, date.day);
+    final age = today.difference(calendarDay).inDays;
+    if (age < 0 || age >= days) continue;
+    final amount = safeKopilkaAmount(entry);
+    if (amount > 0) totals[days - 1 - age] += amount;
+  }
+  return totals;
+}
+
 /// Read-only monthly account movement; transfers are not income or expense.
 /// This reflects only locally confirmed entries, not actual bank balances.
 class KopilkaAccountFlow {
@@ -1226,6 +1249,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final budgetProgress = kopilkaMonthlyBudgetProgress(monthlyExpenses, monthlyBudget);
     final dailyBudgetAllowance = kopilkaDailyBudgetAllowance(monthlyExpenses, monthlyBudget, now);
     final monthlyCategories = summarizeKopilkaExpenses(monthlyEntries);
+    final weeklyExpenses = kopilkaDailyExpenseTrend(entries, now);
+    final weeklyPeak = weeklyExpenses.fold<double>(
+        0, (peak, value) => value > peak ? value : peak);
     final monthlyAccountFlows = summarizeKopilkaAccountFlows(monthlyEntries, banks);
     final sortedCategories = monthlyCategories.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -1466,6 +1492,33 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               icon: const Icon(Icons.edit_calendar_outlined),
               label: Text('День зарплаты: $paydayDay'),
             )),
+          ]),
+        )),
+        Card(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Расходы за последние 7 дней',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            const Text('Только подтверждённые расходы. Переводы и доходы не учитываются.',
+              style: TextStyle(color: Colors.white70, fontSize: 12)),
+            for (var index = 0; index < weeklyExpenses.length; index++) ...[
+              const SizedBox(height: 9),
+              Row(children: [
+                SizedBox(width: 56, child: Text(
+                  DateTime(now.year, now.month, now.day - 6 + index)
+                      .day.toString().padLeft(2, '0') + '.' +
+                  DateTime(now.year, now.month, now.day - 6 + index)
+                      .month.toString().padLeft(2, '0'))),
+                Expanded(child: LinearProgressIndicator(
+                  value: weeklyPeak > 0
+                    ? (weeklyExpenses[index] / weeklyPeak).clamp(0.0, 1.0)
+                    : 0.0)),
+                const SizedBox(width: 8),
+                SizedBox(width: 116, child: Text(money(weeklyExpenses[index]),
+                  textAlign: TextAlign.right)),
+              ]),
+            ],
           ]),
         )),
         Card(child: Padding(

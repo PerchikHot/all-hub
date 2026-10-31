@@ -117,7 +117,8 @@ jobs:
                   val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
                   val expandedText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
                   val body = if (expandedText.isNotBlank()) expandedText else normalText
-                  if (body.isBlank()) return
+                  // Never persist oversized or malformed notification payloads.
+                  if (body.isBlank() || body.length > 2048 || title.length > 200) return
                   // Store transaction alerts only. Never retain OTP/login codes,
                   // promotions or balance-only notifications in the local queue.
                   val combined = title + " " + body
@@ -142,10 +143,16 @@ jobs:
                       credentials.containsMatchIn(combined) ||
                       notPosted.containsMatchIn(combined)) return
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                  val current = JSONArray(prefs.getString("queue", "[]"))
+                  // A damaged local queue must not crash NotificationListenerService.
+                  // Recover the pending queue without touching saved transactions.
+                  val current = try {
+                      JSONArray(prefs.getString("queue", "[]"))
+                  } catch (_: org.json.JSONException) {
+                      JSONArray()
+                  }
                   val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}:${body.hashCode()}"
                   for (i in 0 until current.length()) {
-                      if (current.getJSONObject(i).optString("key") == key) return
+                      if (current.optJSONObject(i)?.optString("key") == key) return
                   }
                   current.put(JSONObject().put("key", key).put("bank", bank)
                       .put("title", title).put("body", body).put("time", sbn.postTime))

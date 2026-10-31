@@ -165,7 +165,7 @@ class ProjectLauncher {
   /// permits launching visible apps; no private app data is accessed.
   static bool isValidAndroidPackageName(String value) =>
       value.length <= 200 &&
-      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+$')
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$')
           .hasMatch(value);
 
   static Future<bool> setExternalPackageName(String id, String packageName) async {

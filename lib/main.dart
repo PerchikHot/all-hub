@@ -1,6 +1,7 @@
 import 'project_launcher.dart';
 import 'external_repositories.dart';
 import 'external_artwork.dart';
+import 'external_screenshots.dart';
 import 'version_status.dart';
 import 'media_browser_page.dart';
 import 'kopilka_page.dart';
@@ -266,6 +267,7 @@ class _HomePageState extends State<HomePage> {
     }
     await ExternalRepositoryStore.remove(external);
     await ExternalArtwork.remove(external.projectId);
+    await ExternalScreenshots.removeAll(external.projectId);
     if (mounted) {
       await refresh();
     }
@@ -468,6 +470,8 @@ class _HomePageState extends State<HomePage> {
               Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
             ]))]),
             const SizedBox(height: 8), Text(project.description),
+            if (project.id.startsWith('external-'))
+              ExternalScreenshotGallery(projectId: project.id),
             if (project.id.startsWith('external-'))
               Align(alignment: Alignment.centerRight, child: TextButton.icon(
                 onPressed: () => chooseExternalArtwork(project),

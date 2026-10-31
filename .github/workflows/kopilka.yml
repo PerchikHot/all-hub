@@ -93,6 +93,18 @@ jobs:
                       .putBoolean("listener_connected", false).apply()
               }
 
+              // Diagnostics are counters only. Filtered notifications, including
+              // one-time codes, never enter the import queue or diagnostic logs.
+              private fun markFiltered(bankId: String) {
+                  val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                  prefs.edit()
+                      .putInt("filtered_count",
+                          (prefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000))
+                      .putInt("bank_filtered_" + bankId,
+                          (prefs.getInt("bank_filtered_" + bankId, 0) + 1)
+                              .coerceAtMost(100000000)).apply()
+              }
+
               override fun onNotificationPosted(sbn: StatusBarNotification?) {
                   if (sbn == null) return
                   val (bank, bankId) = when (sbn.packageName) {
@@ -116,9 +128,7 @@ jobs:
                               .coerceAtMost(100000000)).apply()
                   // Group summaries are duplicates, not individual payments.
                   if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
-                      listenerPrefs.edit().putInt("filtered_count",
-                          (listenerPrefs.getInt("filtered_count", 0) + 1)
-                              .coerceAtMost(100000000)).apply()
+                      markFiltered(bankId)
                       return
                   }
                   val extras = sbn.notification.extras
@@ -128,8 +138,7 @@ jobs:
                   val body = if (expandedText.isNotBlank()) expandedText else normalText
                   // Never persist oversized or malformed notification payloads.
                   if (body.isBlank() || body.length > 2048 || title.length > 200) {
-                      listenerPrefs.edit().putInt("filtered_count",
-                          (listenerPrefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000)).apply()
+                      markFiltered(bankId)
                       return
                   }
                   // Store transaction alerts only. Never retain OTP/login codes,
@@ -172,8 +181,7 @@ jobs:
                       additionalCredentials.containsMatchIn(combined) ||
                       notPosted.containsMatchIn(combined) ||
                       additionalUnposted.containsMatchIn(combined)) {
-                      listenerPrefs.edit().putInt("filtered_count",
-                          (listenerPrefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000)).apply()
+                      markFiltered(bankId)
                       return
                   }
                   val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
@@ -193,7 +201,10 @@ jobs:
                   while (current.length() > 100) current.remove(0)
                   prefs.edit().putString("queue", current.toString())
                       .putInt("accepted_count", (prefs.getInt("accepted_count", 0) + 1)
-                          .coerceAtMost(100000000)).apply()
+                          .coerceAtMost(100000000))
+                      .putInt("bank_accepted_" + bankId,
+                          (prefs.getInt("bank_accepted_" + bankId, 0) + 1)
+                              .coerceAtMost(100000000)).apply()
               }
           }
           ''')
@@ -249,6 +260,16 @@ jobs:
                                           "Т-Банк" to prefs.getInt("bank_count_tbank", 0),
                                           "Газпромбанк" to prefs.getInt("bank_count_gazprom", 0),
                                           "Ozon Банк" to prefs.getInt("bank_count_ozon", 0)
+                                      ),
+                                      "bankAccepted" to mapOf(
+                                          "Т-Банк" to prefs.getInt("bank_accepted_tbank", 0),
+                                          "Газпромбанк" to prefs.getInt("bank_accepted_gazprom", 0),
+                                          "Ozon Банк" to prefs.getInt("bank_accepted_ozon", 0)
+                                      ),
+                                      "bankFiltered" to mapOf(
+                                          "Т-Банк" to prefs.getInt("bank_filtered_tbank", 0),
+                                          "Газпромбанк" to prefs.getInt("bank_filtered_gazprom", 0),
+                                          "Ozon Банк" to prefs.getInt("bank_filtered_ozon", 0)
                                       ),
                                       "bankLastSeen" to mapOf(
                                           "Т-Банк" to prefs.getLong("bank_last_tbank", 0L),

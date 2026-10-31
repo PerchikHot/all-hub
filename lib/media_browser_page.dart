@@ -6,6 +6,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+/// Render direct photos and animated GIFs with Flutter on both platforms.
+/// Android WebView navigation can treat a GIF as a download instead of showing
+/// it. A native Image widget also supports pinch-to-zoom and explicit saving.
+bool isDirectImageMediaUri(Uri uri) =>
+    (uri.scheme == 'https' || uri.scheme == 'http') &&
+    ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']
+        .any(uri.path.toLowerCase().endsWith);
+
 Future<void> migrateAllHubMedia() => MediaBrowserPage.migrateLegacyMedia();
 
 class MediaBrowserPage extends StatefulWidget {
@@ -54,9 +62,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
 
   /// Flutter can render still images and animated GIFs on Windows without
   /// handing private browsing to an external application.
-  bool isDirectImage(Uri uri) =>
-      ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']
-          .any(uri.path.toLowerCase().endsWith);
+  bool isDirectImage(Uri uri) => isDirectImageMediaUri(uri);
 
   bool isMedia(Uri uri) {
     final path = uri.path.toLowerCase();
@@ -68,6 +74,12 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   void initState() {
     super.initState();
     currentUrl = widget.url.toString();
+    // Direct images/GIFs should open inside the app, never auto-download
+    // through Android WebView's navigation delegate.
+    if (isDirectImage(widget.url)) {
+      loading = false;
+      return;
+    }
     if (!Platform.isAndroid) loading = false;
     if (Platform.isAndroid) {
       browser = WebViewController()
@@ -87,14 +99,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
               pageError = 'Страница недоступна. Проверь подключение и повтори загрузку.';
             });
           },
-          onNavigationRequest: (request) {
-            final uri = Uri.tryParse(request.url);
-            if (uri != null && isMedia(uri)) {
-              download(uri);
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
+
         ))
         ..loadRequest(widget.url);
     }

@@ -627,7 +627,7 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
     if (candidates.isEmpty) {
       return const Center(child: Icon(Icons.broken_image_outlined));
     }
-    final current = index.clamp(0, candidates.length - 1);
+    final current = index < candidates.length ? index : candidates.length - 1;
     final url = candidates[current];
     return CachedNetworkImage(
       imageUrl: url,

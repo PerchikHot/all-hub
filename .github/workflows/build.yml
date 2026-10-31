@@ -202,6 +202,12 @@ jobs:
           channel: stable
       - name: Generate Windows platform scaffolding
         run: flutter create --platforms=windows --project-name all_hub .
+      - name: Generate branded Windows desktop and taskbar icon
+        shell: pwsh
+        run: |
+          python -m pip install --quiet Pillow
+          python tools/generate_launcher_icon.py
+          if (!(Test-Path 'windows/runner/resources/app_icon.ico')) { throw 'Windows icon generation failed' }
       - name: Remove generated template test
         run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
       - run: flutter pub get

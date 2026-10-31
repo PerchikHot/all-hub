@@ -318,22 +318,6 @@ jobs:
           PYNOTIFY
           flutter pub add shared_preferences
           python3 -m pip install --quiet Pillow
-          python3 - <<'PYICON'
-          from PIL import Image, ImageDraw, ImageFont
-          from pathlib import Path
-          sizes = {'mdpi':48,'hdpi':72,'xhdpi':96,'xxhdpi':144,'xxxhdpi':192}
-          for density, size in sizes.items():
-              image = Image.new('RGBA', (size,size), (10,20,38,255))
-              draw = ImageDraw.Draw(image)
-              m = int(size*.10)
-              draw.rounded_rectangle((m,m,size-m,size-m), radius=int(size*.23), fill=(30,57,110,255))
-              draw.ellipse((int(size*.24),int(size*.22),int(size*.76),int(size*.74)), outline=(150,193,255,255), width=max(2,int(size*.07)))
-              draw.line((int(size*.49),int(size*.32),int(size*.49),int(size*.67)), fill=(230,240,255,255), width=max(2,int(size*.07)))
-              draw.line((int(size*.39),int(size*.46),int(size*.60),int(size*.46)), fill=(230,240,255,255), width=max(2,int(size*.05)))
-              path = Path('android/app/src/main/res') / ('mipmap-'+density) / 'ic_launcher.png'
-              path.parent.mkdir(parents=True, exist_ok=True)
-              image.save(path)
-          PYICON
           if [ -f /tmp/kopilka-release.jks ]; then cp /tmp/kopilka-release.jks android/app/kopilka-release.jks; fi
           python3 - <<'PY'
           from pathlib import Path
@@ -370,8 +354,9 @@ jobs:
           sed -i 's#package:all_hub/kopilka_page.dart#package:kopilka_app/kopilka_page.dart#' test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart
           flutter analyze
           flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart
+          python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
-          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep -E 'res/mipmap-[^/]+/ic_launcher[^/]*\.png'
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep -E 'res/mipmap[^/]*/ic_launcher'
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
       - name: Upload standalone APK

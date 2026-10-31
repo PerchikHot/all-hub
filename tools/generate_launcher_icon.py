@@ -6,7 +6,7 @@ glyphs). Run after 'flutter create', before building the app.
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets" / "icons"
 DENSITIES = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
@@ -64,10 +64,15 @@ def verify(project: str, root: Path) -> None:
         with Image.open(android / "drawable-nodpi" / "ic_launcher_foreground.png") as im:
             assert im.size == (432, 432)
         assert (android / "mipmap-anydpi-v26" / "ic_launcher.xml").exists()
+        with Image.open(source) as expected, Image.open(android / "mipmap-xxxhdpi" / "ic_launcher.png") as actual:
+            assert ImageChops.difference(expected.convert("RGB"), actual.convert("RGB")).getbbox() is None, "Launcher artwork was overwritten"
     if windows.parent.exists():
         with Image.open(windows) as im:
             assert (16, 16) in im.ico.sizes()
             assert (256, 256) in im.ico.sizes()
+            with Image.open(source) as expected:
+                diff = ImageChops.difference(im.convert("RGB").resize((192, 192), Image.Resampling.LANCZOS), expected.convert("RGB"))
+                assert max(ImageStat.Stat(diff).mean) < 5, "Windows ICO differs from approved artwork"
     assert android.exists() or windows.parent.exists(), "Run after flutter create"
 
 

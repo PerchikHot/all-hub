@@ -158,6 +158,74 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> copyRepositoryBackup() async {
+    try {
+      final catalog = await ExternalRepositoryStore.load();
+      await Clipboard.setData(ClipboardData(
+        text: ExternalRepositoryStore.exportBackup(catalog)));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Скопирован каталог: ${catalog.length} репозиториев. '
+            'Только публичные адреса, без данных приложений.')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось скопировать каталог: $e')));
+    }
+  }
+
+  Future<void> importRepositoryBackup() async {
+    final clipboard = await Clipboard.getData('text/plain');
+    if (!mounted) return;
+    final controller = TextEditingController(text: clipboard?.text ?? '');
+    final source = await showDialog<String>(context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Импорт публичных репозиториев'),
+        content: SizedBox(width: 540, child: TextField(
+          controller: controller, maxLines: 8, minLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Вставь JSON-каталог All Hub',
+            helperText: 'Импорт заменит только список сторонних репозиториев.'),
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text),
+            child: const Text('Проверить')),
+        ],
+      ));
+    controller.dispose();
+    if (!mounted || source == null) return;
+    try {
+      final parsed = ExternalRepositoryStore.parseBackup(source);
+      final approved = await showDialog<bool>(context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Заменить каталог?'),
+          content: Text('Будут проверены ${parsed.length} публичных '
+            'GitHub-репозиториев. Текущий список будет заменён только '
+            'после успешной проверки всех адресов. '
+            'Установленные приложения и их данные останутся без изменений.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Проверить и импортировать')),
+          ],
+        ));
+      if (approved != true || !mounted) return;
+      final count = await ExternalRepositoryStore.importBackup(source);
+      if (!mounted) return;
+      await refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Импортировано репозиториев: $count')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Каталог не изменён: $e')));
+    }
+  }
+
   Future<void> removeRepository(Project project) async {
     final external = ExternalRepository.parse(project.repo ?? '');
     if (external == null || external.projectId != project.id) {
@@ -326,6 +394,15 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 12),
           OutlinedButton.icon(onPressed: addRepository, icon: const Icon(Icons.add_link),
             label: const Text('Добавить приложение из GitHub')),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(onPressed: copyRepositoryBackup,
+              icon: const Icon(Icons.copy_all_outlined),
+              label: const Text('Копировать каталог')),
+            OutlinedButton.icon(onPressed: importRepositoryBackup,
+              icon: const Icon(Icons.restore_outlined),
+              label: const Text('Импорт каталога')),
+          ]),
           const SizedBox(height: 12),
           if (Platform.isAndroid) ...[
             Row(children: [

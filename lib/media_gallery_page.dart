@@ -1,13 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'media_browser_page.dart';
 import 'media_feed_query.dart';
 import 'media_feed_cache.dart';
+import 'media_feed_client.dart';
 import 'media_favorites.dart';
 import 'multi_engine_search_page.dart';
 
@@ -23,6 +22,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final posts = <Map<String, dynamic>>[];
   // Session-only LRU: no searches or feed metadata are persisted to disk.
   final pageCache = MediaFeedMemoryCache(maxEntries: 16);
+  final feedClient = MediaFeedClient();
+  // Keep the visible feed when an explicit network refresh fails.
+  final refreshBackup = <Map<String, dynamic>>[];
   bool bypassPageCache = false;
   bool showingCachedPage = false;
   final favoritePosts = <Map<String, dynamic>>[];
@@ -248,6 +250,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
 
   @override
   void dispose() {
+    feedClient.close();
     scroll.dispose();
     queryController.dispose();
     super.dispose();
@@ -256,6 +259,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   Future<void> search({bool bypassCache = false}) async {
     final q = queryController.text.trim();
     bypassPageCache = bypassCache;
+    refreshBackup
+      ..clear()
+      ..addAll(bypassCache && !favoritesOnly ? posts : const <Map<String, dynamic>>[]);
     favoritesOnly = false;
     searchGeneration++;
     setState(() {
@@ -324,21 +330,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (cached != null) {
         data = cached;
       } else {
-        final response = await http.get(uri).timeout(const Duration(seconds: 18));
-        if (response.statusCode == 403) {
-          throw const _FeedAccessDenied();
-        }
-        if (response.statusCode == 429) {
-          throw const _FeedRateLimited();
-        }
-        if (response.statusCode != 200) {
-          throw Exception('HTTP ${response.statusCode}');
-        }
-        final decoded = jsonDecode(response.body);
-        if (decoded is! List) {
-          throw const FormatException('Неверный ответ сервера');
-        }
-        data = decoded;
+        data = await feedClient.fetch(uri);
         pageCache.store(uri, data.whereType<Map<String, dynamic>>());
       }
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
@@ -351,6 +343,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         query: requestedQuery,
       );
       setState(() {
+        refreshBackup.clear();
         if (cached != null) showingCachedPage = true;
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;
@@ -374,10 +367,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     } catch (e) {
       if (mounted && generation == searchGeneration) {
         setState(() {
-          accessDenied = e is _FeedAccessDenied;
+          // A manual refresh must not turn a populated feed into a blank
+          // screen when the source is temporarily offline or rate limited.
+          if (posts.isEmpty && refreshBackup.isNotEmpty) {
+            posts.addAll(refreshBackup);
+          }
+          refreshBackup.clear();
+          accessDenied = e is MediaFeedRequestException && e.statusCode == 403;
           error = accessDenied
               ? 'Источник отклонил запрос (HTTP 403). Проверь доступ или открой поиск на сайте.'
-              : e is _FeedRateLimited
+              : e is MediaFeedRequestException && e.statusCode == 429
                   ? 'Источник временно ограничил запросы (HTTP 429). Попробуй позже.'
                   : 'Не удалось подключиться к источнику. Проверь сеть или открой Яндекс.Картинки.';
           hasMore = false;
@@ -703,14 +702,3 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
   }
 }
 
-class _FeedRateLimited implements Exception {
-  const _FeedRateLimited();
-  @override
-  String toString() => 'HTTP 429 Too Many Requests';
-}
-
-class _FeedAccessDenied implements Exception {
-  const _FeedAccessDenied();
-  @override
-  String toString() => 'HTTP 403 Forbidden';
-}

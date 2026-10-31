@@ -356,7 +356,7 @@ jobs:
           flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart
           python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
-          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep -E 'res/mipmap[^/]*/ic_launcher'
+          python3 "$GITHUB_WORKSPACE/tools/verify_packaged_icon.py" --project kopilka --apk build/app/outputs/flutter-apk/app-release.apk
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
       - name: Upload standalone APK

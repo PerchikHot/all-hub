@@ -65,12 +65,6 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   /// handing private browsing to an external application.
   bool isDirectImage(Uri uri) => isDirectImageMediaUri(uri);
 
-  bool isMedia(Uri uri) {
-    final path = uri.path.toLowerCase();
-    return ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.webm', '.mov']
-        .any(path.endsWith);
-  }
-
   @override
   void initState() {
     super.initState();
@@ -192,7 +186,9 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
 
   Future<void> saveCurrent() async {
     final uri = Uri.tryParse(currentUrl);
-    if (uri == null || !isMedia(uri)) {
+    // CDN media links can omit an extension entirely. The actual download
+    // is still accepted only after MIME validation and size checks.
+    if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Открой прямую ссылку на фото, GIF или видео для скачивания'),
       ));

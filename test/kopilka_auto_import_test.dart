@@ -101,4 +101,18 @@ void main() {
   });
 
 
+  test('only previously saved or reviewed keys are acknowledged on resume', () {
+    final raw = <dynamic>[
+      {'key': 'saved', 'bank': 'Т-Банк'},
+      {'key': 'new', 'bank': 'Ozon Банк'},
+      {'key': 'saved', 'bank': 'Т-Банк'},
+      {'key': 12},
+      {'key': '  dismissed  '},
+    ];
+    expect(kopilkaQueuedAcknowledgements(raw, {'saved', 'dismissed'}),
+        ['saved', 'dismissed']);
+    expect(kopilkaQueuedAcknowledgements(raw, {}), isEmpty);
+  });
+
+
 }

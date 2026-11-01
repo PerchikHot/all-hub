@@ -4,6 +4,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Refuse to overwrite a damaged financial journal. Previously, malformed
+/// JSON silently loaded as an empty list and the next automatic import could
+/// replace the user's entire transaction history with one new operation.
+List<Map<String, dynamic>> decodeKopilkaJournal(String? raw) {
+  if (raw == null) return <Map<String, dynamic>>[];
+  final decoded = jsonDecode(raw);
+  if (decoded is! List) throw const FormatException('Journal is not a list');
+  final entries = <Map<String, dynamic>>[];
+  for (final value in decoded) {
+    if (value is! Map || value.keys.any((key) => key is! String)) {
+      throw const FormatException('Journal contains a malformed entry');
+    }
+    entries.add(Map<String, dynamic>.from(value));
+  }
+  return entries;
+}
+
+/// A temporarily disconnected Android listener can still have durable queued
+/// transactions from before its disconnection. Import them after UI resumes
+/// when the user has granted access; never require a live service callback.
+bool shouldImportQueuedKopilkaEvents({
+  required bool permissionGranted,
+  required bool journalHealthy,
+  required int queuedCount,
+}) => permissionGranted && journalHealthy && queuedCount > 0;
+
 /// Suggests an amount for manual review. Balance-only notifications must
 /// not be prefilled as expenses; the user still confirms every operation.
 String suggestNotificationAmount(String body, {bool allowAmbiguous = false}) {
@@ -1129,6 +1155,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   bool notificationsEnabled = false;
   Map<String, dynamic>? listenerDiagnostics;
   String? listenerError;
+  String? journalError;
+  bool _journalHealthy = true;
   final pendingNotifications = <Map<String, dynamic>>[];
   Timer? _notificationPoller;
   bool _refreshInProgress = false;
@@ -1172,9 +1200,14 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     try {
-      final saved = jsonDecode(prefs.getString('kopilka_entries_v1') ?? '[]') as List;
-      entries.addAll(saved.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
-    } catch (_) {}
+      entries.addAll(decodeKopilkaJournal(prefs.getString('kopilka_entries_v1')));
+    } catch (_) {
+      // Do not erase the original value or allow a later auto-import to
+      // overwrite a journal that could be recovered from a backup.
+      _journalHealthy = false;
+      journalError = 'Финансовый журнал повреждён. Автозапись отключена, '
+          'исходные данные сохранены без изменений. Нужна диагностика/восстановление.';
+    }
     if (!mounted) return;
     // Legacy or corrupted goal values must not freeze the dashboard.
     // Preserve stored data; use a safe display fallback instead.
@@ -1212,7 +1245,10 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       final data = filterPendingBankNotifications(jsonDecode(raw) as List, reviewed);
       // Save before acknowledging. A crash between these steps cannot
       // duplicate a transaction because notificationKey is persisted.
-      if (enabled && diagnostics?['connected'] == true) {
+      if (shouldImportQueuedKopilkaEvents(
+          permissionGranted: enabled,
+          journalHealthy: _journalHealthy,
+          queuedCount: data.length)) {
         for (final event in data) {
           final entry = confidentKopilkaAutoEntry(event, entries, DateTime.now());
           if (entry == null) continue;
@@ -1334,6 +1370,9 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   }
 
   Future<void> _save() async {
+    if (!_journalHealthy) {
+      throw StateError('Financial journal requires recovery before saving');
+    }
     final prefs = await SharedPreferences.getInstance();
     // Commit the journal last: a failure to persist UI settings must not
     // leave a posted transaction on disk after the UI rolls it back.
@@ -1770,6 +1809,12 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             title: const Text('Диагностика получения уведомлений'),
             subtitle: Text(describeKopilkaListener(listenerDiagnostics)),
           ),
+          if (journalError != null)
+            ListTile(
+              leading: const Icon(Icons.error_outline, color: Colors.redAccent),
+              title: const Text('Защита финансового журнала'),
+              subtitle: Text(journalError!),
+            ),
           if (listenerError != null)
             ListTile(
               leading: const Icon(Icons.warning_amber_rounded,

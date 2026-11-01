@@ -837,7 +837,7 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
               : '') +
       (queueFull is int && queueFull > 0
           ? ' ВНИМАНИЕ: очередь заполнена. $queueFull новых уведомлений не удалось сохранить. Открой Копилку и проверь операции.'
-          : '');
+          : '') + stageSummary + stageWarning;
   final reconnectInfo = !connected && lastDisconnected is int &&
           lastDisconnected > 0
       ? ' Последнее отключение: ${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().day.toString().padLeft(2, '0')}.${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().month.toString().padLeft(2, '0')}. '

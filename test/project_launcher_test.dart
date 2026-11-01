@@ -311,6 +311,11 @@ void main() {
     expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 0, 513 * mb), isFalse);
     expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 1024 * mb, 1), isFalse);
     expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 0, -1), isFalse);
+    // Untrusted ZIP metadata must not wrap the cumulative size limit.
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 1024 * mb, 0), isTrue);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 1024 * mb + 1, 0), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 9223372036854775807, 1), isFalse);
+    expect(ProjectLauncher.isSafeWindowsArchiveBudget(1, 1024 * mb - 1, 2), isFalse);
   });
 
   test('Windows ZIP streaming budget stops oversized downloads early', () {

@@ -50,6 +50,35 @@ void main() {
     }
   });
 
+  test('Windows updater restores interrupted installs without overwriting new ones', () async {
+    final root = await Directory.systemTemp.createTemp('allhub-recovery-');
+    try {
+      final exe = File('${root.path}/shadow-rp.exe');
+      final exeBackup = File('${exe.path}.backup');
+      await exeBackup.writeAsBytes([0x4d, 0x5a, 1]);
+      expect(await ProjectLauncher.recoverInterruptedWindowsExe(exe), isTrue);
+      expect(await exe.readAsBytes(), [0x4d, 0x5a, 1]);
+      expect(await ProjectLauncher.recoverInterruptedWindowsExe(exe), isFalse);
+      await exeBackup.writeAsBytes([0x4d, 0x5a, 2]);
+      expect(await ProjectLauncher.recoverInterruptedWindowsExe(exe), isFalse);
+      expect(await exe.readAsBytes(), [0x4d, 0x5a, 1]);
+
+      final app = Directory('${root.path}/nova-game');
+      final backup = Directory('${app.path}.backup');
+      await backup.create();
+      await File('${backup.path}/NovaGame.exe').writeAsBytes([0x4d, 0x5a]);
+      expect(await ProjectLauncher.recoverInterruptedWindowsZip(app), isTrue);
+      expect(await File('${app.path}/NovaGame.exe').exists(), isTrue);
+      expect(await ProjectLauncher.recoverInterruptedWindowsZip(app), isFalse);
+      await backup.create();
+      await File('${backup.path}/old.exe').writeAsBytes([0x4d, 0x5a]);
+      expect(await ProjectLauncher.recoverInterruptedWindowsZip(app), isFalse);
+      expect(await File('${app.path}/old.exe').exists(), isFalse);
+    } finally {
+      await root.delete(recursive: true);
+    }
+  });
+
   test('published SHA-256 digest rejects modified download before install', () async {
     final dir = await Directory.systemTemp.createTemp('allhub-digest-');
     try {

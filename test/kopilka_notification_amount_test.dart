@@ -10,6 +10,22 @@ void main() {
         contains('после обновления'));
   });
 
+  test('listener disconnect diagnostics report rebind attempts without bank text', () {
+    final report = describeKopilkaListener({
+      'connected': false,
+      'lastConnected': DateTime(2026, 10, 31).millisecondsSinceEpoch,
+      'lastDisconnected': DateTime(2026, 11, 1).millisecondsSinceEpoch,
+      'rebindRequests': 2,
+      'lastSeen': 0,
+    });
+    expect(report, contains('Служба отключена'));
+    expect(report, contains('Запросов переподключения: 2'));
+    expect(report, contains('01.11'));
+    expect(report, isNot(contains('код')));
+    expect(describeKopilkaListener({'connected': true, 'lastSeen': 0}),
+        contains('Служба уведомлений подключена'));
+  });
+
   test('three banks: posted payment wording and amount extraction', () {
     for (final alert in [
       'Платёж 1 250,50 ₽ выполнен',

@@ -365,7 +365,9 @@ Map<String, dynamic>? validatedNativeKopilkaEntry(
   final value = amount.toDouble();
   if (possibleKopilkaDuplicateNotification(saved,
       bank: bank, kind: kind as String, amount: value, postedAt: date)
-      .isNotEmpty) return null;
+      .isNotEmpty) {
+    return null;
+  }
   // Never mistake the other leg of a transfer between owned banks for income.
   final opposite = kind == 'expense' ? 'income' : 'expense';
   if (saved.any((entry) =>
@@ -373,7 +375,9 @@ Map<String, dynamic>? validatedNativeKopilkaEntry(
       (safeKopilkaAmount(entry) * 100).round() == (value * 100).round() &&
       DateTime.tryParse((entry['date'] ?? '').toString()) != null &&
       date.difference(DateTime.parse(entry['date'].toString())).abs() <=
-          const Duration(minutes: 30))) return null;
+          const Duration(minutes: 30))) {
+    return null;
+  }
   return <String, dynamic>{
     'kind': kind, 'amount': value, 'bank': bank,
     'from': bank, 'to': '', 'note': note.trim(),

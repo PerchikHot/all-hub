@@ -43,6 +43,8 @@ class MainActivity : FlutterActivity() {
                         } catch (_: Exception) { 0 }
                         result.success(mapOf(
                             "queued" to count,
+                            "queueCapacity" to BankNotificationService.MAX_PENDING,
+                            "queueRemaining" to (BankNotificationService.MAX_PENDING - count).coerceAtLeast(0),
                             "accepted" to prefs.getInt("accepted_count", 0),
                             "filtered" to prefs.getInt("filtered_count", 0),
                             "lastSeen" to prefs.getLong("last_seen", 0L),

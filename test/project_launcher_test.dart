@@ -237,6 +237,9 @@ void main() {
     expect(ProjectLauncher.selectWindowsLaunchExecutable('shadow-rp', [
       'uninstall.exe', 'setup.exe',
     ]), isNull);
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('kopilka', [
+      'KopilkaUpdater.exe', 'KopilkaInstaller.exe',
+    ]), isNull);
     expect(ProjectLauncher.selectWindowsLaunchExecutable('../bad', [
       'good.exe',
     ]), isNull);

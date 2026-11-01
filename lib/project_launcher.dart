@@ -120,7 +120,9 @@ class ProjectLauncher {
     final candidates = paths.where((path) {
       final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
       return filename.endsWith('.exe') &&
-          !RegExp(r'^(?:unins|uninstall|setup|updater|crashreport)')
+          // Some archives name a maintenance binary "KopilkaUpdater.exe".
+          // A sole updater must never become the registered app launcher.
+          !RegExp(r'uninstall|updater|installer|setup|crashreport|^unins')
               .hasMatch(filename);
     }).toList(growable: false);
     if (candidates.isEmpty) return null;

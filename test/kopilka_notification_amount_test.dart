@@ -57,6 +57,18 @@ void main() {
         contains('после обновления'));
   });
 
+  test('near-capacity native queue warns before banking alerts are rejected', () {
+    final report = describeKopilkaListener({
+      'connected': true, 'lastSeen': 0, 'queued': 455,
+      'queueCapacity': 500, 'queueRemaining': 45,
+    });
+    expect(report, contains('осталось 45 мест'));
+    expect(describeKopilkaListener({
+      'connected': true, 'lastSeen': 0, 'queued': 30,
+      'queueCapacity': 500, 'queueRemaining': 470,
+    }), isNot(contains('осталось')));
+  });
+
   test('queue overflow and recovery are visible without notification contents', () {
     final report = describeKopilkaListener({
       'connected': true, 'lastSeen': 0, 'queued': 100,

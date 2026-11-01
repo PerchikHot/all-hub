@@ -11,6 +11,9 @@ class BankNotificationService : NotificationListenerService() {
         // The Flutter UI and listener share a process and must not lose
         // newly posted payments while the user dismisses an older alert.
         val queueLock = Any()
+        // Retain more payments while the Flutter dashboard is closed. This
+        // remains bounded to avoid unlimited private notification storage.
+        const val MAX_PENDING = 500
     }
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -167,7 +170,7 @@ class BankNotificationService : NotificationListenerService() {
         }
         // Never silently evict older, unprocessed payments while Flutter
         // is closed. Reject new events and expose queue pressure instead.
-        if (current.length() >= 100) {
+        if (current.length() >= MAX_PENDING) {
             prefs.edit().putInt("queue_full_rejections",
                 (prefs.getInt("queue_full_rejections", 0) + 1).coerceAtMost(100000000))
                 .putString("last_skip_reason", "queue_full")

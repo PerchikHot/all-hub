@@ -50,7 +50,7 @@ class MainActivity : FlutterActivity() {
                             "lastSeen" to prefs.getLong("last_seen", 0L),
                             "lastBank" to (prefs.getString("last_bank", "") ?: ""),
                             "permissionGranted" to isListenerPermissionGranted(),
-                            "connected" to prefs.getBoolean("listener_connected", false),
+                            "connected" to BankNotificationService.connectedInProcess,
                             "lastAccepted" to prefs.getLong("last_accepted", 0L),
                             "lastAcceptedBank" to (prefs.getString("last_accepted_bank", "") ?: ""),
                             "lastSkipped" to prefs.getLong("last_skipped", 0L),

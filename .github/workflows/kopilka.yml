@@ -130,6 +130,16 @@ jobs:
           python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify
           flutter build apk --release --build-name "1.0.${GITHUB_RUN_NUMBER}" --build-number "${GITHUB_RUN_NUMBER}"
           python3 "$GITHUB_WORKSPACE/tools/verify_packaged_icon.py" --project kopilka --apk build/app/outputs/flutter-apk/app-release.apk
+          # Verify the actual packaged manifest, not only the generated source.
+          # A successful Flutter build does not prove the listener service was
+          # included; without it Android cannot deliver bank notifications.
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          AAPT="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$AAPT" || { echo "::error::Android aapt missing"; exit 1; }
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > /tmp/kopilka-manifest.txt
+          grep -F 'BankNotificationService' /tmp/kopilka-manifest.txt
+          grep -F 'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE' /tmp/kopilka-manifest.txt
+          grep -F 'android.service.notification.NotificationListenerService' /tmp/kopilka-manifest.txt
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
       - name: Upload standalone APK

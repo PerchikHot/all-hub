@@ -327,11 +327,21 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       // Pull-to-refresh bypasses memory; never cache HTTP errors.
       final cached = bypassPageCache ? null : pageCache.read(uri);
       final List<dynamic> data;
+      var usedCachedPage = cached != null;
       if (cached != null) {
         data = cached;
       } else {
-        data = await feedClient.fetch(uri);
-        pageCache.store(uri, data.whereType<Map<String, dynamic>>());
+        try {
+          data = await feedClient.fetch(uri);
+          pageCache.store(uri, data.whereType<Map<String, dynamic>>());
+        } catch (_) {
+          // Keep the gallery usable during HTTP 403/429 or temporary outages.
+          // A stale page is a fallback only, never treated as fresh network data.
+          final stale = pageCache.readStale(uri);
+          if (stale == null) rethrow;
+          data = stale;
+          usedCachedPage = true;
+        }
       }
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
       // The API can repeat an ID inside one response. De-duplicate before
@@ -344,7 +354,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       );
       setState(() {
         refreshBackup.clear();
-        if (cached != null) showingCachedPage = true;
+        if (usedCachedPage) showingCachedPage = true;
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;
         for (final post in newPosts) {

@@ -12,7 +12,7 @@ class BankAutoClassifierTest {
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {
-            val result = parse("Покупка 250,50 ₽\\n$label")
+            val result = parse("Покупка 250,50 ₽\n$label")
             assertNotNull(label, result)
             assertEquals("expense", result!!["kind"])
             assertEquals(250.5, result["amount"])
@@ -25,23 +25,23 @@ class BankAutoClassifierTest {
 
     @Test fun refusesTransfersMultipleAmountsAndUncertainMessages() {
         for (body in listOf(
-            "Перевод 200 ₽\\nМагазин: Пятёрочка",
-            "Покупка 250 ₽. Остаток 4 000 ₽\\nМагазин: Пятёрочка",
-            "Оплата 250 ₽ не прошла\\nМагазин: Пятёрочка",
+            "Перевод 200 ₽\nМагазин: Пятёрочка",
+            "Покупка 250 ₽. Остаток 4 000 ₽\nМагазин: Пятёрочка",
+            "Оплата 250 ₽ не прошла\nМагазин: Пятёрочка",
             "Код подтверждения оплаты 250 ₽: 1234",
             "Покупка 250 ₽",
-            "Покупка 250 ₽\\nМагазин: A",
+            "Покупка 250 ₽\nМагазин: A",
         )) assertNull(body, parse(body))
-        assertNull(parse("Покупка 250 ₽\\nМагазин: Пятёрочка", "Другой банк"))
+        assertNull(parse("Покупка 250 ₽\nМагазин: Пятёрочка", "Другой банк"))
     }
 
     @Test fun rejectsFutureAndOldOrReusedKeys() {
         assertNull(BankAutoClassifier.classify("Т-Банк", "Операция",
-            "Покупка 250 ₽\\nМагазин: Пятёрочка", "", now, now))
+            "Покупка 250 ₽\nМагазин: Пятёрочка", "", now, now))
         assertNull(BankAutoClassifier.classify("Т-Банк", "Операция",
-            "Покупка 250 ₽\\nМагазин: Пятёрочка", "id", now + 600000, now))
+            "Покупка 250 ₽\nМагазин: Пятёрочка", "id", now + 600000, now))
         assertNull(BankAutoClassifier.classify("Т-Банк", "Операция",
-            "Покупка 250 ₽\\nМагазин: Пятёрочка", "id",
+            "Покупка 250 ₽\nМагазин: Пятёрочка", "id",
             now - 25L * 60L * 60L * 1000L, now))
     }
 }

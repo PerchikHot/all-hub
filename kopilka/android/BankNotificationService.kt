@@ -2,6 +2,7 @@ package com.veyrion.kopilka_app
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.app.Notification
+import android.content.ComponentName
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -15,8 +16,26 @@ class BankNotificationService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
-        getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
-            .putBoolean("listener_connected", false).apply()
+        val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val lastRequest = prefs.getLong("last_rebind_request", 0L)
+        prefs.edit().putBoolean("listener_connected", false)
+            .putLong("last_disconnected", now).apply()
+        // Official Android rebind request only. It never grants notification
+        // access or bypasses the user's system permission. Throttle requests
+        // to avoid loops when the service is deliberately disabled.
+        if (now >= lastRequest && now - lastRequest >= 60_000L) {
+            prefs.edit().putLong("last_rebind_request", now)
+                .putInt("rebind_requests",
+                    (prefs.getInt("rebind_requests", 0) + 1)
+                        .coerceAtMost(100000000)).apply()
+            try {
+                NotificationListenerService.requestRebind(
+                    ComponentName(this, BankNotificationService::class.java))
+            } catch (_: SecurityException) {
+                // The user may have revoked access. Keep diagnostics only.
+            }
+        }
     }
 
     // Diagnostics are counters only. Filtered notifications, including

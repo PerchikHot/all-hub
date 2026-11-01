@@ -73,6 +73,22 @@ void main() {
         permissionGranted: true, journalHealthy: true, queuedCount: 0), isFalse);
   });
 
+  test('stale connected preference never implies a live listener', () {
+    // A process can be killed without onListenerDisconnected being called.
+    // The native channel must report its process-local connection flag.
+    final stale = <String, dynamic>{
+      'permissionGranted': true, 'connected': false,
+      'lastConnected': DateTime(2026, 11, 1).millisecondsSinceEpoch,
+      'lastSeen': 0,
+    };
+    expect(describeKopilkaListenerPipeline(stale, permissionEnabled: true),
+        contains('служба не подключена'));
+    expect(describeKopilkaListener(stale), contains('Служба отключена'));
+    final live = Map<String, dynamic>.from(stale)..['connected'] = true;
+    expect(describeKopilkaListenerPipeline(live, permissionEnabled: true),
+        contains('Служба подключена'));
+  });
+
   test('corrupted journal is never interpreted as an empty history', () {
     expect(decodeKopilkaJournal(null), isEmpty);
     expect(decodeKopilkaJournal('[]'), isEmpty);

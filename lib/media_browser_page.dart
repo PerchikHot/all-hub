@@ -15,6 +15,12 @@ bool isDirectImageMediaUri(Uri uri) =>
     ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']
         .any(uri.path.toLowerCase().endsWith);
 
+/// Null means an unknown-size stream; never show an invented percentage.
+double? mediaTransferProgress(int received, int? total) {
+  if (received < 0 || total == null || total <= 0) return null;
+  return (received / total).clamp(0.0, 1.0).toDouble();
+}
+
 Future<void> migrateAllHubMedia() => MediaBrowserPage.migrateLegacyMedia();
 
 class MediaBrowserPage extends StatefulWidget {
@@ -57,6 +63,8 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   String currentUrl = '';
   bool loading = true;
   bool downloading = false;
+  int downloadReceived = 0;
+  int? downloadTotal;
   String? pageError;
   String? savedFile;
 
@@ -102,7 +110,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
 
   Future<void> download(Uri uri) async {
     if (downloading || (uri.scheme != 'https' && uri.scheme != 'http')) return;
-    setState(() => downloading = true);
+    setState(() { downloading = true; downloadReceived = 0; downloadTotal = null; });
     http.Client? client;
     File? temp;
     try {
@@ -121,6 +129,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       if (safeName == null) {
         throw Exception('Неподдерживаемый тип файла');
       }
+      if (mounted) setState(() => downloadTotal = response.contentLength);
       if ((response.contentLength ?? 0) > 200 * 1024 * 1024) {
         throw Exception('Файл больше 200 МБ');
       }
@@ -140,6 +149,11 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
             throw Exception('Файл больше 200 МБ');
           }
           sink.add(chunk);
+          // Throttle rebuilds: large GIF/video transfers can contain many chunks.
+          if (mounted && (received - downloadReceived >= 256 * 1024 ||
+              (downloadTotal != null && received >= downloadTotal!))) {
+            setState(() => downloadReceived = received);
+          }
         }
         await sink.flush();
       } finally {
@@ -180,7 +194,11 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     } finally {
       client?.close();
       if (temp != null && await temp.exists()) await temp.delete();
-      if (mounted) setState(() => downloading = false);
+      if (mounted) setState(() {
+        downloading = false;
+        downloadReceived = 0;
+        downloadTotal = null;
+      });
     }
   }
 
@@ -222,7 +240,26 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       ],
     ),
     body: Column(children: [
-      if (loading || downloading) const LinearProgressIndicator(),
+      if (loading || downloading) LinearProgressIndicator(
+        minHeight: 4,
+        value: downloading ? mediaTransferProgress(downloadReceived, downloadTotal) : null,
+      ),
+      if (downloading)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          color: const Color(0xFF142846),
+          child: Row(children: [
+            const Icon(Icons.download_rounded, color: Color(0xFF7DCBFF), size: 19),
+            const SizedBox(width: 10),
+            Expanded(child: Text(
+              mediaTransferProgress(downloadReceived, downloadTotal) == null
+                  ? 'Скачивание медиа • размер пока неизвестен'
+                  : 'Скачивание медиа • ${(mediaTransferProgress(downloadReceived, downloadTotal)! * 100).round()}%',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )),
+          ]),
+        ),
       if (pageError != null)
         MaterialBanner(
           content: Text(pageError!),

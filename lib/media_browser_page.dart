@@ -194,11 +194,13 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     } finally {
       client?.close();
       if (temp != null && await temp.exists()) await temp.delete();
-      if (mounted) setState(() {
-        downloading = false;
-        downloadReceived = 0;
-        downloadTotal = null;
-      });
+      if (mounted) {
+        setState(() {
+          downloading = false;
+          downloadReceived = 0;
+          downloadTotal = null;
+        });
+      }
     }
   }
 

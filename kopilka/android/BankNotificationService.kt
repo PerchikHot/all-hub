@@ -184,6 +184,20 @@ class BankNotificationService : NotificationListenerService() {
             return
         }
         val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}"
+        // A previously acknowledged alert may still be visible in the
+        // Android notification shade after reconnect. Never queue it again.
+        // A corrupt acknowledgement ledger is a stop condition, not an
+        // excuse to silently forget processed transaction IDs.
+        val acknowledged = try {
+            JSONArray(prefs.getString("acknowledged", "[]"))
+        } catch (_: org.json.JSONException) {
+            prefs.edit().putString("last_skip_reason", "acknowledgements_corrupt")
+                .putLong("last_skipped", System.currentTimeMillis()).commit()
+            return
+        }
+        for (i in 0 until acknowledged.length()) {
+            if (acknowledged.optString(i) == key) return
+        }
         for (i in 0 until current.length()) {
             val existingKey = current.optJSONObject(i)?.optString("key").orEmpty()
             // Old builds appended a body hash. Treat them as the same

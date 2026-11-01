@@ -101,6 +101,60 @@ void main() {
     }
   });
 
+  test('native Android auto ledger reconciles exactly once on resume', () {
+    final staged = <String, dynamic>{
+      'key': 'bank:42:123', 'notificationKey': 'bank:42:123',
+      'nativeClassifier': 1, 'bank': 'Т-Банк', 'kind': 'expense',
+      'sourceType': 'purchase', 'amount': 250.5,
+      'dateMillis': DateTime(2026, 11, 1, 13, 59).millisecondsSinceEpoch,
+      'note': 'Пятёрочка',
+    };
+    final entry = validatedNativeKopilkaEntry(staged, [], now)!;
+    expect(entry['amount'], 250.5);
+    expect(entry['kind'], 'expense');
+    expect(entry['autoImported'], isTrue);
+    expect(entry['notificationKey'], 'bank:42:123');
+    expect(validatedNativeKopilkaEntry(staged, [entry], now), isNull);
+  });
+
+  test('native ledger rejects forged, ambiguous or duplicate postings', () {
+    final candidate = <String, dynamic>{
+      'key': 'n-1', 'nativeClassifier': 1, 'bank': 'Газпромбанк',
+      'kind': 'income', 'sourceType': 'salary', 'amount': 20000.0,
+      'dateMillis': DateTime(2026, 11, 1, 13, 59).millisecondsSinceEpoch,
+      'note': 'Зарплата',
+    };
+    expect(validatedNativeKopilkaEntry(candidate, [], now), isNotNull);
+    for (final bad in [
+      {'nativeClassifier': 0},
+      {'bank': 'Unknown'},
+      {'amount': -5},
+      {'amount': double.infinity},
+      {'dateMillis': 0},
+      {'sourceType': 'transfer'},
+      {'kind': 'expense'},
+      {'note': 'Подмена\\nданных'},
+    ]) {
+      expect(validatedNativeKopilkaEntry({...candidate, ...bad}, [], now),
+          isNull, reason: bad.toString());
+    }
+    final otherBank = [{
+      'kind': 'expense', 'bank': 'Т-Банк', 'amount': 20000.0,
+      'date': DateTime(2026, 11, 1, 13, 58).toIso8601String(),
+    }];
+    expect(validatedNativeKopilkaEntry(candidate, otherBank, now), isNull);
+  });
+
+  test('diagnostics show native staging without raw bank messages', () {
+    final message = describeKopilkaListener({
+      'connected': true, 'lastSeen': 0, 'nativeAutoStaged': 2,
+      'nativeStageError': 'ledger_full',
+    });
+    expect(message, contains('Автосохранено Android до открытия экрана: 2'));
+    expect(message, contains('нативный журнал заполнен'));
+    expect(message, isNot(contains('Пятёрочка')));
+  });
+
   test('reconnect recovery is reported without notification contents', () {
     final message = describeKopilkaListener({
       'connected': true,

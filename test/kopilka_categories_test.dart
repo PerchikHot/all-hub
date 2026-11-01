@@ -2,6 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('merchant category suggestions remain editable and conservative', () {
+    expect(suggestKopilkaCategory('Оплата 299 ₽ Пятёрочка'), 'Продукты');
+    expect(suggestKopilkaCategory('Покупка 750 ₽ Яндекс Go такси'), 'Транспорт');
+    expect(suggestKopilkaCategory('Аптека 350 руб.'), 'Здоровье');
+    expect(suggestKopilkaCategory('Ozon Банк: списание 400 ₽'), 'Другое');
+    expect(suggestKopilkaCategory('Т-Банк: перевод 1000 ₽'), 'Другое');
+    expect(suggestKopilkaCategory('Неизвестный магазин'), 'Другое');
+  });
+
   test('monthly category totals exclude transfers and income', () {
     final transactions = <Map<String, dynamic>>[
       {'kind': 'expense', 'category': 'Продукты', 'amount': 250.5},

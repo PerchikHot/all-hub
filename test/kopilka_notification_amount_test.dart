@@ -2,6 +2,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('multiple transaction amounts require manual selection, not guessing', () {
+    final body = 'Оплата 100 ₽. Оплата 250 ₽';
+    expect(suggestNotificationAmount(body), isEmpty);
+    expect(isBankTransactionNotification('Т-Банк', body), isTrue);
+    expect(kopilkaPendingReviewPreview({
+      'title': 'Т-Банк', 'body': body,
+    }), 'Сумма требует проверки');
+    expect(suggestNotificationAmount('Оплата 100 ₽. Остаток 250 ₽'), '100');
+    expect(suggestNotificationAmount('Оплата 100 ₽. Оплата 100 ₽'), '100');
+  });
+
   test('pending review preview never posts or invents a bank balance', () {
     final payment = <String, dynamic>{
       'title': 'Т-Банк', 'body': 'Оплата 1 250,50 ₽. Остаток 4 000 ₽',

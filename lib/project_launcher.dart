@@ -90,6 +90,34 @@ class ProjectLauncher {
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
       RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(id);
+  /// Pick the portable app's EXE without opening a manual file chooser.
+  /// Archives with multiple unrelated executables are ambiguous and must
+  /// not silently launch an uninstaller or an arbitrary helper program.
+  static String? selectWindowsLaunchExecutable(
+      String id, Iterable<String> relativePaths) {
+    if (!isValidProjectId(id)) return null;
+    final paths = relativePaths.toList(growable: false);
+    if (paths.isEmpty) return null;
+    final candidates = paths.where((path) {
+      final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
+      return filename.endsWith('.exe') &&
+          !RegExp(r'^(?:unins|uninstall|setup|updater|crashreport)')
+              .hasMatch(filename);
+    }).toList(growable: false);
+    if (candidates.isEmpty) return null;
+    final slug = id.replaceAll('-', '');
+    String normalizedName(String path) => path.replaceAll('\\', '/')
+        .split('/').last.toLowerCase().replaceAll('.exe', '')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final exact = candidates.where((path) => normalizedName(path) == slug)
+        .toList(growable: false);
+    if (exact.length == 1) return exact.single;
+    final matches = candidates.where((path) =>
+        normalizedName(path).contains(slug)).toList(growable: false);
+    if (matches.length == 1) return matches.single;
+    return candidates.length == 1 ? candidates.single : null;
+  }
+
   /// Reject Windows-unsafe archive members before extracting portable apps.
   /// ZIP paths may use either separator, but may not escape the staging root.
   static bool isSafeWindowsArchivePath(String path) {
@@ -667,14 +695,12 @@ class ProjectLauncher {
           await handle.close();
         }
       }
-      executables.sort((a, b) {
-        final aName = a.uri.pathSegments.last.toLowerCase();
-        final bName = b.uri.pathSegments.last.toLowerCase();
-        final aRank = aName.contains(id.replaceAll('-', '')) ? 0 : 1;
-        final bRank = bName.contains(id.replaceAll('-', '')) ? 0 : 1;
-        return aRank.compareTo(bRank);
-      });
-      final relativeExe = executables.first.path.substring(staging.path.length);
+      final relativeExe = selectWindowsLaunchExecutable(id,
+          executables.map((exe) => exe.path.substring(staging.path.length)));
+      if (relativeExe == null) {
+        throw const FormatException(
+            'В Windows ZIP несколько EXE без однозначного приложения');
+      }
       if (await backup.exists()) await backup.delete(recursive: true);
       if (await target.exists()) await target.rename(backup.path);
       try {

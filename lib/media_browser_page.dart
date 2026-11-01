@@ -115,7 +115,10 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     File? temp;
     try {
       client = http.Client();
-      final response = await client.send(http.Request('GET', uri))
+      // Never follow CDN redirects while downloading a file: the origin
+      // and MIME must be checked at the URL the user chose.
+      final request = http.Request('GET', uri)..followRedirects = false;
+      final response = await client.send(request)
           .timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
@@ -156,6 +159,9 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           }
         }
         await sink.flush();
+        if (!isCompleteMediaDownload(received, response.contentLength)) {
+          throw const FormatException('Неполный медиафайл: размер не совпал с ответом сервера');
+        }
       } finally {
         await sink.close();
       }

@@ -29,3 +29,13 @@ String? mediaDownloadFileName(Uri uri, String contentType) {
   final shortened = stem.length > 80 ? stem.substring(0, 80) : stem;
   return '${shortened.isEmpty ? 'media' : shortened}$extension';
 }
+
+
+/// A CDN may end a response early while still returning HTTP 200.
+/// Never publish a truncated GIF/video when Content-Length was supplied.
+bool isCompleteMediaDownload(int receivedBytes, int? expectedBytes) {
+  if (receivedBytes < 0 || expectedBytes != null && expectedBytes < 0) {
+    return false;
+  }
+  return expectedBytes == null || receivedBytes == expectedBytes;
+}

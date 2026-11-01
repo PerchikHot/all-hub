@@ -22,6 +22,15 @@ void main() {
         'image/gif'), isNull);
   });
 
+  test('incomplete media responses are rejected before publishing', () {
+    expect(isCompleteMediaDownload(4096, 4096), isTrue);
+    expect(isCompleteMediaDownload(4095, 4096), isFalse);
+    expect(isCompleteMediaDownload(4097, 4096), isFalse);
+    expect(isCompleteMediaDownload(4096, null), isTrue);
+    expect(isCompleteMediaDownload(-1, null), isFalse);
+    expect(isCompleteMediaDownload(100, -1), isFalse);
+  });
+
   test('remote filenames are sanitized and bounded', () {
     expect(mediaDownloadFileName(Uri.parse('https://cdn.example/%3Cbad%3E.gif'),
         'image/gif'), '_bad_.gif');

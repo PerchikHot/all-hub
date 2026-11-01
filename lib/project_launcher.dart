@@ -194,7 +194,9 @@ class ProjectLauncher {
   ) => entryCount >= 0 && entryCount <= 10000 &&
       totalBytes >= 0 && nextEntryBytes >= 0 &&
       nextEntryBytes <= 512 * 1024 * 1024 &&
-      totalBytes + nextEntryBytes <= 1024 * 1024 * 1024;
+      totalBytes <= 1024 * 1024 * 1024 &&
+      // Subtraction avoids overflow on malformed ZIP size metadata.
+      nextEntryBytes <= 1024 * 1024 * 1024 - totalBytes;
 
   /// Reject oversized streaming downloads before consuming more disk space.
   static bool isSafeWindowsDownloadBudget(int received, int nextChunk, {int maxBytes = 256 * 1024 * 1024}) =>

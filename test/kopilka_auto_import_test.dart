@@ -85,4 +85,20 @@ void main() {
     }
   });
 
+  test('reconnect recovery is reported without notification contents', () {
+    final message = describeKopilkaListener({
+      'connected': true,
+      'lastSeen': 0,
+      'lastRecoveryScan': DateTime(2026, 11, 1).millisecondsSinceEpoch,
+      'recoveryCandidates': 3,
+      'queued': 2,
+      'queueCapacity': 500,
+      'queueRemaining': 498,
+    });
+    expect(message, contains('проверено активных банковских уведомлений: 3'));
+    expect(message, contains('восстановить не может'));
+    expect(message, isNot(contains('код подтверждения')));
+  });
+
+
 }

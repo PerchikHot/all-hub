@@ -1,30 +1,8 @@
 {
-  "run_id": 41327545939,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/41327545939",
+  "run_id": 41327687222,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/41327687222",
   "conclusion": "cancelled",
-  "head_sha": "5a56ead9fe73af1ea1754a06753e83a1611fd984",
-  "jobs": [
-    {
-      "name": "windows",
-      "status": "completed",
-      "conclusion": "cancelled",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41327545939/job/124910553273",
-      "id": 124910553273
-    },
-    {
-      "name": "android",
-      "status": "completed",
-      "conclusion": "cancelled",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41327545939/job/124910553425",
-      "id": 124910553425
-    },
-    {
-      "name": "Publish verified Android and Windows pair",
-      "status": "completed",
-      "conclusion": "cancelled",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41327545939/job/124910575833",
-      "id": 124910575833
-    }
-  ],
+  "head_sha": "adb41c764e877df8600f150e7491151677a45f5a",
+  "jobs": [],
   "artifacts": []
 }

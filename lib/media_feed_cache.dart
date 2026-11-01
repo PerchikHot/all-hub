@@ -53,10 +53,19 @@ class MediaFeedMemoryCache {
 
   void store(Uri request, Iterable<Map<String, dynamic>> posts) {
     final key = request.toString();
-    final snapshot = posts
-        .take(40)
-        .map(_copyJsonPost)
-        .toList(growable: false);
+    // One API page may repeat the same post ID. Deduplicate before the
+    // 40-card limit so repeated GIFs do not crowd out unique artwork.
+    // Bound traversal as well as storage to keep a hostile feed finite.
+    final snapshot = <Map<String, dynamic>>[];
+    final seenIds = <String>{};
+    for (final post in posts.take(200)) {
+      final id = post['id'];
+      if (id is int || id is String) {
+        if (!seenIds.add(id.toString())) continue;
+      }
+      snapshot.add(_copyJsonPost(post));
+      if (snapshot.length == 40) break;
+    }
     _pages.remove(key);
     _pages[key] = _MediaFeedPage(_clock(), snapshot);
     while (_pages.length > maxEntries) {

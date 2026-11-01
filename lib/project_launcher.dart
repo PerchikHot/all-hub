@@ -227,6 +227,23 @@ class ProjectLauncher {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('installed_version_$id', version);
   }
+  /// An old version receipt alone does not prove the Windows executable
+  /// still exists. Keep the receipt for recovery, but show "Install" if the
+  /// registered EXE has been moved or deleted.
+  static Future<String?> installedWindowsVersion(String id) async {
+    if (!isValidProjectId(id)) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final executable = prefs.getString('exe_$id');
+    final version = prefs.getString('installed_version_$id');
+    if (executable == null || executable.isEmpty ||
+        version == null || version.isEmpty) return null;
+    try {
+      return await File(executable).exists() ? version : null;
+    } on FileSystemException {
+      return null;
+    }
+  }
+
   static Future<String?> installedVersion(String id) async {
     if (Platform.isAndroid) {
       // The launcher itself is not an external launchable project, but its
@@ -238,8 +255,8 @@ class ProjectLauncher {
         return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
       } catch (_) { return null; }
     }
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('installed_version_$id');
+    if (Platform.isWindows) return installedWindowsVersion(id);
+    return null;
   }
   /// Stream a response to disk for Windows installers and archives.
   static Future<void> _download(http.StreamedResponse response, File file, {int? maxBytes}) async {

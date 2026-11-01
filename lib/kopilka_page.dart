@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -208,6 +209,75 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
       }).toList();
 }
 
+
+/// Only unambiguous *completed* purchases and explicit salary/refund alerts
+/// may be imported without opening a confirmation dialog. All transfers,
+/// missing merchants, multiple amounts, balance messages, and possible
+/// duplicates stay in the review queue. This function has no side effects.
+Map<String, dynamic>? confidentKopilkaAutoEntry(
+    Map<String, dynamic> event, Iterable<Map<String, dynamic>> saved,
+    DateTime now) {
+  final key = event['key'];
+  final bank = event['bank'];
+  final title = event['title'];
+  final body = event['body'];
+  if (key is! String || key.trim().isEmpty || key.length > 256 ||
+      bank is! String ||
+      !const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}.contains(bank) ||
+      title is! String || body is! String ||
+      !isBankTransactionNotification(title, body) ||
+      isKopilkaNotificationImported(saved, key)) {
+    return null;
+  }
+  final text = '$title\n$body';
+  if (RegExp(r'перевод|transfer|пополнени[ея]|снятие|withdraw|'
+      r'остаток|баланс|доступно|available|balance',
+      caseSensitive: false).hasMatch(text)) {
+    return null;
+  }
+  // Two currency amounts could be two payments or payment + balance.
+  final sums = RegExp(
+    r'(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)',
+    caseSensitive: false,
+  ).allMatches(text).toList();
+  if (sums.length != 1) return null;
+  final amount = parseKopilkaAmount(suggestNotificationAmount(text));
+  if (amount == null) return null;
+  final purchase = RegExp(r'покупк|оплат[ауы]|оплачено|purchase|payment',
+      caseSensitive: false).hasMatch(text);
+  final trustedIncome = RegExp(r'зарплат|кэшбэк|кешбэк|возврат\s+(?:покупк|оплат)|salary|cashback|refund',
+      caseSensitive: false).hasMatch(text);
+  if (purchase == trustedIncome) return null;
+  final merchant = suggestKopilkaMerchant(text);
+  final category = suggestKopilkaCategory(text);
+  // A generic debit alert is not evidence of a merchant purchase.
+  if (purchase && merchant == null && category == 'Другое') return null;
+  final kind = purchase ? 'expense' : 'income';
+  final date = kopilkaConfirmedNotificationDate(event, now);
+  if (possibleKopilkaDuplicateNotification(saved,
+      bank: bank, kind: kind, amount: amount, postedAt: date).isNotEmpty) {
+    return null;
+  }
+  // Opposite bank entries may be two legs of a self-transfer.
+  final opposite = kind == 'expense' ? 'income' : 'expense';
+  if (saved.any((entry) =>
+      entry['bank'] != bank && entry['kind'] == opposite &&
+      (safeKopilkaAmount(entry) * 100).round() == (amount * 100).round() &&
+      DateTime.tryParse((entry['date'] ?? '').toString()) != null &&
+      date.difference(DateTime.parse(entry['date'].toString())).abs() <=
+          const Duration(minutes: 30))) {
+    return null;
+  }
+  return <String, dynamic>{
+    'kind': kind, 'amount': amount, 'bank': bank,
+    'from': bank, 'to': '',
+    'note': merchant ?? title.trim(),
+    'date': date.toIso8601String(),
+    if (kind == 'expense') 'category': category,
+    'notificationKey': key.trim(),
+    'autoImported': true,
+  };
+}
 
 /// A local UI filter only: never marks notifications reviewed or posts entries.
 List<Map<String, dynamic>> filterKopilkaPendingByBank(

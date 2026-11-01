@@ -236,6 +236,25 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 }
 
 
+/// Reconcile crash leftovers: a journal entry can be durable even if Android
+/// died before removing its source notification from the native queue.
+/// Only acknowledge keys already reviewed or saved, never unseen payments.
+List<String> kopilkaQueuedAcknowledgements(
+    List<dynamic> raw, Set<String> reviewed) {
+  final known = reviewed.map((key) => key.trim()).toSet();
+  final keys = <String>{};
+  for (final item in raw.whereType<Map>()) {
+    final value = item['key'];
+    if (value is! String) continue;
+    final key = value.trim();
+    if (key.isNotEmpty && key.length <= 256 &&
+        !RegExp(r'[\x00-\x1f\x7f]').hasMatch(key) && known.contains(key)) {
+      keys.add(key);
+    }
+  }
+  return keys.toList(growable: false);
+}
+
 /// Only unambiguous *completed* purchases and explicit salary/refund alerts
 /// may be imported without opening a confirmation dialog. All transfers,
 /// missing merchants, multiple amounts, balance messages, and possible
@@ -1263,7 +1282,17 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       // before recording the reviewed key must not cause a second import.
       reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
           .where((key) => key.isNotEmpty));
-      final data = filterPendingBankNotifications(jsonDecode(raw) as List, reviewed);
+      final nativeEvents = jsonDecode(raw) as List;
+      // Retry native acknowledgement after a crash between saving the
+      // journal and dismissing the notification. No unreviewed alert is lost.
+      for (final key in kopilkaQueuedAcknowledgements(nativeEvents, reviewed)) {
+        try {
+          await _notifications.invokeMethod<void>('dismiss', {'key': key});
+        } on PlatformException {
+          break; // Keep the original native queue for the next retry.
+        }
+      }
+      final data = filterPendingBankNotifications(nativeEvents, reviewed);
       // Save before acknowledging. A crash between these steps cannot
       // duplicate a transaction because notificationKey is persisted.
       if (shouldImportQueuedKopilkaEvents(

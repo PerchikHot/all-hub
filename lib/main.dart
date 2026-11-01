@@ -575,7 +575,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         style: TextStyle(color: Theme.of(context).colorScheme.tertiary))),
                   ],
                 ),
-                if (tab == 0 && ProjectLauncher.canLaunch(project.id))
+                if (tab == 0 && project.id != 'all-hub' && ProjectLauncher.canLaunch(project.id))
                   FutureBuilder<bool>(
                     future: ProjectLauncher.isAvailable(project.id),
                     builder: (context, status) => Padding(
@@ -596,7 +596,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   OutlinedButton.icon(onPressed: () => open('https://github.com/${project.repo}'), icon: const Icon(Icons.code), label: const Text('Репозиторий')),
                   if (tab == 0 && i.downloadUrl == null)
                     FilledButton.icon(onPressed: () => open(i.actionsUrl ?? 'https://github.com/${project.repo}/actions'), icon: const Icon(Icons.download), label: const Text('Сборка пока недоступна')),
-                  if (tab == 0 && ProjectLauncher.canLaunch(project.id))
+                  if (tab == 0 && project.id != 'all-hub' && ProjectLauncher.canLaunch(project.id))
                     FilledButton.icon(
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('Открыть'),
@@ -655,7 +655,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                  if (tab == 0 && Platform.isWindows && i.downloadUrl != null)
+                  if (tab == 0 && Platform.isWindows && project.id == 'all-hub')
+                    const Chip(avatar: Icon(Icons.info_outline, size: 18),
+                      label: Text('Лаунчер запущен; обновление самого EXE требует отдельного перезапуска')),
+                  if (tab == 0 && Platform.isWindows && project.id != 'all-hub' && i.downloadUrl != null)
                     FutureBuilder<String?>(
                       future: ProjectLauncher.installedVersion(project.id),
                       builder: (context, installed) {

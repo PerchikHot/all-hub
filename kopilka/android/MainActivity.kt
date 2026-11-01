@@ -103,10 +103,22 @@ class MainActivity : FlutterActivity() {
                                     val item = current.getJSONObject(i)
                                     if (item.optString("key") != key) remaining.put(item)
                                 }
-                                // Do not acknowledge a processed payment until the
-                                // removal is durable. Otherwise a process death can
-                                // replay the notification and double-post a transaction.
-                                if (prefs.edit().putString("queue", remaining.toString()).commit()) {
+                                // Persist both the removal and a bounded replay
+                                // tombstone atomically. Active Android notifications
+                                // can be delivered again after a listener reconnect.
+                                val previous = org.json.JSONArray(
+                                    prefs.getString("acknowledged", "[]"))
+                                val acknowledgements = org.json.JSONArray()
+                                for (i in maxOf(0, previous.length() - 999) until previous.length()) {
+                                    val oldKey = previous.optString(i)
+                                    if (oldKey.isNotBlank() && oldKey != key) {
+                                        acknowledgements.put(oldKey)
+                                    }
+                                }
+                                acknowledgements.put(key)
+                                if (prefs.edit().putString("queue", remaining.toString())
+                                        .putString("acknowledged", acknowledgements.toString())
+                                        .commit()) {
                                     result.success(null)
                                 } else {
                                     result.error("QUEUE", "Cannot persist notification acknowledgement", null)

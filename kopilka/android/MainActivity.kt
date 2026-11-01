@@ -60,6 +60,7 @@ class MainActivity : FlutterActivity() {
                             "queueRecoveries" to prefs.getInt("queue_recoveries", 0),
                             "queueDropped" to prefs.getInt("queue_dropped", 0),
                             "lastQueueDrop" to prefs.getLong("last_queue_drop", 0L),
+                            "lastQueueWriteFailed" to prefs.getLong("last_queue_write_failed", 0L),
                             "bankEvents" to mapOf(
                                 "Т-Банк" to prefs.getInt("bank_count_tbank", 0),
                                 "Газпромбанк" to prefs.getInt("bank_count_gazprom", 0),
@@ -96,8 +97,14 @@ class MainActivity : FlutterActivity() {
                                     val item = current.getJSONObject(i)
                                     if (item.optString("key") != key) remaining.put(item)
                                 }
-                                prefs.edit().putString("queue", remaining.toString()).apply()
-                                result.success(null)
+                                // Do not acknowledge a processed payment until the
+                                // removal is durable. Otherwise a process death can
+                                // replay the notification and double-post a transaction.
+                                if (prefs.edit().putString("queue", remaining.toString()).commit()) {
+                                    result.success(null)
+                                } else {
+                                    result.error("QUEUE", "Cannot persist notification acknowledgement", null)
+                                }
                             } catch (_: Exception) {
                                 result.error("QUEUE", "Cannot update local notification queue", null)
                             }
@@ -106,9 +113,10 @@ class MainActivity : FlutterActivity() {
                     }
                     "clear" -> {
                         synchronized(BankNotificationService.queueLock) {
-                            getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                                .edit().remove("queue").apply()
-                            result.success(null)
+                            val cleared = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                .edit().remove("queue").commit()
+                            if (cleared) result.success(null)
+                            else result.error("QUEUE", "Cannot clear local notification queue", null)
                         }
                     }
                     else -> result.notImplemented()

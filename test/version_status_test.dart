@@ -58,6 +58,10 @@ void main() {
   test('shared repository release channels never cross-contaminate', () {
     expect(releaseMatchesProject('all-hub-latest', 'all-hub'), isTrue);
     expect(releaseMatchesProject('kopilka-latest', 'kopilka'), isTrue);
+    expect(releaseMatchesProject('kopilka-windows', 'kopilka'), isTrue);
+    expect(releaseMatchesProject('kopilka-windows', 'all-hub'), isFalse);
+    expect(publishedVersionFromRelease('kopilka-windows',
+      'Windows portable ZIP; version: 1.0.263'), '1.0.263');
     expect(releaseMatchesProject('kopilka-latest', 'all-hub'), isFalse);
     expect(releaseMatchesProject('all-hub-latest', 'kopilka'), isFalse);
     expect(releaseMatchesProject('eclipse-arena-android', 'eclipse-arena'), isTrue);

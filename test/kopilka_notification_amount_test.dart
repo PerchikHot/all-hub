@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('pending review preview never posts or invents a bank balance', () {
+    final payment = <String, dynamic>{
+      'title': 'Т-Банк', 'body': 'Оплата 1 250,50 ₽. Остаток 4 000 ₽',
+    };
+    expect(kopilkaPendingReviewPreview(payment),
+      contains('Возможный расход 1250.50 ₽'));
+    expect(kopilkaPendingReviewPreview({
+      'title': 'Ozon Банк', 'body': 'Зачислено 350 ₽',
+    }), contains('Возможный доход 350 ₽'));
+    expect(kopilkaPendingReviewPreview({
+      'title': 'Газпромбанк', 'body': 'Перевод 500 ₽',
+    }), contains('уточнить свои счета'));
+    expect(kopilkaPendingReviewPreview({
+      'title': 'Т-Банк', 'body': 'Код подтверждения оплаты 500 ₽',
+    }), 'Данные требуют ручной проверки');
+    expect(kopilkaPendingReviewPreview({'title': 'Банк', 'body': null}),
+      'Данные требуют ручной проверки');
+    expect(payment['body'], 'Оплата 1 250,50 ₽. Остаток 4 000 ₽');
+  });
+
+
   test('bank review filters preserve pending alerts and never approve them', () {
     final pending = <Map<String, dynamic>>[
       {'bank': 'Т-Банк', 'key': 'one'},

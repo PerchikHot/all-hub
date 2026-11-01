@@ -84,6 +84,8 @@ class MainActivity : FlutterActivity() {
                             "nativeAutoStaged" to try {
                                 org.json.JSONArray(prefs.getString("auto_entries", "[]")).length()
                             } catch (_: Exception) { -1 },
+                            "nativeAutoStagedTotal" to prefs.getInt("native_auto_staged_count", 0),
+                            "nativeReviewOnlyTotal" to prefs.getInt("native_review_only_count", 0),
                             "lastNativeAutoStage" to prefs.getLong("last_native_auto_stage", 0L),
                             "nativeStageError" to (prefs.getString("last_native_stage_error", "") ?: ""),
                             "queueCapacity" to BankNotificationService.MAX_PENDING,

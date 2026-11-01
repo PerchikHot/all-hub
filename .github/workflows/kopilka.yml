@@ -84,6 +84,14 @@ jobs:
           (folder / 'BankNotificationService.kt').write_text(
               (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/BankNotificationService.kt')
                   .read_text(encoding='utf-8'), encoding='utf-8')
+          (folder / 'BankAutoClassifier.kt').write_text(
+              (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/BankAutoClassifier.kt')
+                  .read_text(encoding='utf-8'), encoding='utf-8')
+          tests = Path('android/app/src/test/kotlin/com/veyrion/kopilka_app')
+          tests.mkdir(parents=True, exist_ok=True)
+          (tests / 'BankAutoClassifierTest.kt').write_text(
+              (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/BankAutoClassifierTest.kt')
+                  .read_text(encoding='utf-8'), encoding='utf-8')
           (folder / 'MainActivity.kt').write_text(
               (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/MainActivity.kt')
                   .read_text(encoding='utf-8'), encoding='utf-8')
@@ -125,6 +133,14 @@ jobs:
           cp "$GITHUB_WORKSPACE/test/kopilka_budget_test.dart" test/kopilka_budget_test.dart
           cp "$GITHUB_WORKSPACE/test/kopilka_notification_date_test.dart" test/kopilka_notification_date_test.dart
           sed -i 's#package:all_hub/kopilka_page.dart#package:kopilka_app/kopilka_page.dart#' test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart test/kopilka_auto_import_test.dart
+          # Native Kotlin classification must pass on the generated APK source,
+          # not only its Dart mirror. JUnit runs without bank data or a device.
+          cat >> android/app/build.gradle.kts <<'GRADLE'
+          dependencies {
+              testImplementation("junit:junit:4.13.2")
+          }
+          GRADLE
+          (cd android && ./gradlew testDebugUnitTest --no-daemon)
           flutter analyze
           flutter test test/kopilka_notification_amount_test.dart test/kopilka_history_search_test.dart test/kopilka_categories_test.dart test/kopilka_account_flow_test.dart test/kopilka_weekly_expenses_test.dart test/kopilka_budget_test.dart test/kopilka_notification_date_test.dart test/kopilka_auto_import_test.dart
           python3 "$GITHUB_WORKSPACE/tools/generate_launcher_icon.py" --project kopilka --root "$PWD" --verify

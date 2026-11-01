@@ -49,6 +49,13 @@ void main() {
     }
   });
 
+  test('Windows update cannot be reported complete without a saved launcher path', () {
+    expect(() => ProjectLauncher.requireWindowsInstallRegistered(true),
+        returnsNormally);
+    expect(() => ProjectLauncher.requireWindowsInstallRegistered(false),
+        throwsStateError);
+  });
+
   test('Android installer failures are never reported as completed updates', () {
     expect(() => ProjectLauncher.requireAndroidInstallerOpened(true), returnsNormally);
     expect(() => ProjectLauncher.requireAndroidInstallerOpened(false), throwsStateError);

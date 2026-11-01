@@ -326,7 +326,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       // Reopening a filter reuses recent pages without another API request.
       // Pull-to-refresh bypasses memory; never cache HTTP errors.
       final cached = bypassPageCache ? null : pageCache.read(uri);
-      final List<dynamic> data;
+      List<dynamic> data;
       var usedCachedPage = cached != null;
       if (cached != null) {
         data = cached;

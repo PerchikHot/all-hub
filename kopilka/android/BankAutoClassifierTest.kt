@@ -17,6 +17,19 @@ class BankAutoClassifierTest {
             assertEquals("expense", result!!["kind"])
             assertEquals(250.5, result["amount"])
         }
+        // Real alerts often put the merchant after the amount on one line.
+        for (body in listOf(
+            "Покупка 250,50 ₽. Магазин: Пятёрочка",
+            "Оплата 250,50 ₽; Продавец: Пятёрочка",
+            "Payment 250,50 RUB. Merchant: Grocery"
+        )) {
+            val result = parse(body)
+            assertNotNull(body, result)
+            assertEquals(250.5, result!!["amount"])
+        }
+        // An unlabelled store mention is not evidence of a completed purchase.
+        assertNull(parse("Покупка 250 ₽ в магазине Пятёрочка"))
+        assertNull(parse("Покупка 250 ₽. Магазин: A"))
         assertEquals("income", parse("Зарплата поступила 20 000 ₽",
             "Газпромбанк")?.get("kind"))
         assertEquals("income", parse("Возврат покупки 350 ₽",

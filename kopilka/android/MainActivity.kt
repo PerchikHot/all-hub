@@ -58,6 +58,7 @@ class MainActivity : FlutterActivity() {
                             "lastDisconnected" to prefs.getLong("last_disconnected", 0L),
                             "rebindRequests" to prefs.getInt("rebind_requests", 0),
                             "queueRecoveries" to prefs.getInt("queue_recoveries", 0),
+                            "queueCorrupt" to prefs.getBoolean("queue_corrupt", false),
                             "queueDropped" to prefs.getInt("queue_dropped", 0),
                             "queueFullRejections" to prefs.getInt("queue_full_rejections", 0),
                             "lastQueueDrop" to prefs.getLong("last_queue_drop", 0L),
@@ -115,7 +116,7 @@ class MainActivity : FlutterActivity() {
                     "clear" -> {
                         synchronized(BankNotificationService.queueLock) {
                             val cleared = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                                .edit().remove("queue").commit()
+                                .edit().remove("queue").putBoolean("queue_corrupt", false).commit()
                             if (cleared) result.success(null)
                             else result.error("QUEUE", "Cannot clear local notification queue", null)
                         }

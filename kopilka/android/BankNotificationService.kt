@@ -20,6 +20,28 @@ class BankNotificationService : NotificationListenerService() {
         getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
             .putBoolean("listener_connected", true)
             .putLong("last_connected", System.currentTimeMillis()).apply()
+        // Android can reconnect the listener after process death. Recover only
+        // currently visible, recent bank alerts; the normal privacy gate and
+        // durable queue deduplication are reused for every recovered event.
+        // This cannot recover notifications already dismissed by the user.
+        val now = System.currentTimeMillis()
+        val active = try {
+            activeNotifications?.asList().orEmpty()
+        } catch (_: SecurityException) {
+            emptyList()
+        } catch (_: RuntimeException) {
+            emptyList()
+        }
+        val candidates = active.asSequence()
+            .filter { it.packageName == "com.idamob.tinkoff.android" ||
+                it.packageName == "ru.gazprombank.android.mobilebank.app" ||
+                it.packageName == "ru.ozon.fintech.finance" }
+            .filter { it.postTime in (now - 24L * 60L * 60L * 1000L)..(now + 5L * 60L * 1000L) }
+            .take(100).toList()
+        val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+        prefs.edit().putLong("last_recovery_scan", now)
+            .putInt("recovery_candidates", candidates.size).apply()
+        candidates.forEach { onNotificationPosted(it) }
     }
 
     override fun onListenerDisconnected() {

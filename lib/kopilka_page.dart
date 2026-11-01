@@ -1351,6 +1351,48 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         icon: const Icon(Icons.add), label: const Text('Операция')),
       body: loading ? const Center(child: CircularProgressIndicator()) :
       ListView(padding: const EdgeInsets.all(16), children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(notificationsEnabled
+                      ? Icons.verified_user_outlined
+                      : Icons.notifications_off_outlined,
+                    color: notificationsEnabled
+                        ? const Color(0xFF78E5C1)
+                        : const Color(0xFFFFCA79)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(
+                    notificationsEnabled
+                        ? 'Автоучёт: разрешение включено'
+                        : 'Автоучёт: требуется подключение',
+                    style: const TextStyle(fontSize: 16,
+                        fontWeight: FontWeight.w700),
+                  )),
+                ]),
+                const SizedBox(height: 8),
+                Text(Theme.of(context).platform == TargetPlatform.android
+                    ? 'Ожидают проверки: ${pendingNotifications.length}. '
+                      'Уведомления не изменяют баланс без подтверждения.'
+                    : 'Банковские уведомления доступны только в Android APK. '
+                      'Операции на Windows остаются локальными.'),
+                if (!notificationsEnabled &&
+                    Theme.of(context).platform == TargetPlatform.android)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _openNotificationSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      label: const Text('Открыть разрешения Android'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(

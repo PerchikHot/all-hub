@@ -1071,6 +1071,10 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   Map<String, dynamic>? listenerDiagnostics;
   String? listenerError;
   final pendingNotifications = <Map<String, dynamic>>[];
+  Timer? _notificationPoller;
+  bool _refreshInProgress = false;
+  bool _listenerSupported = true;
+  int autoImportedThisSession = 0;
   int visiblePendingCount = 10;
   String? pendingBankFilter;
   double goal = 100000;
@@ -1083,6 +1087,14 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Load persisted entries before filtering already imported notifications.
     _load().then((_) { if (mounted) _refreshNotifications(); });
+    // Native listener queues events while the UI is closed. Import safe
+    // transactions on resume and while the dashboard remains visible.
+    _notificationPoller = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (mounted && _listenerSupported &&
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _refreshNotifications();
+      }
+    });
   }
 
   @override
@@ -1093,6 +1105,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _notificationPoller?.cancel();
     historySearchController.dispose();
     super.dispose();
   }
@@ -1123,6 +1136,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshNotifications() async {
+    if (_refreshInProgress || !_listenerSupported) return;
+    _refreshInProgress = true;
     try {
       final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
       final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
@@ -1136,15 +1151,36 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
           .where((key) => key.isNotEmpty));
       final data = filterPendingBankNotifications(jsonDecode(raw) as List, reviewed);
+      // Save before acknowledging. A crash between these steps cannot
+      // duplicate a transaction because notificationKey is persisted.
+      if (enabled && diagnostics?['connected'] == true) {
+        for (final event in data) {
+          final entry = confidentKopilkaAutoEntry(event, entries, DateTime.now());
+          if (entry == null) continue;
+          entries.insert(0, entry);
+          try {
+            await _save();
+          } catch (_) {
+            entries.remove(entry);
+            break; // Native event remains queued for the next attempt.
+          }
+          await _archiveNotificationKey(entry['notificationKey'] as String);
+          autoImportedThisSession++;
+        }
+      }
+      final remaining = filterPendingBankNotifications(data,
+          entries.map((entry) => (entry['notificationKey'] ?? '').toString())
+              .where((key) => key.isNotEmpty).toSet());
       if (mounted) {
         setState(() {
           notificationsEnabled = enabled;
           listenerDiagnostics = diagnostics;
           listenerError = null;
-          pendingNotifications..clear()..addAll(data);
+          pendingNotifications..clear()..addAll(remaining);
         });
       }
     } on MissingPluginException {
+      _listenerSupported = false;
       // Embedded All Hub builds do not include the standalone listener yet.
       _reportListenerError('Встроенный All Hub не содержит службы чтения уведомлений. '
           'Нужна отдельная APK Копилки.');
@@ -1157,6 +1193,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           'Сохранённые операции не изменены.');
     } on TypeError {
       _reportListenerError('Формат очереди несовместим с этой версией Копилки.');
+    } finally {
+      _refreshInProgress = false;
     }
   }
 
@@ -1658,6 +1696,13 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             leading: const Icon(Icons.filter_alt_outlined),
             title: const Text('Отбор уведомлений для импорта'),
             subtitle: Text(describeKopilkaImportGate(listenerDiagnostics)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome_outlined),
+            title: Text('Автоматически учтено за запуск: $autoImportedThisSession'),
+            subtitle: const Text('Однозначные завершённые покупки и зарплата/возвраты '
+              'сохраняются автоматически. Переводы, повторы и сомнительные '
+              'уведомления остаются на проверке.'),
           ),
           if (pendingNotifications.isNotEmpty)
             ExpansionTile(

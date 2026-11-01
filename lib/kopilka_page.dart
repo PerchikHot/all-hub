@@ -732,6 +732,54 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   return '$connection Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.$queueWarning';
 }
 
+/// Explain the entire native pipeline without exposing any bank message
+/// body. Permission, service connection and receipt are distinct states.
+String describeKopilkaListenerPipeline(Map<String, dynamic>? diagnostics,
+    {required bool permissionEnabled}) {
+  if (diagnostics == null) {
+    return 'Состояние Android-службы пока неизвестно. Нажми «Проверить подключение».';
+  }
+  if (!permissionEnabled || diagnostics['permissionGranted'] == false) {
+    return 'Доступ к уведомлениям выключен в настройках Android. '
+        'Автоматический учёт недоступен.';
+  }
+  if (diagnostics['connected'] != true) {
+    return 'Разрешение есть, но служба не подключена. '
+        'Проверь ограничения фоновой работы и повторно открой Копилку.';
+  }
+  final lastAccepted = diagnostics['lastAccepted'];
+  final lastSeen = diagnostics['lastSeen'];
+  final accepted = diagnostics['accepted'];
+  final acceptedCount = accepted is int && accepted >= 0 ? accepted : 0;
+  final lastBank = diagnostics['lastAcceptedBank'];
+  final bank = const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}.contains(lastBank)
+      ? lastBank : 'поддерживаемый банк';
+  final received = lastSeen is int && lastSeen > 0;
+  final acceptedEvent = lastAccepted is int && lastAccepted > 0;
+  final reason = switch (diagnostics['lastSkipReason']) {
+    'group_summary' => 'сводное уведомление',
+    'invalid_payload' => 'пустой или слишком длинный текст',
+    'credentials' => 'сообщение с кодом или паролем',
+    'not_completed' => 'операция не завершена',
+    'not_transaction' => 'не финансовая операция',
+    'no_amount' => 'нет однозначной суммы в рублях',
+    _ => 'причина ещё не зарегистрирована',
+  };
+  final skipped = diagnostics['lastSkipped'];
+  final rejection = skipped is int && skipped > 0
+      ? ' Последний пропуск: $reason.' : '';
+  if (!received) {
+    return 'Служба подключена, но банковские уведомления ещё не поступали.$rejection';
+  }
+  if (!acceptedEvent) {
+    return 'Банковское уведомление получено, но ни одно не прошло '
+        'первичный фильтр.$rejection';
+  }
+  return 'Служба активна. Принято событий: $acceptedCount. '
+      'Последнее принятое: $bank.$rejection '
+      'Принятие в очередь не означает запись в финансовый журнал.';
+}
+
 /// Counts supported-bank events observed by the native listener, including
 /// rejected OTP/balance alerts. No message bodies are included in diagnostics.
 /// Zero can also mean that a bank changed its Android package identifier.
@@ -1283,7 +1331,10 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
+    final saved = await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
+    if (!saved) {
+      throw StateError('Could not persist finance journal');
+    }
     await prefs.setDouble('kopilka_goal_v1', goal);
     await prefs.setDouble('kopilka_monthly_budget_v1', monthlyBudget);
     await prefs.setInt('kopilka_payday_day_v1', paydayDay);
@@ -1627,7 +1678,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 const SizedBox(height: 8),
                 Text(Theme.of(context).platform == TargetPlatform.android
                     ? 'Ожидают проверки: ${pendingNotifications.length}. '
-                      'Уведомления не изменяют баланс без подтверждения.'
+                      'Однозначные операции сохраняются автоматически при '
+                      'открытой Копилке, остальные — после подтверждения.'
                     : 'Банковские уведомления доступны только в Android APK. '
                       'Операции на Windows остаются локальными.'),
                 if (!notificationsEnabled &&
@@ -1694,6 +1746,12 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               title: const Text('Ошибка подключения службы'),
               subtitle: Text(listenerError!),
             ),
+          ListTile(
+            leading: const Icon(Icons.rule_folder_outlined),
+            title: const Text('Путь уведомления: разрешение → служба → фильтр'),
+            subtitle: Text(describeKopilkaListenerPipeline(listenerDiagnostics,
+                permissionEnabled: notificationsEnabled)),
+          ),
           ListTile(
             leading: const Icon(Icons.account_balance_outlined),
             title: const Text('События от каждого банка'),

@@ -2,6 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/kopilka_page.dart';
 
 void main() {
+  test('bank review filters preserve pending alerts and never approve them', () {
+    final pending = <Map<String, dynamic>>[
+      {'bank': 'Т-Банк', 'key': 'one'},
+      {'bank': 'Ozon Банк', 'key': 'two'},
+      {'bank': 'Газпромбанк', 'key': 'three'},
+      {'bank': 'Т-Банк', 'key': 'four'},
+    ];
+    expect(filterKopilkaPendingByBank(pending, null), hasLength(4));
+    expect(filterKopilkaPendingByBank(pending, 'Т-Банк')
+        .map((e) => e['key']).toList(), ['one', 'four']);
+    expect(filterKopilkaPendingByBank(pending, 'Ozon Банк'), hasLength(1));
+    expect(filterKopilkaPendingByBank(pending, 'unknown'), isEmpty);
+    expect(pending, hasLength(4));
+  });
+
   test('listener import counters never reveal notification contents', () {
     expect(describeKopilkaImportGate(null), contains('отдельной Android APK'));
     expect(describeKopilkaImportGate({'accepted': 3, 'filtered': 8}),

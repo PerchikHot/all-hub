@@ -162,9 +162,15 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
         uri.userInfo.isNotEmpty || uri.hasFragment) {
       continue;
     }
+    // Keep a large GIF as a fallback only. An HD preference must not
+    // decode a 12-24 MiB animation in each visible feed tile.
+    if (!autoplay && animated != null && value == animated) continue;
     if (seen.add(value)) {
       urls.add(value);
     }
+  }
+  if (!autoplay && animated != null && seen.add(animated)) {
+    urls.add(animated);
   }
   return urls;
 }

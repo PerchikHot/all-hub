@@ -32,4 +32,23 @@ void main() {
     await tester.pump();
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
+
+  testWidgets('progress never exposes invalid percentages or claims install',
+      (tester) async {
+    final active = ValueNotifier<String?>('nova');
+    final progress = ValueNotifier<double?>(double.nan);
+    addTearDown(active.dispose);
+    addTearDown(progress.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body:
+      ProjectDownloadProgress(projectId: 'nova',
+        activeProject: active, progress: progress))));
+    expect(tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator)).value, isNull);
+    progress.value = 1.8;
+    await tester.pump();
+    expect(find.text('Загрузка: 100%'), findsOneWidget);
+    expect(tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator)).value, 1.0);
+    expect(find.textContaining('подтверждение установки'), findsOneWidget);
+  });
 }

@@ -149,9 +149,12 @@ void main() {
     final message = describeKopilkaListener({
       'connected': true, 'lastSeen': 0, 'nativeAutoStaged': 2,
       'nativeStageError': 'ledger_full',
+      'nativeAutoStagedTotal': 4, 'nativeReviewOnlyTotal': 9,
     });
-    expect(message, contains('Автосохранено Android до открытия экрана: 2'));
+    expect(message, contains('Подготовлено Android для переноса в журнал: 2'));
     expect(message, contains('нативный журнал заполнен'));
+    expect(message, contains('подготовлено автоматически 4'));
+    expect(message, contains('оставлено на проверку 9'));
     expect(message, isNot(contains('Пятёрочка')));
   });
 

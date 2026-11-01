@@ -11,12 +11,17 @@ class BankNotificationService : NotificationListenerService() {
         // The Flutter UI and listener share a process and must not lose
         // newly posted payments while the user dismisses an older alert.
         val queueLock = Any()
+        // Process-local state, unlike SharedPreferences which may retain a stale
+        // connected=true after Android kills the process without a callback.
+        @Volatile var connectedInProcess: Boolean = false
+            private set
         // Retain more payments while the Flutter dashboard is closed. This
         // remains bounded to avoid unlimited private notification storage.
         const val MAX_PENDING = 500
     }
     override fun onListenerConnected() {
         super.onListenerConnected()
+        connectedInProcess = true
         getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
             .putBoolean("listener_connected", true)
             .putLong("last_connected", System.currentTimeMillis()).apply()
@@ -46,6 +51,7 @@ class BankNotificationService : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        connectedInProcess = false
         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
         val now = System.currentTimeMillis()
         val lastRequest = prefs.getLong("last_rebind_request", 0L)
@@ -66,6 +72,11 @@ class BankNotificationService : NotificationListenerService() {
                 // The user may have revoked access. Keep diagnostics only.
             }
         }
+    }
+
+    override fun onDestroy() {
+        connectedInProcess = false
+        super.onDestroy()
     }
 
     // Diagnostics are counters only. Filtered notifications, including

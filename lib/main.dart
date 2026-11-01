@@ -85,7 +85,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int tab = 0;
   String category = 'All';
   String search = '';
@@ -94,8 +94,25 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     CoverSettings.load();
     migrateAllHubMedia();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Android's package installer is external to All Hub. Re-read the
+    // installed package version only after the user returns: starting the
+    // installer does not prove that installation was approved or completed.
+    if (state == AppLifecycleState.resumed && mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
   final Map<String, Future<GithubInfo>> info = {};
   Future<List<Project>> _loadProjects() async {
@@ -588,7 +605,7 @@ class _HomePageState extends State<HomePage> {
                           final ok = await ProjectLauncher.launch(project.id);
                           if (!ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Приложение не найдено или EXE не выбран')));
+                              const SnackBar(content: Text('Приложение не найдено или не установлено')));
                           }
                         } catch (e) {
                           if (context.mounted) {

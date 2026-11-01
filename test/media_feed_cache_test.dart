@@ -76,6 +76,8 @@ void main() {
     final fallback = cache.readStale(request)!;
     (fallback.single['tags'] as List).clear();
     expect((cache.readStale(request)!.single['tags'] as List), ['safe']);
+    expect(cache.readStale(request,
+        maxAge: const Duration(days: 7)), isNull);
     now = now.add(const Duration(hours: 3));
     expect(cache.readStale(request), isNull);
   });

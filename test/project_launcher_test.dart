@@ -189,6 +189,30 @@ void main() {
     expect(() => ProjectLauncher.androidApkCacheName('all-hub', kopilka), throwsArgumentError);
   });
 
+  test('Windows ZIP chooses the actual application without a file picker', () {
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('shadow-rp', [
+      r'bin\\python.exe', r'ShadowRP.exe', r'bin\\helper.exe',
+    ]), r'ShadowRP.exe');
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('eclipse-arena', [
+      'uninstall.exe', 'EclipseArena.exe',
+    ]), 'EclipseArena.exe');
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('kopilka', [
+      'Kopilka.exe', 'KopilkaUpdater.exe',
+    ]), 'Kopilka.exe');
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('nova-game', [
+      'NovaGame.exe',
+    ]), 'NovaGame.exe');
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('external-example', [
+      'helper.exe', 'another.exe',
+    ]), isNull);
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('shadow-rp', [
+      'uninstall.exe', 'setup.exe',
+    ]), isNull);
+    expect(ProjectLauncher.selectWindowsLaunchExecutable('../bad', [
+      'good.exe',
+    ]), isNull);
+  });
+
   test('portable Windows executable requires MZ header', () {
     expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d, 0x5a, 0, 0]), isTrue);
     expect(ProjectLauncher.hasWindowsExecutableHeader([0x50, 0x4b]), isFalse);

@@ -133,7 +133,7 @@ void main() {
       {'dateMillis': 0},
       {'sourceType': 'transfer'},
       {'kind': 'expense'},
-      {'note': 'Подмена\\nданных'},
+      {'note': 'Подмена\nданных'},
     ]) {
       expect(validatedNativeKopilkaEntry({...candidate, ...bad}, [], now),
           isNull, reason: bad.toString());

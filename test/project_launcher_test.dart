@@ -31,6 +31,25 @@ void main() {
     );
   });
 
+  test('Windows version receipt requires an existing registered EXE', () async {
+    final directory = await Directory.systemTemp.createTemp('allhub-receipt-');
+    try {
+      final executable = File('${directory.path}/shadow-rp.exe');
+      SharedPreferences.setMockInitialValues({
+        'exe_shadow-rp': executable.path,
+        'installed_version_shadow-rp': '0.18.6',
+      });
+      expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);
+      await executable.writeAsBytes([0x4d, 0x5a, 0, 0]);
+      expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), '0.18.6');
+      await executable.delete();
+      expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);
+      expect(await ProjectLauncher.installedWindowsVersion('../outside'), isNull);
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
   test('published SHA-256 digest rejects modified download before install', () async {
     final dir = await Directory.systemTemp.createTemp('allhub-digest-');
     try {

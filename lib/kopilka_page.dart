@@ -183,6 +183,16 @@ List<Map<String, dynamic>> filterPendingBankNotifications(
 }
 
 
+/// A local UI filter only: never marks notifications reviewed or posts entries.
+List<Map<String, dynamic>> filterKopilkaPendingByBank(
+    List<Map<String, dynamic>> pending, String? bank) {
+  if (bank == null) return List<Map<String, dynamic>>.of(pending);
+  if (!const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}.contains(bank)) {
+    return <Map<String, dynamic>>[];
+  }
+  return pending.where((event) => event['bank'] == bank).toList();
+}
+
 /// Preserve the Android notification's actual posting time when a user
 /// confirms it later. This keeps weekly analytics and 30-minute transfer
 /// suggestions accurate. Only the OS-supplied millisecond timestamp is used;
@@ -903,6 +913,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
   String? listenerError;
   final pendingNotifications = <Map<String, dynamic>>[];
   int visiblePendingCount = 10;
+  String? pendingBankFilter;
   double goal = 100000;
   double monthlyBudget = 0; // Disabled until explicitly configured.
   int paydayDay = 10;
@@ -1318,6 +1329,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     final weeklyPeak = weeklyExpenses.fold<double>(
         0, (peak, value) => value > peak ? value : peak);
     final monthlyAccountFlows = summarizeKopilkaAccountFlows(monthlyEntries, banks);
+    final filteredPendingNotifications =
+        filterKopilkaPendingByBank(pendingNotifications, pendingBankFilter);
     final sortedCategories = monthlyCategories.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     // Reuse the same filtered list for display and summary. Transfers between
@@ -1459,7 +1472,25 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               title: Text('На проверке: ${pendingNotifications.length}'),
               subtitle: const Text('Операции не меняют баланс до подтверждения.'),
               children: [
-                for (final event in pendingNotifications.reversed.take(visiblePendingCount))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Wrap(spacing: 8, runSpacing: 4, children: [
+                    for (final bank in <String?>[
+                      null, 'Т-Банк', 'Газпромбанк', 'Ozon Банк',
+                    ])
+                      ChoiceChip(
+                        label: Text('${bank ?? 'Все'} · ${bank == null ? pendingNotifications.length : filterKopilkaPendingByBank(pendingNotifications, bank).length}'),
+                        selected: pendingBankFilter == bank,
+                        onSelected: (_) => setState(() {
+                          pendingBankFilter = bank;
+                          visiblePendingCount = 10;
+                        }),
+                      ),
+                  ]),
+                ),
+                if (filteredPendingNotifications.isEmpty)
+                  const ListTile(title: Text('У этого банка нет операций на проверке')),
+                for (final event in filteredPendingNotifications.reversed.take(visiblePendingCount))
                   ListTile(
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: Text((event['bank'] ?? 'Банк').toString()),
@@ -1468,11 +1499,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _reviewNotification(event),
                   ),
-                if (pendingNotifications.length > visiblePendingCount)
+                if (filteredPendingNotifications.length > visiblePendingCount)
                   TextButton(
                     onPressed: () => setState(() => visiblePendingCount += 10),
                     child: Text('Показать ещё уведомления '
-                      '(${pendingNotifications.length - visiblePendingCount} осталось)'),
+                      '(${filteredPendingNotifications.length - visiblePendingCount} осталось)'),
                   ),
               ],
             ),

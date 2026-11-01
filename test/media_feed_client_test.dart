@@ -22,6 +22,9 @@ void main() {
     final client = MediaFeedClient(client: MockClient((request) async {
       calls++;
       expect(request.followRedirects, isFalse);
+      expect(request.headers['User-Agent'], contains('AllHub/'));
+      expect(request.headers['Accept'], 'application/json');
+      expect(request.headers.containsKey('Authorization'), isFalse);
       expect(request.url.host, 'danbooru.donmai.us');
       return http.Response('', 302, headers: {
         'location': 'https://untrusted.example/collect',

@@ -466,6 +466,10 @@ class ProjectLauncher {
     }
   }
 
+  static void requireWindowsInstallRegistered(bool saved) {
+    if (!saved) throw StateError('Не удалось сохранить путь установленного Windows-приложения');
+  }
+
   // Installs a standalone Windows EXE from a published GitHub release.
   // Portable ZIP distributions require their full folder and are not handled here.
   static Future<void> installWindowsExe(String id, String url, {String? externalRepo, String? sha256Digest}) async {
@@ -508,19 +512,23 @@ class ProjectLauncher {
           await file.close();
         }
         await verifyDownloadedDigest(temporary, sha256Digest);
-        // Preserve the last working version if the replacement fails.
+        // Preserve the previous executable until both the file activation
+        // AND the launch registration have succeeded. A failed preferences
+        // write must not leave a new unlaunchable app marked as installed.
         final backup = File('${target.path}.backup');
         if (await backup.exists()) await backup.delete();
         if (await target.exists()) await target.rename(backup.path);
         try {
           await temporary.rename(target.path);
+          final prefs = await SharedPreferences.getInstance();
+          requireWindowsInstallRegistered(
+              await prefs.setString('exe_$id', target.path));
           if (await backup.exists()) await backup.delete();
         } catch (_) {
+          if (await target.exists()) await target.delete();
           if (await backup.exists()) await backup.rename(target.path);
           rethrow;
         }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('exe_$id', target.path);
       } finally {
         if (await temporary.exists()) await temporary.delete();
       }
@@ -625,7 +633,8 @@ class ProjectLauncher {
       try {
         await staging.rename(target.path);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('exe_$id', '${target.path}$relativeExe');
+        requireWindowsInstallRegistered(
+            await prefs.setString('exe_$id', '${target.path}$relativeExe'));
         if (await backup.exists()) await backup.delete(recursive: true);
       } catch (_) {
         if (await target.exists()) await target.delete(recursive: true);

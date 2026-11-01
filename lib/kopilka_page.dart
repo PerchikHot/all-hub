@@ -590,11 +590,18 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final queued = diagnostics['queued'];
   final connected = diagnostics['connected'] == true;
   final lastConnected = diagnostics['lastConnected'];
-  final connection = connected
+  final lastDisconnected = diagnostics['lastDisconnected'];
+  final rebindRequests = diagnostics['rebindRequests'];
+  final reconnectInfo = !connected && lastDisconnected is int &&
+          lastDisconnected > 0
+      ? ' Последнее отключение: ${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().day.toString().padLeft(2, '0')}.${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().month.toString().padLeft(2, '0')}. '
+          'Запросов переподключения: ${rebindRequests is int && rebindRequests >= 0 ? rebindRequests : 0}.'
+      : '';
+  final connection = (connected
       ? 'Служба уведомлений подключена.'
       : lastConnected is int && lastConnected > 0
           ? 'Служба отключена — проверь разрешение и энергосбережение.'
-          : 'Подключение службы ещё не подтверждено.';
+          : 'Подключение службы ещё не подтверждено.') + reconnectInfo;
   if (lastSeen is! int || lastSeen <= 0) {
     return '$connection Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.';
   }

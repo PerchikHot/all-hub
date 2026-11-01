@@ -65,6 +65,21 @@ void main() {
     expect(cache.read(c), isNotNull);
   });
 
+  test('expired feed is available only as a bounded offline fallback', () {
+    var now = DateTime.utc(2026, 11, 1);
+    final request = Uri.parse('https://example.org/offline');
+    final cache = MediaFeedMemoryCache(
+      ttl: const Duration(minutes: 5), clock: () => now);
+    cache.store(request, [{'id': 9, 'tags': <String>['safe']}]);
+    now = now.add(const Duration(minutes: 7));
+    expect(cache.read(request), isNull);
+    final fallback = cache.readStale(request)!;
+    (fallback.single['tags'] as List).clear();
+    expect((cache.readStale(request)!.single['tags'] as List), ['safe']);
+    now = now.add(const Duration(hours: 3));
+    expect(cache.readStale(request), isNull);
+  });
+
   test('invalid cache budgets are rejected', () {
     expect(() => MediaFeedMemoryCache(maxEntries: 0), throwsArgumentError);
     expect(() => MediaFeedMemoryCache(ttl: Duration.zero), throwsArgumentError);

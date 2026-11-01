@@ -502,6 +502,8 @@ class ProjectLauncher {
         : isTrustedExternalDownload(id, externalRepo, url, 'exe'))) {
       throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
     }
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
     final client = http.Client();
     try {
       final request = http.Request('GET', uri);
@@ -553,6 +555,8 @@ class ProjectLauncher {
       }
     } finally {
       client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
     }
   }
 
@@ -578,6 +582,8 @@ class ProjectLauncher {
     final zipFile = File('${projects.path}${Platform.pathSeparator}$id.download.zip');
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
     final client = http.Client();
     try {
       final response = await client.send(http.Request('GET', uri))
@@ -662,6 +668,8 @@ class ProjectLauncher {
       }
     } finally {
       client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
       if (await zipFile.exists()) await zipFile.delete();
       if (await staging.exists()) await staging.delete(recursive: true);
     }

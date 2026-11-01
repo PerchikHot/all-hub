@@ -146,7 +146,9 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
   // Large GIF originals can consume tens of MB per visible masonry tile.
   // Animate only bounded assets in the feed; the full GIF remains available
   // on tap in MediaBrowserPage. Missing sizes are treated conservatively.
-  final autoplay = highQuality || shouldAutoplayFeedGif(post);
+  // HD means sharper still previews, not permission to autoplay a 24 MB
+  // GIF in every masonry tile. Bound animation equally on Android/Windows.
+  final autoplay = shouldAutoplayFeedGif(post);
   final keys = highQuality
       ? ['large_file_url', 'file_url', 'sample_url', 'preview_file_url']
       : ['preview_file_url', 'sample_url', 'large_file_url', 'file_url'];

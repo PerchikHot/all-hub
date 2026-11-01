@@ -465,6 +465,38 @@ void main() {
 
   });
 
+  test('diagnostics distinguish Android permission, connection and import', () {
+    expect(describeKopilkaListenerPipeline(null, permissionEnabled: true),
+        contains('неизвестно'));
+    expect(describeKopilkaListenerPipeline({
+      'permissionGranted': false, 'connected': true,
+    }, permissionEnabled: true), contains('выключен'));
+    expect(describeKopilkaListenerPipeline({
+      'permissionGranted': true, 'connected': false,
+    }, permissionEnabled: true), contains('не подключена'));
+    expect(describeKopilkaListenerPipeline({
+      'permissionGranted': true, 'connected': true, 'lastSeen': 0,
+    }, permissionEnabled: true), contains('ещё не поступали'));
+    expect(describeKopilkaListenerPipeline({
+      'permissionGranted': true, 'connected': true,
+      'lastSeen': 1000, 'lastAccepted': 0,
+      'lastSkipped': 1100, 'lastSkipReason': 'credentials',
+      'body': 'Код подтверждения 123456',
+    }, permissionEnabled: true), allOf(
+        contains('ни одно не прошло'), contains('кодом'),
+        isNot(contains('123456'))));
+    expect(describeKopilkaListenerPipeline({
+      'permissionGranted': true, 'connected': true,
+      'lastSeen': 1000, 'lastAccepted': 1000,
+      'accepted': 3, 'lastAcceptedBank': 'Т-Банк',
+      'lastSkipped': 1100, 'lastSkipReason': 'unknown secret',
+      'body': 'PIN 987654',
+    }, permissionEnabled: true), allOf(
+        contains('Принято событий: 3'), contains('Т-Банк'),
+        contains('не означает запись'), isNot(contains('987654')),
+        isNot(contains('unknown secret'))));
+  });
+
   test('per-bank listener counts are visible without notification bodies', () {
     expect(describeKopilkaBankEvents(null), contains('Android-службы'));
     final summary = describeKopilkaBankEvents({

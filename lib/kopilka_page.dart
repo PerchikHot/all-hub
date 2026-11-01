@@ -730,10 +730,15 @@ String suggestKopilkaCategory(String notificationText) {
     'Развлечения': RegExp(r'кинотеатр|steam purchase|билет в кино'),
     'Покупки': RegExp(r'wildberries|вайлдберриз|магазин dns'),
   };
+  // One notification may mention two merchants or two separate purchases.
+  // Never choose the first matching category and silently mislabel a payment.
+  String? candidate;
   for (final entry in patterns.entries) {
-    if (entry.value.hasMatch(text)) return entry.key;
+    if (!entry.value.hasMatch(text)) continue;
+    if (candidate != null && candidate != entry.key) return 'Другое';
+    candidate = entry.key;
   }
-  return 'Другое';
+  return candidate ?? 'Другое';
 }
 
 String kopilkaExpenseCategory(Map<String, dynamic> entry) {

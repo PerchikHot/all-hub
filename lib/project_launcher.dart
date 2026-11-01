@@ -91,6 +91,24 @@ class ProjectLauncher {
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
       RegExp(r'^[a-z0-9]+(?:-[a-z0-9]+)*$').hasMatch(id);
+  /// A crash between moving the old install to .backup and activating the
+  /// new one can leave no launchable app. Recover it before a new update.
+  /// Never overwrite a present target: that might be a successfully updated
+  /// version whose backup cleanup was interrupted.
+  static Future<bool> recoverInterruptedWindowsExe(File target) async {
+    final backup = File('${target.path}.backup');
+    if (await target.exists() || !await backup.exists()) return false;
+    await backup.rename(target.path);
+    return true;
+  }
+
+  static Future<bool> recoverInterruptedWindowsZip(Directory target) async {
+    final backup = Directory('${target.path}.backup');
+    if (await target.exists() || !await backup.exists()) return false;
+    await backup.rename(target.path);
+    return true;
+  }
+
   /// Pick the portable app's EXE without opening a manual file chooser.
   /// Archives with multiple unrelated executables are ambiguous and must
   /// not silently launch an uninstaller or an arbitrary helper program.
@@ -595,6 +613,8 @@ class ProjectLauncher {
         // Preserve the previous executable until both the file activation
         // AND the launch registration have succeeded. A failed preferences
         // write must not leave a new unlaunchable app marked as installed.
+        // Restore a previous install interrupted before activation.
+        await recoverInterruptedWindowsExe(target);
         final backup = File('${target.path}.backup');
         if (await backup.exists()) await backup.delete();
         if (await target.exists()) await target.rename(backup.path);
@@ -638,6 +658,7 @@ class ProjectLauncher {
     final target = Directory('${projects.path}${Platform.pathSeparator}$id');
     final staging = Directory('${projects.path}${Platform.pathSeparator}$id.staging');
     final backup = Directory('${projects.path}${Platform.pathSeparator}$id.backup');
+    await recoverInterruptedWindowsZip(target);
     final zipFile = File('${projects.path}${Platform.pathSeparator}$id.download.zip');
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);

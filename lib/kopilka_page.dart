@@ -331,6 +331,58 @@ Map<String, dynamic>? confidentKopilkaAutoEntry(
   };
 }
 
+/// Reconcile a transaction already classified and durably staged by the
+/// Android listener while Flutter was closed. Never trust a malformed native
+/// payload, and never overwrite or duplicate an existing journal entry.
+/// The native record contains only a bank, amount, time and short note.
+Map<String, dynamic>? validatedNativeKopilkaEntry(
+    Map<String, dynamic> candidate, Iterable<Map<String, dynamic>> saved,
+    DateTime now) {
+  final key = candidate['key'];
+  final bank = candidate['bank'];
+  final amount = candidate['amount'];
+  final posted = candidate['dateMillis'];
+  final note = candidate['note'];
+  final source = candidate['sourceType'];
+  final kind = candidate['kind'];
+  if (candidate['nativeClassifier'] != 1 ||
+      key is! String || key.trim().isEmpty || key.length > 256 ||
+      bank is! String ||
+      !const {'Т-Банк', 'Газпромбанк', 'Ozon Банк'}.contains(bank) ||
+      amount is! num || !amount.isFinite || amount <= 0 ||
+      amount > 1000000000 ||
+      posted is! int || posted < 946684800000 ||
+      posted > now.millisecondsSinceEpoch + 300000 ||
+      note is! String || note.trim().isEmpty || note.length > 80 ||
+      note.contains(RegExp(r'[\r\n]')) ||
+      source is! String ||
+      !const {'purchase', 'salary', 'refund', 'cashback'}.contains(source) ||
+      kind != (source == 'purchase' ? 'expense' : 'income') ||
+      isKopilkaNotificationImported(saved, key)) {
+    return null;
+  }
+  final date = DateTime.fromMillisecondsSinceEpoch(posted);
+  final value = amount.toDouble();
+  if (possibleKopilkaDuplicateNotification(saved,
+      bank: bank, kind: kind as String, amount: value, postedAt: date)
+      .isNotEmpty) return null;
+  // Never mistake the other leg of a transfer between owned banks for income.
+  final opposite = kind == 'expense' ? 'income' : 'expense';
+  if (saved.any((entry) =>
+      entry['bank'] != bank && entry['kind'] == opposite &&
+      (safeKopilkaAmount(entry) * 100).round() == (value * 100).round() &&
+      DateTime.tryParse((entry['date'] ?? '').toString()) != null &&
+      date.difference(DateTime.parse(entry['date'].toString())).abs() <=
+          const Duration(minutes: 30))) return null;
+  return <String, dynamic>{
+    'kind': kind, 'amount': value, 'bank': bank,
+    'from': bank, 'to': '', 'note': note.trim(),
+    'date': date.toIso8601String(),
+    if (kind == 'expense') 'category': suggestKopilkaCategory(note),
+    'notificationKey': key.trim(), 'autoImported': true,
+  };
+}
+
 /// A local UI filter only: never marks notifications reviewed or posts entries.
 List<Map<String, dynamic>> filterKopilkaPendingByBank(
     List<Map<String, dynamic>> pending, String? bank) {
@@ -744,6 +796,16 @@ bool matchesKopilkaHistory(Map<String, dynamic> entry, String query) {
 /// Human-readable listener health without exposing notification bodies.
 String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   if (diagnostics == null) return 'Диагностика доступна в отдельной Android APK Копилки.';
+  final staged = diagnostics['nativeAutoStaged'];
+  final stageError = diagnostics['nativeStageError'];
+  final stageSummary = staged is int && staged >= 0
+      ? ' Автосохранено Android до открытия экрана: $staged.'
+      : ' Нативный журнал автосохранения требует проверки.';
+  final stageWarning = stageError == 'ledger_corrupt'
+      ? ' ВНИМАНИЕ: нативный журнал повреждён; исходные данные сохранены.'
+      : stageError == 'ledger_full'
+          ? ' ВНИМАНИЕ: нативный журнал заполнен.'
+          : '';
   final lastSeen = diagnostics['lastSeen'];
   final queued = diagnostics['queued'];
   final connected = diagnostics['connected'] == true;
@@ -1283,6 +1345,35 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
           .where((key) => key.isNotEmpty));
       final nativeEvents = jsonDecode(raw) as List;
+      // Reconcile native transactions staged while the Flutter process was
+      // closed. Save the financial journal BEFORE acknowledging each stage.
+      // A crash after save is idempotent by notificationKey on next launch.
+      final stagedRaw = await _notifications.invokeMethod<String>('autoEntries') ?? '[]';
+      final stagedEvents = jsonDecode(stagedRaw) as List;
+      if (enabled && _journalHealthy) {
+        for (final staged in stagedEvents) {
+          if (staged is! Map) continue;
+          final event = Map<String, dynamic>.from(staged);
+          final key = event['key'];
+          if (key is! String || key.isEmpty) continue;
+          if (isKopilkaNotificationImported(entries, key)) {
+            await _notifications.invokeMethod<void>('ackAutoEntry', {'key': key});
+            continue;
+          }
+          final entry = validatedNativeKopilkaEntry(event, entries, DateTime.now());
+          if (entry == null) continue; // Keep ambiguous cases for review.
+          entries.insert(0, entry);
+          try {
+            await _save();
+          } catch (_) {
+            entries.remove(entry);
+            break; // Do not acknowledge an unsaved transaction.
+          }
+          await _notifications.invokeMethod<void>('ackAutoEntry', {'key': key});
+          await _archiveNotificationKey(key);
+          autoImportedThisSession++;
+        }
+      }
       // Retry native acknowledgement after a crash between saving the
       // journal and dismissing the notification. No unreviewed alert is lost.
       for (final key in kopilkaQueuedAcknowledgements(nativeEvents, reviewed)) {

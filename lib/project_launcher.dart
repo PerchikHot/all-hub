@@ -84,9 +84,33 @@ class ProjectLauncher {
         .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
   }
 
-  /// Check a portable EXE before replacing a previously working installation.
-  static bool hasWindowsExecutableHeader(List<int> bytes) =>
-      bytes.length >= 2 && bytes[0] == 0x4d && bytes[1] == 0x5a;
+  /// Validate the actual Portable Executable signature, not just "MZ".
+  /// An HTML/error response or a truncated DOS stub must never replace a
+  /// previously working Windows installation. Only read the first 8 KiB.
+  static bool hasWindowsExecutableHeader(List<int> bytes) {
+    if (bytes.length < 0x40 || bytes[0] != 0x4d || bytes[1] != 0x5a) {
+      return false;
+    }
+    int u16(int offset) => bytes[offset] | (bytes[offset + 1] << 8);
+    final peOffset = bytes[0x3c] | (bytes[0x3d] << 8) |
+        (bytes[0x3e] << 16) | (bytes[0x3f] << 24);
+    // e_lfanew must point beyond the DOS header, within the bounded prefix.
+    if (peOffset < 0x40 || peOffset > bytes.length - 26) return false;
+    if (bytes[peOffset] != 0x50 || bytes[peOffset + 1] != 0x45 ||
+        bytes[peOffset + 2] != 0 || bytes[peOffset + 3] != 0) {
+      return false;
+    }
+    final machine = u16(peOffset + 4);
+    final sections = u16(peOffset + 6);
+    final optionalSize = u16(peOffset + 20);
+    if (!const {0x14c, 0x8664, 0xaa64}.contains(machine) ||
+        sections == 0 || sections > 96 || optionalSize < 2 ||
+        peOffset + 24 + optionalSize > bytes.length) {
+      return false;
+    }
+    final magic = u16(peOffset + 24);
+    return magic == 0x10b || magic == 0x20b;
+  }
 
   // Project IDs become Windows directory names: never accept path segments.
   static bool isValidProjectId(String id) =>
@@ -606,9 +630,9 @@ class ProjectLauncher {
         }
         final file = await temporary.open();
         try {
-          final header = await file.read(2);
+          final header = await file.read(8192);
           if (!hasWindowsExecutableHeader(header)) {
-            throw const FormatException('Файл не похож на Windows EXE (нет MZ-заголовка)');
+            throw const FormatException('Файл не является корректным Windows PE (MZ/PE)');
           }
         } finally {
           await file.close();
@@ -722,7 +746,7 @@ class ProjectLauncher {
       for (final executable in executables) {
         final handle = await executable.open();
         try {
-          if (!hasWindowsExecutableHeader(await handle.read(2))) {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
             throw const FormatException('ZIP содержит некорректный Windows EXE');
           }
         } finally {

@@ -245,11 +245,39 @@ void main() {
     ]), isNull);
   });
 
-  test('portable Windows executable requires MZ header', () {
-    expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d, 0x5a, 0, 0]), isTrue);
+  test('Windows installer rejects fake MZ, corrupt PE and truncated files', () {
+    List<int> pe({int offset = 0x80, int machine = 0x8664,
+        int magic = 0x20b, int sections = 3}) {
+      final bytes = List<int>.filled(1024, 0);
+      bytes[0] = 0x4d;
+      bytes[1] = 0x5a;
+      bytes[0x3c] = offset & 0xff;
+      bytes[0x3d] = (offset >> 8) & 0xff;
+      bytes[offset] = 0x50;
+      bytes[offset + 1] = 0x45;
+      bytes[offset + 4] = machine & 0xff;
+      bytes[offset + 5] = (machine >> 8) & 0xff;
+      bytes[offset + 6] = sections;
+      bytes[offset + 20] = 0xf0; // Optional header length.
+      bytes[offset + 24] = magic & 0xff;
+      bytes[offset + 25] = magic >> 8;
+      return bytes;
+    }
+    expect(ProjectLauncher.hasWindowsExecutableHeader(pe()), isTrue);
+    expect(ProjectLauncher.hasWindowsExecutableHeader(
+        pe(machine: 0x14c, magic: 0x10b)), isTrue);
+    expect(ProjectLauncher.hasWindowsExecutableHeader(
+        pe(machine: 0xaa64)), isTrue);
+    expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d, 0x5a, 0, 0]), isFalse);
     expect(ProjectLauncher.hasWindowsExecutableHeader([0x50, 0x4b]), isFalse);
-    expect(ProjectLauncher.hasWindowsExecutableHeader([0x4d]), isFalse);
     expect(ProjectLauncher.hasWindowsExecutableHeader([]), isFalse);
+    final fake = pe()..[0x80] = 0;
+    expect(ProjectLauncher.hasWindowsExecutableHeader(fake), isFalse);
+    expect(ProjectLauncher.hasWindowsExecutableHeader(pe(machine: 0)), isFalse);
+    expect(ProjectLauncher.hasWindowsExecutableHeader(pe(sections: 0)), isFalse);
+    expect(ProjectLauncher.hasWindowsExecutableHeader(pe().sublist(0, 200)), isFalse);
+    final offsetOutside = pe()..[0x3d] = 0x7f;
+    expect(ProjectLauncher.hasWindowsExecutableHeader(offsetOutside), isFalse);
   });
 
   test('Android APK resumes only from a matching bounded HTTP range', () {

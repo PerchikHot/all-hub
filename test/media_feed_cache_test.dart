@@ -97,6 +97,21 @@ void main() {
     expect(page.first['file_url'], 'https://example.org/0.gif');
   });
 
+  test('mirrored GIF URLs are not duplicated even with different post IDs', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/mirrored-gifs');
+    cache.store(request, [
+      {'id': 11, 'file_url': 'https://cdn.example/one.gif'},
+      {'id': 12, 'file_url': 'https://cdn.example/one.gif'},
+      {'id': 13, 'file_url': 'https://cdn.example/two.gif'},
+      {'id': 14, 'file_url': 'https://cdn.example/three.gif'},
+      {'id': 15, 'preview_file_url': 'https://cdn.example/three.gif'},
+      {'id': 16, 'file_url': 'https://cdn.example/four.gif'},
+    ]);
+    final posts = cache.read(request)!;
+    expect(posts.map((post) => post['id']).toList(), [11, 13, 14, 16]);
+  });
+
   test('failed refresh restores exact page cursor and deduplication', () {
     final posts = <Map<String, dynamic>>[
       {'id': 11, 'media_asset': {'variants': ['original.gif']}},

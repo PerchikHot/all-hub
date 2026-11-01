@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -285,7 +286,15 @@ class ProjectLauncher {
         return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
       } catch (_) { return null; }
     }
-    if (Platform.isWindows) return installedWindowsVersion(id);
+    if (Platform.isWindows) {
+      // All Hub is the running executable, not a child app under projects/.
+      // Never require exe_all-hub to be manually bound to detect its version.
+      if (id == 'all-hub') {
+        final info = await PackageInfo.fromPlatform();
+        return info.buildNumber.isEmpty ? info.version : '${info.version}+${info.buildNumber}';
+      }
+      return installedWindowsVersion(id);
+    }
     return null;
   }
   /// Never activate a Windows EXE/ZIP after a short HTTP response. A file

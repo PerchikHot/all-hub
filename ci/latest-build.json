@@ -1,43 +1,30 @@
 {
-  "run_id": 41348937932,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/41348937932",
-  "conclusion": "success",
-  "head_sha": "6e1573f6fde7b8d9a3a924f014682180a1a4fe68",
+  "run_id": 41353175063,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/41353175063",
+  "conclusion": "cancelled",
+  "head_sha": "ec2843d130600c2f73240b0238205072ef3e689f",
   "jobs": [
     {
       "name": "windows",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41348937932/job/124974852903",
-      "id": 124974852903
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41353175063/job/124987553558",
+      "id": 124987553558
     },
     {
       "name": "android",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41348937932/job/124974853130",
-      "id": 124974853130
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41353175063/job/124987553748",
+      "id": 124987553748
     },
     {
       "name": "Publish verified Android and Windows pair",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41348937932/job/124977176835",
-      "id": 124977176835
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/41353175063/job/124987664620",
+      "id": 124987664620
     }
   ],
-  "artifacts": [
-    {
-      "name": "AllHub-Android-release",
-      "size_in_bytes": 29774370,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/13100801026/zip"
-    },
-    {
-      "name": "AllHub-Windows",
-      "size_in_bytes": 12980358,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/13100114817/zip"
-    }
-  ]
+  "artifacts": []
 }

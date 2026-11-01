@@ -182,7 +182,14 @@ class BankNotificationService : NotificationListenerService() {
                 .coerceAtMost(100000000))
             .putInt("bank_accepted_" + bankId,
                 (prefs.getInt("bank_accepted_" + bankId, 0) + 1)
-                    .coerceAtMost(100000000)).apply()
+                    .coerceAtMost(100000000))
+        // A notification is an irreplaceable event: synchronously commit
+        // the pending queue before treating it as accepted. apply() could
+        // lose it if Android kills the process immediately after callback.
+        if (!editor.commit()) {
+            prefs.edit().putLong("last_queue_write_failed", System.currentTimeMillis())
+                .commit()
+        }
         } // queueLock
     }
 }

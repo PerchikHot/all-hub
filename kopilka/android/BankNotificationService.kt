@@ -146,14 +146,16 @@ class BankNotificationService : NotificationListenerService() {
         }
         synchronized(queueLock) {
         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-        // A damaged local queue must not crash NotificationListenerService.
-        // Recover the pending queue without touching saved transactions.
+        // A damaged queue may contain payments not yet saved in the journal.
+        // Preserve the original bytes rather than replacing them with [].
         val current = try {
             JSONArray(prefs.getString("queue", "[]"))
         } catch (ignored: org.json.JSONException) {
             prefs.edit().putInt("queue_recoveries",
-                (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000)).apply()
-            JSONArray()
+                (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000))
+                .putString("last_skip_reason", "queue_corrupt")
+                .putLong("last_skipped", System.currentTimeMillis()).commit()
+            return
         }
         val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}"
         for (i in 0 until current.length()) {
@@ -162,19 +164,18 @@ class BankNotificationService : NotificationListenerService() {
             // notification to avoid duplicate pending transactions.
             if (existingKey == key || existingKey.startsWith("$key:")) return
         }
+        // Never silently evict older, unprocessed payments while Flutter
+        // is closed. Reject new events and expose queue pressure instead.
+        if (current.length() >= 100) {
+            prefs.edit().putInt("queue_full_rejections",
+                (prefs.getInt("queue_full_rejections", 0) + 1).coerceAtMost(100000000))
+                .putString("last_skip_reason", "queue_full")
+                .putLong("last_skipped", System.currentTimeMillis()).commit()
+            return
+        }
         current.put(JSONObject().put("key", key).put("bank", bank)
             .put("title", title).put("body", body).put("time", sbn.postTime))
-        var dropped = 0
-        while (current.length() > 100) {
-            current.remove(0)
-            dropped++
-        }
         val editor = prefs.edit().putString("queue", current.toString())
-        if (dropped > 0) {
-            editor.putInt("queue_dropped",
-                (prefs.getInt("queue_dropped", 0) + dropped).coerceAtMost(100000000))
-                .putLong("last_queue_drop", System.currentTimeMillis())
-        }
         editor
             .putLong("last_accepted", System.currentTimeMillis())
             .putString("last_accepted_bank", bank)

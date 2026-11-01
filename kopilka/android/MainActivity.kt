@@ -36,6 +36,44 @@ class MainActivity : FlutterActivity() {
                             result.success(prefs.getString("queue", "[]"))
                         }
                     }
+                    "autoEntries" -> {
+                        val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                        synchronized(BankNotificationService.queueLock) {
+                            // A damaged ledger is an error, never an empty array.
+                            val raw = prefs.getString("auto_entries", "[]") ?: "[]"
+                            try {
+                                org.json.JSONArray(raw)
+                                result.success(raw)
+                            } catch (_: org.json.JSONException) {
+                                result.error("LEDGER", "Native auto ledger is corrupt", null)
+                            }
+                        }
+                    }
+                    "ackAutoEntry" -> {
+                        val key = call.argument<String>("key")
+                        if (key.isNullOrBlank()) {
+                            result.error("ARGUMENT", "Missing transaction key", null)
+                        } else {
+                            val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                            synchronized(BankNotificationService.queueLock) {
+                                try {
+                                    val staged = org.json.JSONArray(prefs.getString("auto_entries", "[]"))
+                                    val remaining = org.json.JSONArray()
+                                    for (i in 0 until staged.length()) {
+                                        val entry = staged.getJSONObject(i)
+                                        if (entry.optString("key") != key) remaining.put(entry)
+                                    }
+                                    if (prefs.edit().putString("auto_entries", remaining.toString()).commit()) {
+                                        result.success(null)
+                                    } else {
+                                        result.error("LEDGER", "Cannot persist auto ledger acknowledgement", null)
+                                    }
+                                } catch (_: Exception) {
+                                    result.error("LEDGER", "Cannot update native auto ledger", null)
+                                }
+                            }
+                        }
+                    }
                     "diagnostics" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                         val count = try {
@@ -43,6 +81,11 @@ class MainActivity : FlutterActivity() {
                         } catch (_: Exception) { 0 }
                         result.success(mapOf(
                             "queued" to count,
+                            "nativeAutoStaged" to try {
+                                org.json.JSONArray(prefs.getString("auto_entries", "[]")).length()
+                            } catch (_: Exception) { -1 },
+                            "lastNativeAutoStage" to prefs.getLong("last_native_auto_stage", 0L),
+                            "nativeStageError" to (prefs.getString("last_native_stage_error", "") ?: ""),
                             "queueCapacity" to BankNotificationService.MAX_PENDING,
                             "queueRemaining" to (BankNotificationService.MAX_PENDING - count).coerceAtLeast(0),
                             "accepted" to prefs.getInt("accepted_count", 0),

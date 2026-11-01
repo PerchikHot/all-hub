@@ -70,6 +70,20 @@ void main() {
     }), isNot(contains('Внимание:')));
   });
 
+  test('native queue disk failure is surfaced without leaking bank data', () {
+    final report = describeKopilkaListener({
+      'connected': true,
+      'lastSeen': 0,
+      'lastQueueWriteFailed': 1793540000000,
+      'body': 'Код 123456',
+    });
+    expect(report, contains('не смог сохранить банковское уведомление'));
+    expect(report, contains('свободное место'));
+    expect(report, isNot(contains('123456')));
+    expect(describeKopilkaListener({'connected': true, 'lastSeen': 0}),
+        isNot(contains('не смог сохранить')));
+  });
+
   test('listener disconnect diagnostics report rebind attempts without bank text', () {
     final report = describeKopilkaListener({
       'connected': false,

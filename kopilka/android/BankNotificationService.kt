@@ -7,6 +7,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class BankNotificationService : NotificationListenerService() {
+    companion object {
+        // The Flutter UI and listener share a process and must not lose
+        // newly posted payments while the user dismisses an older alert.
+        val queueLock = Any()
+    }
     override fun onListenerConnected() {
         super.onListenerConnected()
         getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
@@ -129,12 +134,15 @@ class BankNotificationService : NotificationListenerService() {
             markFiltered(bankId)
             return
         }
+        synchronized(queueLock) {
         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
         // A damaged local queue must not crash NotificationListenerService.
         // Recover the pending queue without touching saved transactions.
         val current = try {
             JSONArray(prefs.getString("queue", "[]"))
         } catch (ignored: org.json.JSONException) {
+            prefs.edit().putInt("queue_recoveries",
+                (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000)).apply()
             JSONArray()
         }
         val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}"
@@ -146,12 +154,23 @@ class BankNotificationService : NotificationListenerService() {
         }
         current.put(JSONObject().put("key", key).put("bank", bank)
             .put("title", title).put("body", body).put("time", sbn.postTime))
-        while (current.length() > 100) current.remove(0)
-        prefs.edit().putString("queue", current.toString())
+        var dropped = 0
+        while (current.length() > 100) {
+            current.remove(0)
+            dropped++
+        }
+        val editor = prefs.edit().putString("queue", current.toString())
+        if (dropped > 0) {
+            editor.putInt("queue_dropped",
+                (prefs.getInt("queue_dropped", 0) + dropped).coerceAtMost(100000000))
+                .putLong("last_queue_drop", System.currentTimeMillis())
+        }
+        editor
             .putInt("accepted_count", (prefs.getInt("accepted_count", 0) + 1)
                 .coerceAtMost(100000000))
             .putInt("bank_accepted_" + bankId,
                 (prefs.getInt("bank_accepted_" + bankId, 0) + 1)
                     .coerceAtMost(100000000)).apply()
+        } // queueLock
     }
 }

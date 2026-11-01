@@ -30,7 +30,9 @@ class MainActivity : FlutterActivity() {
                     }
                     "pending" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                        result.success(prefs.getString("queue", "[]"))
+                        synchronized(BankNotificationService.queueLock) {
+                            result.success(prefs.getString("queue", "[]"))
+                        }
                     }
                     "diagnostics" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
@@ -47,6 +49,9 @@ class MainActivity : FlutterActivity() {
                             "lastConnected" to prefs.getLong("last_connected", 0L),
                             "lastDisconnected" to prefs.getLong("last_disconnected", 0L),
                             "rebindRequests" to prefs.getInt("rebind_requests", 0),
+                            "queueRecoveries" to prefs.getInt("queue_recoveries", 0),
+                            "queueDropped" to prefs.getInt("queue_dropped", 0),
+                            "lastQueueDrop" to prefs.getLong("last_queue_drop", 0L),
                             "bankEvents" to mapOf(
                                 "Т-Банк" to prefs.getInt("bank_count_tbank", 0),
                                 "Газпромбанк" to prefs.getInt("bank_count_gazprom", 0),
@@ -75,6 +80,7 @@ class MainActivity : FlutterActivity() {
                             result.error("ARGUMENT", "Missing notification key", null)
                         } else {
                             val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                            synchronized(BankNotificationService.queueLock) {
                             try {
                                 val current = org.json.JSONArray(prefs.getString("queue", "[]"))
                                 val remaining = org.json.JSONArray()
@@ -87,12 +93,15 @@ class MainActivity : FlutterActivity() {
                             } catch (_: Exception) {
                                 result.error("QUEUE", "Cannot update local notification queue", null)
                             }
+                            }
                         }
                     }
                     "clear" -> {
-                        getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
-                            .edit().remove("queue").apply()
-                        result.success(null)
+                        synchronized(BankNotificationService.queueLock) {
+                            getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+                                .edit().remove("queue").apply()
+                            result.success(null)
+                        }
                     }
                     else -> result.notImplemented()
                 }

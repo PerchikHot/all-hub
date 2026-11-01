@@ -17,6 +17,23 @@ void main() {
     client.close();
   });
 
+  test('does not follow CDN redirects or leak media search tags', () async {
+    var calls = 0;
+    final client = MediaFeedClient(client: MockClient((request) async {
+      calls++;
+      expect(request.followRedirects, isFalse);
+      expect(request.url.host, 'danbooru.donmai.us');
+      return http.Response('', 302, headers: {
+        'location': 'https://untrusted.example/collect',
+      });
+    }));
+    await expectLater(client.fetch(url),
+        throwsA(isA<MediaFeedRequestException>().having(
+            (e) => e.statusCode, 'status', 302)));
+    expect(calls, 1);
+    client.close();
+  });
+
   test('HTTP 403 and 429 are reported, never cached as empty pages', () async {
     for (final status in [403, 429]) {
       var calls = 0;

@@ -43,7 +43,10 @@ class MediaFeedClient {
       try {
         // A timeout while reading the body is as recoverable as a timeout
         // while connecting. Retry the same page without caching a partial JSON.
-        final response = await _client.send(http.Request('GET', uri))
+        // The source is public, but redirects can leak search tags to
+        // unrelated domains and return an unrelated page as feed JSON.
+        final request = http.Request('GET', uri)..followRedirects = false;
+        final response = await _client.send(request)
             .timeout(const Duration(seconds: 18));
         if (response.statusCode >= 500 && attempt + 1 < maxAttempts) {
           // Do not leave an unread response attached to the connection.

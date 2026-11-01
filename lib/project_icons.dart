@@ -32,12 +32,12 @@ class VeyrionProjectIcon extends StatelessWidget {
     final Widget artwork;
     if (local != null) {
       artwork = Image.asset(local, width: size, height: size,
-          fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback());
+          fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => fallback());
     } else if (remote != null) {
       artwork = CachedNetworkImage(imageUrl: remote,
         width: size, height: size, fit: BoxFit.cover,
-        placeholder: (_, _) => fallback(),
-        errorWidget: (_, _, _) => fallback());
+        placeholder: (context, url) => fallback(),
+        errorWidget: (context, url, error) => fallback());
     } else {
       artwork = fallback();
     }

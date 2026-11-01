@@ -260,6 +260,15 @@ class ProjectLauncher {
     if (Platform.isWindows) return installedWindowsVersion(id);
     return null;
   }
+  /// Never activate a Windows EXE/ZIP after a short HTTP response. A file
+  /// may still have an MZ header even when its body is truncated.
+  static void requireCompleteWindowsDownload(int received, int? expected) {
+    if (received < 0 || expected != null &&
+        (expected < 0 || received != expected)) {
+      throw const FormatException('Загрузка Windows-файла завершилась не полностью');
+    }
+  }
+
   /// Stream a response to disk for Windows installers and archives.
   static Future<void> _download(http.StreamedResponse response, File file, {int? maxBytes}) async {
     if (maxBytes != null && response.contentLength != null &&
@@ -283,6 +292,7 @@ class ProjectLauncher {
         }
       }
       await sink.flush();
+      requireCompleteWindowsDownload(received, response.contentLength);
       downloadProgress.value = 1;
     } finally {
       await sink.close();

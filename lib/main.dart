@@ -599,35 +599,43 @@ class _HomePageState extends State<HomePage> {
                     ),
                   if (tab == 0 && Platform.isAndroid && i.downloadUrl != null &&
                       Uri.parse(i.downloadUrl!).path.toLowerCase().endsWith('.apk'))
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.install_mobile),
-                      label: FutureBuilder<String?>(
-                        future: ProjectLauncher.installedVersion(project.id),
-                        builder: (context, installed) => Text(installActionLabel(
-                          installed.data, i.version, 'Скачать APK и установить')),
-                      ),
-                      onPressed: () async {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Скачивание APK...')));
-                        try {
-                          if (isPublishedDowngrade(
-                              await ProjectLauncher.installedVersion(project.id), i.version)) {
-                            throw StateError('Установленная версия новее опубликованной. Понижение версии заблокировано.');
-                          }
-                          if (!await confirmExternalInstall(project)) {
-                            return;
-                          }
-                          await ProjectLauncher.runInstallExclusive(project.id,
-                            () => ProjectLauncher.installAndroidApk(i.downloadUrl!,
-                              projectId: project.id,
-                              externalRepo: project.id.startsWith('external-')
-                                  ? project.repo : null,
-                              sha256Digest: i.sha256Digest));
-                        } catch (e) {
-                          if (context.mounted) {
-                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка установки APK: $e')));
-                           }
+                    FutureBuilder<String?>(
+                      future: ProjectLauncher.installedVersion(project.id),
+                      builder: (context, installed) {
+                        final comparison = installed.data == null || i.version == null
+                            ? null : comparePublishedVersions(installed.data!, i.version!);
+                        if (comparison == 0) {
+                          return const Chip(
+                            avatar: Icon(Icons.check_circle_outline, size: 18),
+                            label: Text('Установлена актуальная версия'),
+                          );
                         }
+                        if (comparison == 1) {
+                          return const Chip(label: Text('Установленная версия новее релиза'));
+                        }
+                        return OutlinedButton.icon(
+                          icon: Icon(comparison == -1 ? Icons.system_update_alt : Icons.install_mobile),
+                          label: Text(comparison == -1 ? 'Обновить до ${i.version}' : 'Скачать APK и установить'),
+                          onPressed: () async {
+                            try {
+                              if (isPublishedDowngrade(
+                                  await ProjectLauncher.installedVersion(project.id), i.version)) {
+                                throw StateError('Понижение версии заблокировано');
+                              }
+                              if (!await confirmExternalInstall(project)) return;
+                              await ProjectLauncher.runInstallExclusive(project.id,
+                                () => ProjectLauncher.installAndroidApk(i.downloadUrl!,
+                                  projectId: project.id,
+                                  externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                  sha256Digest: i.sha256Digest));
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Ошибка установки APK: $e')));
+                              }
+                            }
+                          },
+                        );
                       },
                     ),
                   if (tab == 0 && Platform.isWindows && i.downloadUrl != null)

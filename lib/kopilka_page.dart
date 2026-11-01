@@ -1365,9 +1365,11 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                         : const Color(0xFFFFCA79)),
                   const SizedBox(width: 10),
                   Expanded(child: Text(
-                    notificationsEnabled
-                        ? 'Автоучёт: разрешение включено'
-                        : 'Автоучёт: требуется подключение',
+                    Theme.of(context).platform != TargetPlatform.android
+                        ? 'Автоучёт уведомлений: Android'
+                        : notificationsEnabled
+                            ? 'Автоучёт: разрешение включено'
+                            : 'Автоучёт: требуется подключение',
                     style: const TextStyle(fontSize: 16,
                         fontWeight: FontWeight.w700),
                   )),

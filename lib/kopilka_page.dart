@@ -780,6 +780,28 @@ Map<String, KopilkaAccountFlow> summarizeKopilkaAccountFlows(
   return flows;
 }
 
+/// Advisory duplicate detection for independently posted bank notifications.
+/// A second alert may have a different Android notification key but describe
+/// the same posted operation. Never discard it silently: show a confirmation.
+/// Require identical bank, direction, kopecks and a 90-second time window.
+List<Map<String, dynamic>> possibleKopilkaDuplicateNotification(
+    Iterable<Map<String, dynamic>> saved, {
+    required String bank, required String kind, required double amount,
+    required DateTime postedAt}) {
+  if (!const {'expense', 'income'}.contains(kind) ||
+      !amount.isFinite || amount <= 0 || bank.isEmpty) {
+    return <Map<String, dynamic>>[];
+  }
+  final cents = (amount * 100).round();
+  return saved.where((entry) {
+    if (entry['kind'] != kind || entry['bank'] != bank) return false;
+    if ((safeKopilkaAmount(entry) * 100).round() != cents) return false;
+    final timestamp = DateTime.tryParse((entry['date'] ?? '').toString());
+    return timestamp != null &&
+        postedAt.difference(timestamp).abs() <= const Duration(seconds: 90);
+  }).toList(growable: false);
+}
+
 /// Possible internal transfers entered as two separate bank notifications.
 /// Read-only: never merge, delete or reclassify money without user approval.
 /// Matches must have equal amounts to the kopeck, distinct known accounts and
@@ -1223,6 +1245,37 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         return;
       }
       final value = parseKopilkaAmount(amount.text)!;
+      if (notification != null) {
+        final duplicates = possibleKopilkaDuplicateNotification(entries,
+          bank: bank, kind: kind, amount: value,
+          postedAt: kopilkaConfirmedNotificationDate(notification, DateTime.now()));
+        if (duplicates.isNotEmpty && mounted) {
+          final proceed = await showDialog<bool>(context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Возможная повторная операция'),
+              content: Text('В журнале уже есть ${duplicates.length} операция(й) '
+                  'того же типа, банка и суммы за последние 90 секунд. '
+                  'Банк может прислать несколько уведомлений об одной покупке. '
+                  'Сохранить ещё одну запись?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Вернуться к проверке')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Сохранить всё равно')),
+              ],
+            ));
+          if (proceed != true) {
+            amount.dispose();
+            note.dispose();
+            return;
+          }
+        }
+      }
+      if (!mounted) {
+        amount.dispose();
+        note.dispose();
+        return;
+      }
       setState(() => entries.insert(0, {
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
         'note': note.text.trim(),

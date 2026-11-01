@@ -92,4 +92,26 @@ void main() {
     expect(suggestKopilkaOwnTransfers(
       entries, ['Т-Банк', 'Газпромбанк', 'Ozon Банк']), isEmpty);
   });
+  test('notification duplicate warning is read-only and respects bank/time', () {
+    final saved = <Map<String, dynamic>>[
+      {'kind': 'expense', 'bank': 'Т-Банк', 'amount': 399.90,
+       'date': '2026-11-01T12:00:00'},
+      {'kind': 'income', 'bank': 'Т-Банк', 'amount': 399.90,
+       'date': '2026-11-01T12:00:00'},
+      {'kind': 'expense', 'bank': 'Ozon Банк', 'amount': 399.90,
+       'date': '2026-11-01T12:00:00'},
+    ];
+    final snapshot = saved.map((e) => Map<String, dynamic>.from(e)).toList();
+    List<Map<String, dynamic>> find(String bank, String kind, double amount,
+        String date) => possibleKopilkaDuplicateNotification(saved,
+          bank: bank, kind: kind, amount: amount, postedAt: DateTime.parse(date));
+    expect(find('Т-Банк', 'expense', 399.90, '2026-11-01T12:01:30'), hasLength(1));
+    expect(find('Т-Банк', 'expense', 399.90, '2026-11-01T12:01:31'), isEmpty);
+    expect(find('Т-Банк', 'expense', 399.91, '2026-11-01T12:00:00'), isEmpty);
+    expect(find('Газпромбанк', 'expense', 399.90, '2026-11-01T12:00:00'), isEmpty);
+    expect(find('Т-Банк', 'transfer', 399.90, '2026-11-01T12:00:00'), isEmpty);
+    expect(find('Т-Банк', 'income', 399.90, '2026-11-01T12:00:00'), hasLength(1));
+    expect(saved, snapshot);
+  });
+
 }

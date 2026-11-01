@@ -7,6 +7,19 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    // A user-controlled Android permission, not proof that the service is
+    // currently connected or that any bank has posted a notification.
+    private fun isListenerPermissionGranted(): Boolean {
+        val listeners = Settings.Secure.getString(
+            contentResolver, "enabled_notification_listeners") ?: ""
+        return listeners.split(':').any { entry ->
+            val component = ComponentName.unflattenFromString(entry.trim())
+            component != null &&
+                component.packageName == packageName &&
+                component.className == BankNotificationService::class.java.name
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kopilka/notifications")
@@ -16,18 +29,7 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                         result.success(null)
                     }
-                    "enabled" -> {
-                        val listeners = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: ""
-                        // Match the exact listener component, not a substring of
-                        // another application's package name.
-                        val enabled = listeners.split(':').any { entry ->
-                            val component = ComponentName.unflattenFromString(entry.trim())
-                            component != null &&
-                                component.packageName == packageName &&
-                                component.className == BankNotificationService::class.java.name
-                        }
-                        result.success(enabled)
-                    }
+                    "enabled" -> result.success(isListenerPermissionGranted())
                     "pending" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                         synchronized(BankNotificationService.queueLock) {
@@ -45,7 +47,13 @@ class MainActivity : FlutterActivity() {
                             "filtered" to prefs.getInt("filtered_count", 0),
                             "lastSeen" to prefs.getLong("last_seen", 0L),
                             "lastBank" to (prefs.getString("last_bank", "") ?: ""),
+                            "permissionGranted" to isListenerPermissionGranted(),
                             "connected" to prefs.getBoolean("listener_connected", false),
+                            "lastAccepted" to prefs.getLong("last_accepted", 0L),
+                            "lastAcceptedBank" to (prefs.getString("last_accepted_bank", "") ?: ""),
+                            "lastSkipped" to prefs.getLong("last_skipped", 0L),
+                            // Fixed category only. Never expose rejected notification text.
+                            "lastSkipReason" to (prefs.getString("last_skip_reason", "") ?: ""),
                             "lastConnected" to prefs.getLong("last_connected", 0L),
                             "lastDisconnected" to prefs.getLong("last_disconnected", 0L),
                             "rebindRequests" to prefs.getInt("rebind_requests", 0),

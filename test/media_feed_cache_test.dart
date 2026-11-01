@@ -97,5 +97,32 @@ void main() {
     expect(page.first['file_url'], 'https://example.org/0.gif');
   });
 
+  test('failed refresh restores exact page cursor and deduplication', () {
+    final posts = <Map<String, dynamic>>[
+      {'id': 11, 'media_asset': {'variants': ['original.gif']}},
+    ];
+    final ids = <String>{'11'};
+    final urls = <String>{'https://cdn.example/11.gif'};
+    final exhausted = <String>{'futanari'};
+    final backup = MediaFeedRefreshSnapshot(
+      posts: posts, nextPage: 7, seenIds: ids,
+      seenUrls: urls, exhaustedTags: exhausted,
+    );
+    posts.single['id'] = 99;
+    ids.clear();
+    urls.clear();
+    exhausted.clear();
+    expect(backup.posts.single['id'], 11);
+    expect(backup.nextPage, 7);
+    expect(backup.seenIds, {'11'});
+    expect(backup.seenUrls, {'https://cdn.example/11.gif'});
+    expect(backup.exhaustedTags, {'futanari'});
+    expect(() => backup.seenIds.add('12'), throwsUnsupportedError);
+    expect(() => MediaFeedRefreshSnapshot(
+      posts: const [], nextPage: 0, seenIds: const [],
+      seenUrls: const [], exhaustedTags: const [],
+    ), throwsArgumentError);
+  });
+
 
 }

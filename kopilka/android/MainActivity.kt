@@ -45,6 +45,8 @@ class MainActivity : FlutterActivity() {
                             "lastBank" to (prefs.getString("last_bank", "") ?: ""),
                             "connected" to prefs.getBoolean("listener_connected", false),
                             "lastConnected" to prefs.getLong("last_connected", 0L),
+                            "lastDisconnected" to prefs.getLong("last_disconnected", 0L),
+                            "rebindRequests" to prefs.getInt("rebind_requests", 0),
                             "bankEvents" to mapOf(
                                 "Т-Банк" to prefs.getInt("bank_count_tbank", 0),
                                 "Газпромбанк" to prefs.getInt("bank_count_gazprom", 0),

@@ -42,6 +42,14 @@ void main() {
       'Изменения:\r\n  Версия: 1.7.2+18\r\nИсправления'), '1.7.2+18');
     expect(publishedVersionFromRelease('nova-android',
       'VERSION: v2.1.0'), 'v2.1.0');
+    expect(publishedVersionFromRelease('all-hub-v0.7.3+859', null), '0.7.3+859');
+    expect(publishedVersionFromRelease('kopilka-windows',
+      'Windows portable ZIP; version: 1.0.263'), '1.0.263');
+    expect(publishedVersionFromRelease('kopilka-windows',
+      'Windows portable ZIP; version: 1.0.263; SHA-256: abc'), '1.0.263');
+    expect(publishedVersionFromRelease('kopilka-windows', null), 'kopilka-windows');
+    expect(publishedVersionFromRelease('all-hub-v0.7.3+859',
+      'Version: 0.7.3+860\nVersion: 0.7.3+861'), 'all-hub-v0.7.3+859');
     expect(publishedVersionFromRelease('all-hub-latest',
       'Автоматическая сборка без версии'), 'all-hub-latest');
     expect(publishedVersionFromRelease('all-hub-latest',

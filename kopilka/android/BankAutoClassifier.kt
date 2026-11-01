@@ -37,7 +37,10 @@ internal object BankAutoClassifier {
             RegexOption.IGNORE_CASE).containsMatchIn(text)
         val income = refund || salary || cashback
         if ((!purchase && !income) || (purchase && income && !refund)) return null
-        val merchant = Regex("""(?:^|\n)\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\r\n,;]{2,80})""",
+        // Banks may place the labelled merchant after a full stop or semicolon
+        // on the same line as the amount. Require a real separator and a
+        // labelled field: free-form text is never sufficient for auto-import.
+        val merchant = Regex("""(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\r\n,;]{2,80})""",
             RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
         if (purchase && !income && (merchant.isNullOrBlank() || merchant.length < 2)) return null
         val note = when {

@@ -151,7 +151,8 @@ class BankNotificationService : NotificationListenerService() {
         val current = try {
             JSONArray(prefs.getString("queue", "[]"))
         } catch (ignored: org.json.JSONException) {
-            prefs.edit().putInt("queue_recoveries",
+            prefs.edit().putBoolean("queue_corrupt", true)
+                .putInt("queue_recoveries",
                 (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000))
                 .putString("last_skip_reason", "queue_corrupt")
                 .putLong("last_skipped", System.currentTimeMillis()).commit()
@@ -176,6 +177,7 @@ class BankNotificationService : NotificationListenerService() {
         current.put(JSONObject().put("key", key).put("bank", bank)
             .put("title", title).put("body", body).put("time", sbn.postTime))
         val editor = prefs.edit().putString("queue", current.toString())
+            .putBoolean("queue_corrupt", false)
         editor
             .putLong("last_accepted", System.currentTimeMillis())
             .putString("last_accepted_bank", bank)

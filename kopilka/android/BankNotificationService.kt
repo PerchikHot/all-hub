@@ -244,6 +244,17 @@ class BankNotificationService : NotificationListenerService() {
         }
         val editor = prefs.edit().putString("queue", current.toString())
             .putBoolean("queue_corrupt", false)
+        // Distinguish conservative review-only alerts from durable automatic
+        // candidates without retaining any additional private message text.
+        if (candidate == null) {
+            editor.putInt("native_review_only_count",
+                (prefs.getInt("native_review_only_count", 0) + 1)
+                    .coerceAtMost(100000000))
+        } else if (canStage) {
+            editor.putInt("native_auto_staged_count",
+                (prefs.getInt("native_auto_staged_count", 0) + 1)
+                    .coerceAtMost(100000000))
+        }
         if (canStage) {
             editor.putString("auto_entries", staged!!.toString())
                 .putLong("last_native_auto_stage", System.currentTimeMillis())

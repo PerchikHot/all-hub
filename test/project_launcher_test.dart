@@ -68,6 +68,16 @@ void main() {
     }
   });
 
+  test('Windows installer rejects truncated HTTP payloads before activation', () {
+    ProjectLauncher.requireCompleteWindowsDownload(1024, 1024);
+    ProjectLauncher.requireCompleteWindowsDownload(1024, null);
+    for (final values in <(int, int?)>[(1023, 1024), (1025, 1024),
+                                       (-1, null), (0, -1)]) {
+      expect(() => ProjectLauncher.requireCompleteWindowsDownload(
+          values.$1, values.$2), throwsFormatException);
+    }
+  });
+
   test('Windows update cannot be reported complete without a saved launcher path', () {
     expect(() => ProjectLauncher.requireWindowsInstallRegistered(true),
         returnsNormally);

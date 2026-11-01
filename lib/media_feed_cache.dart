@@ -25,14 +25,29 @@ class MediaFeedMemoryCache {
 
   List<Map<String, dynamic>>? read(Uri request) {
     final key = request.toString();
-    final entry = _pages.remove(key);
+    final entry = _pages[key];
     if (entry == null) return null;
     final age = _clock().difference(entry.createdAt);
     if (age.isNegative || age >= ttl) return null;
-    // Moving a hit to the end gives deterministic LRU eviction.
+    // Moving a fresh hit to the end gives deterministic LRU eviction.
+    _pages.remove(key);
     _pages[key] = entry;
     // Deep copies are necessary: Danbooru posts can contain nested tags,
     // metadata and lists which a shallow Map.from would still share.
+    return entry.posts.map(_copyJsonPost).toList(growable: false);
+  }
+
+  /// An expired page may be used only after a failed network request.
+  /// This never extends the normal TTL or writes the user's feed to disk.
+  /// Keep a strict two-hour ceiling to avoid showing arbitrarily old media.
+  List<Map<String, dynamic>>? readStale(Uri request, {
+    Duration maxAge = const Duration(hours: 2),
+  }) {
+    if (maxAge < ttl) return null;
+    final entry = _pages[request.toString()];
+    if (entry == null) return null;
+    final age = _clock().difference(entry.createdAt);
+    if (age.isNegative || age > maxAge) return null;
     return entry.posts.map(_copyJsonPost).toList(growable: false);
   }
 

@@ -61,9 +61,12 @@ void main() {
     final report = describeKopilkaListener({
       'connected': true, 'lastSeen': 0, 'queued': 100,
       'queueDropped': 3, 'queueRecoveries': 1,
+      'queueFullRejections': 2,
     });
     expect(report, contains('3 уведомлений вытеснено'));
-    expect(report, contains('повреждения 1 раз'));
+    expect(report, contains('очередь повреждена'));
+    expect(report, contains('Исходные данные не перезаписаны'));
+    expect(report, contains('2 новых уведомлений не удалось сохранить'));
     expect(report, isNot(contains('body')));
     expect(describeKopilkaListener({
       'lastSeen': 0, 'queueDropped': 0, 'queueRecoveries': 0,

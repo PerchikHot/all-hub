@@ -1,4 +1,5 @@
 import 'project_launcher.dart';
+import 'project_download_progress.dart';
 import 'external_repositories.dart';
 import 'external_artwork.dart';
 import 'external_screenshots.dart';
@@ -519,32 +520,7 @@ class _HomePageState extends State<HomePage> {
                     : 'Файл для этой платформы не опубликован',
                     style: const TextStyle(fontWeight: FontWeight.w600))),
                 ]),
-                // React to the active project as well as byte progress.
-                // Previously the condition was evaluated only when the whole
-                // card rebuilt, so downloads often appeared to have no progress.
-                ValueListenableBuilder<String?>(
-                  valueListenable: ProjectLauncher.activeDownloadProject,
-                  builder: (context, activeProject, child) {
-                    if (activeProject != project.id) {
-                      return const SizedBox.shrink();
-                    }
-                    return ValueListenableBuilder<double?>(
-                      valueListenable: ProjectLauncher.downloadProgress,
-                      builder: (context, progress, child) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(progress == null
-                                ? 'Подготовка загрузки…'
-                                : 'Загрузка: ${(progress * 100).toStringAsFixed(0)}%'),
-                            LinearProgressIndicator(value: progress),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                ProjectDownloadProgress(projectId: project.id),
                 FutureBuilder<String?>(
                   future: ProjectLauncher.installedVersion(project.id),
                   builder: (context, installed) => Padding(

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Bounded, in-memory cache for Danbooru feed pages.
 ///
 /// Search terms and results are never written to preferences or disk by this
@@ -29,17 +31,16 @@ class MediaFeedMemoryCache {
     if (age.isNegative || age >= ttl) return null;
     // Moving a hit to the end gives deterministic LRU eviction.
     _pages[key] = entry;
-    // Return copies so UI mutations cannot corrupt the cached response.
-    return entry.posts
-        .map((post) => Map<String, dynamic>.from(post))
-        .toList(growable: false);
+    // Deep copies are necessary: Danbooru posts can contain nested tags,
+    // metadata and lists which a shallow Map.from would still share.
+    return entry.posts.map(_copyJsonPost).toList(growable: false);
   }
 
   void store(Uri request, Iterable<Map<String, dynamic>> posts) {
     final key = request.toString();
     final snapshot = posts
         .take(40)
-        .map((post) => Map<String, dynamic>.from(post))
+        .map(_copyJsonPost)
         .toList(growable: false);
     _pages.remove(key);
     _pages[key] = _MediaFeedPage(_clock(), snapshot);
@@ -50,6 +51,9 @@ class MediaFeedMemoryCache {
 
   void clear() => _pages.clear();
 }
+
+Map<String, dynamic> _copyJsonPost(Map<String, dynamic> post) =>
+    Map<String, dynamic>.from(jsonDecode(jsonEncode(post)) as Map);
 
 class _MediaFeedPage {
   const _MediaFeedPage(this.createdAt, this.posts);

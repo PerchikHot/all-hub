@@ -674,6 +674,25 @@ const kopilkaExpenseCategories = <String>[
   'Развлечения', 'Покупки', 'Другое',
 ];
 
+/// Conservative, editable merchant suggestion for reviewed notifications.
+/// Bank names alone never determine a spending category.
+String suggestKopilkaCategory(String notificationText) {
+  final text = notificationText.toLowerCase();
+  final patterns = <String, RegExp>{
+    'Продукты': RegExp(r'пят[её]рочк|перекр[её]сток|вкусвилл|дикси|супермаркет|продуктовый|магазин магнит'),
+    'Транспорт': RegExp(r'яндекс[ .-]*go|такси|метрополитен|трамвай|автобус|электричк'),
+    'Жильё': RegExp(r'жкх|коммунальн|квартплат|управляющ[а-яё]* компания'),
+    'Связь': RegExp(r'мегафон|билайн|теле2|сотов[а-яё]* связь|оплата интернет'),
+    'Здоровье': RegExp(r'аптек|фармац|поликлиник'),
+    'Развлечения': RegExp(r'кинотеатр|steam purchase|билет в кино'),
+    'Покупки': RegExp(r'wildberries|вайлдберриз|магазин dns'),
+  };
+  for (final entry in patterns.entries) {
+    if (entry.value.hasMatch(text)) return entry.key;
+  }
+  return 'Другое';
+}
+
 String kopilkaExpenseCategory(Map<String, dynamic> entry) {
   final category = entry['category'];
   return category is String && kopilkaExpenseCategories.contains(category)
@@ -1110,7 +1129,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       if (banks.contains(savedDestination)) destination = savedDestination;
     }
     String category = kopilkaExpenseCategories.contains(existing?['category'])
-        ? existing!['category'] as String : 'Другое';
+        ? existing!['category'] as String
+        : (notification == null ? 'Другое' : suggestKopilkaCategory(notificationText));
     final notificationBank = notification?['bank']?.toString();
     if (notificationBank != null && banks.contains(notificationBank)) bank = notificationBank;
     final amount = TextEditingController(

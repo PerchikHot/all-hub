@@ -1442,7 +1442,15 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             bank: bank, destination: destination,
             category: category, note: note.text);
           setState(() => entries[position] = edited);
-          await _save();
+          try {
+            await _save();
+          } catch (_) {
+            if (mounted) {
+              setState(() => entries[position] = existing);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Не удалось сохранить изменение. Старая операция сохранена.')));
+            }
+          }
         }
         amount.dispose();
         note.dispose();
@@ -1491,15 +1499,29 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
         note.dispose();
         return;
       }
-      setState(() => entries.insert(0, {
+      final created = <String, dynamic>{
         'kind': kind, 'amount': value, 'bank': bank, 'from': bank, 'to': destination,
         'note': note.text.trim(),
         'date': kopilkaConfirmedNotificationDate(
             notification, DateTime.now()).toIso8601String(),
         if (kind == 'expense') 'category': category,
         if (notification != null) 'notificationKey': key,
-      }));
-      await _save();
+      };
+      setState(() => entries.insert(0, created));
+      try {
+        await _save();
+      } catch (_) {
+        // Never acknowledge a bank notification when the journal write
+        // failed. Leave it in the native queue for a later retry.
+        if (mounted) {
+          setState(() => entries.remove(created));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Не удалось сохранить операцию. Уведомление осталось на проверке.')));
+        }
+        amount.dispose();
+        note.dispose();
+        return;
+      }
       if (notification != null) {
         final key = (notification['key'] ?? '').toString();
         if (key.isNotEmpty) {

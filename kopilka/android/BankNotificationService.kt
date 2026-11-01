@@ -240,7 +240,7 @@ class BankNotificationService : NotificationListenerService() {
         val canStage = candidate != null && staged != null &&
             staged.length() < MAX_PENDING
         if (canStage) {
-            staged!!.put(JSONObject(candidate))
+            staged!!.put(JSONObject(candidate!!))
         }
         val editor = prefs.edit().putString("queue", current.toString())
         if (canStage) {

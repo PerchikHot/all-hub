@@ -61,7 +61,7 @@ void main() {
     final report = describeKopilkaListener({
       'connected': true, 'lastSeen': 0, 'queued': 100,
       'queueDropped': 3, 'queueRecoveries': 1,
-      'queueFullRejections': 2,
+      'queueFullRejections': 2, 'queueCorrupt': true,
     });
     expect(report, contains('3 уведомлений вытеснено'));
     expect(report, contains('очередь повреждена'));

@@ -338,8 +338,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         data = cached;
       } else {
         try {
-          data = await feedClient.fetch(uri);
-          pageCache.store(uri, data.whereType<Map<String, dynamic>>());
+          final fetched = await feedClient.fetch(uri);
+          pageCache.store(uri, fetched);
+          // Use the deduplicated snapshot immediately, not only when the
+          // user revisits this page. Mirrored GIF URLs otherwise still
+          // occupied multiple slots on the first live load.
+          data = pageCache.read(uri) ?? fetched;
         } catch (_) {
           // Keep the gallery usable during HTTP 403/429 or temporary outages.
           // A stale page is a fallback only, never treated as fresh network data.

@@ -45,14 +45,18 @@ class BankNotificationService : NotificationListenerService() {
 
     // Diagnostics are counters only. Filtered notifications, including
     // one-time codes, never enter the import queue or diagnostic logs.
-    private fun markFiltered(bankId: String) {
+    private fun markFiltered(bankId: String, reason: String) {
         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
         prefs.edit()
             .putInt("filtered_count",
                 (prefs.getInt("filtered_count", 0) + 1).coerceAtMost(100000000))
             .putInt("bank_filtered_" + bankId,
                 (prefs.getInt("bank_filtered_" + bankId, 0) + 1)
-                    .coerceAtMost(100000000)).apply()
+                    .coerceAtMost(100000000))
+            // Only a fixed diagnostic category, never the notification body.
+            .putString("last_skip_reason", reason)
+            .putLong("last_skipped", System.currentTimeMillis())
+            .apply()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -78,7 +82,7 @@ class BankNotificationService : NotificationListenerService() {
                     .coerceAtMost(100000000)).apply()
         // Group summaries are duplicates, not individual payments.
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
-            markFiltered(bankId)
+            markFiltered(bankId, "group_summary")
             return
         }
         val extras = sbn.notification.extras
@@ -88,7 +92,7 @@ class BankNotificationService : NotificationListenerService() {
         val body = if (expandedText.isNotBlank()) expandedText else normalText
         // Never persist oversized or malformed notification payloads.
         if (body.isBlank() || body.length > 2048 || title.length > 200) {
-            markFiltered(bankId)
+            markFiltered(bankId, "invalid_payload")
             return
         }
         // Store transaction alerts only. Never retain OTP/login codes,
@@ -123,15 +127,21 @@ class BankNotificationService : NotificationListenerService() {
         val amount = Regex(
             """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
             RegexOption.IGNORE_CASE)
-        if (!transaction.containsMatchIn(combined) ||
-            !currency.containsMatchIn(combined) ||
-            !amount.containsMatchIn(combined) ||
+        // Record the first rejection reason as a fixed category only.
+        // Never persist the rejected notification text or credentials.
+        val skipReason = when {
             sensitive.containsMatchIn(combined) ||
-            credentials.containsMatchIn(combined) ||
-            additionalCredentials.containsMatchIn(combined) ||
+                credentials.containsMatchIn(combined) ||
+                additionalCredentials.containsMatchIn(combined) -> "credentials"
             notPosted.containsMatchIn(combined) ||
-            additionalUnposted.containsMatchIn(combined)) {
-            markFiltered(bankId)
+                additionalUnposted.containsMatchIn(combined) -> "not_completed"
+            !transaction.containsMatchIn(combined) -> "not_transaction"
+            !currency.containsMatchIn(combined) ||
+                !amount.containsMatchIn(combined) -> "no_amount"
+            else -> null
+        }
+        if (skipReason != null) {
+            markFiltered(bankId, skipReason)
             return
         }
         synchronized(queueLock) {
@@ -166,6 +176,8 @@ class BankNotificationService : NotificationListenerService() {
                 .putLong("last_queue_drop", System.currentTimeMillis())
         }
         editor
+            .putLong("last_accepted", System.currentTimeMillis())
+            .putString("last_accepted_bank", bank)
             .putInt("accepted_count", (prefs.getInt("accepted_count", 0) + 1)
                 .coerceAtMost(100000000))
             .putInt("bank_accepted_" + bankId,

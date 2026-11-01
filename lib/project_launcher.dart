@@ -462,7 +462,19 @@ class ProjectLauncher {
         } finally {
           await file.close();
         }
-        await verifyDownloadedDigest(temporary, sha256Digest);
+        // Rolling GitHub Releases replace the asset at the same URL. A partial
+        // download from the previous asset must never be resumed into the new
+        // APK. On a digest mismatch, discard the partial file and retry once
+        // from byte zero; never bypass SHA-256 verification.
+        try {
+          await verifyDownloadedDigest(temporary, sha256Digest);
+        } on FormatException {
+          if (sha256Digest == null) rethrow;
+          if (await temporary.exists()) await temporary.delete();
+          downloadProgress.value = 0;
+          await _downloadResumable(client, uri, temporary);
+          await verifyDownloadedDigest(temporary, sha256Digest);
+        }
         if (await apk.exists()) await apk.delete();
         await temporary.rename(apk.path);
         // Android owns the final install confirmation. A false/null result

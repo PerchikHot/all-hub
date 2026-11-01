@@ -45,7 +45,12 @@ class MediaFeedClient {
         // while connecting. Retry the same page without caching a partial JSON.
         // The source is public, but redirects can leak search tags to
         // unrelated domains and return an unrelated page as feed JSON.
-        final request = http.Request('GET', uri)..followRedirects = false;
+        final request = http.Request('GET', uri)
+          ..followRedirects = false
+          // Public API providers can reject generic Dart clients as bots.
+          // Identify this app, request JSON only, and never attach credentials.
+          ..headers['User-Agent'] = 'AllHub/0.7.8 (public media browser; github.com/PerchikHot/all-hub)'
+          ..headers['Accept'] = 'application/json';
         final response = await _client.send(request)
             .timeout(const Duration(seconds: 18));
         if (response.statusCode >= 500 && attempt + 1 < maxAttempts) {

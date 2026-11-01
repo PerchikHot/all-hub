@@ -42,14 +42,13 @@ String suggestNotificationAmount(String body, {bool allowAmbiguous = false}) {
     if (beforeBalance && !beforeTransaction) continue;
     if (!beforeTransaction && afterBalance && !afterTransaction) continue;
     final score = beforeTransaction ? 10 : afterTransaction ? 5 : 0;
+    final whole = match.group(1)!.replaceAll(RegExp(r'[ \u00a0\u202f]'), '');
+    final decimals = match.group(2);
+    final candidate = decimals == null ? whole : '$whole.$decimals';
+    // Ignore invalid and zero-value amounts at every ranking level.
+    final numeric = double.tryParse(candidate);
+    if (numeric == null || !numeric.isFinite || numeric <= 0) continue;
     if (score > bestScore) {
-      final whole = match.group(1)!.replaceAll(RegExp(r'[ \u00a0\u202f]'), '');
-      final decimals = match.group(2);
-      final candidate = decimals == null ? whole : '$whole.$decimals';
-      // Zero-value bank alerts are not transactions. Ignore them rather
-      // than prefill an invalid amount or hide a later valid purchase.
-      final numeric = double.tryParse(candidate);
-      if (numeric == null || !numeric.isFinite || numeric <= 0) continue;
       bestScore = score;
       result = candidate;
       ambiguous = false;

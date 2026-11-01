@@ -58,6 +58,8 @@ class MainActivity : FlutterActivity() {
                             "lastSkipReason" to (prefs.getString("last_skip_reason", "") ?: ""),
                             "lastConnected" to prefs.getLong("last_connected", 0L),
                             "lastDisconnected" to prefs.getLong("last_disconnected", 0L),
+                            "lastRecoveryScan" to prefs.getLong("last_recovery_scan", 0L),
+                            "recoveryCandidates" to prefs.getInt("recovery_candidates", 0),
                             "rebindRequests" to prefs.getInt("rebind_requests", 0),
                             "queueRecoveries" to prefs.getInt("queue_recoveries", 0),
                             "queueCorrupt" to prefs.getBoolean("queue_corrupt", false),

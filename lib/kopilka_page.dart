@@ -131,6 +131,26 @@ bool isBankTransactionNotification(String title, String body) {
       !scheduledTransaction.hasMatch(text);
 }
 
+/// Read-only preview for the review queue. Never posts an operation or
+/// treats a suggested amount as an actual bank balance.
+String kopilkaPendingReviewPreview(Map<String, dynamic> event) {
+  final title = event['title'];
+  final body = event['body'];
+  if (title is! String || body is! String ||
+      !isBankTransactionNotification(title, body)) {
+    return 'Данные требуют ручной проверки';
+  }
+  final amount = suggestNotificationAmount('$title\n$body');
+  if (amount.isEmpty) return 'Сумма требует проверки';
+  final combined = '$title\n$body';
+  if (RegExp(r'перевод|transfer', caseSensitive: false).hasMatch(combined)) {
+    return 'Перевод $amount ₽ · уточнить свои счета';
+  }
+  final kind = suggestNotificationKind(combined) == 'income'
+      ? 'Возможный доход' : 'Возможный расход';
+  return '$kind $amount ₽ · подтвердить';
+}
+
 /// Only review a native notification once, even if the listener returns the
 /// same event repeatedly. Events without a stable key cannot be safely imported.
 List<Map<String, dynamic>> filterPendingBankNotifications(
@@ -1585,8 +1605,17 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                   ListTile(
                     leading: const Icon(Icons.receipt_long_outlined),
                     title: Text((event['bank'] ?? 'Банк').toString()),
-                    subtitle: Text((event['title'] ?? 'Уведомление').toString(),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text((event['title'] ?? 'Уведомление').toString(),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(kopilkaPendingReviewPreview(event),
+                          style: const TextStyle(color: Color(0xFFA8D8FF)),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                    isThreeLine: true,
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _reviewNotification(event),
                   ),

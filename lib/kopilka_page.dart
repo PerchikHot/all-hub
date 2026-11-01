@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Suggests an amount for manual review. Balance-only notifications must
 /// not be prefilled as expenses; the user still confirms every operation.
-String suggestNotificationAmount(String body) {
+String suggestNotificationAmount(String body, {bool allowAmbiguous = false}) {
   final amountPattern = RegExp(
     r'(\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(?:₽|руб(?:\.|ль|ля|лей)?|RUB)',
     caseSensitive: false,
@@ -21,6 +21,7 @@ String suggestNotificationAmount(String body) {
   final matches = amountPattern.allMatches(body).toList();
   String result = '';
   var bestScore = -1;
+  var ambiguous = false;
   for (var i = 0; i < matches.length; i++) {
     final match = matches[i];
     final beforeStart = i == 0
@@ -51,9 +52,14 @@ String suggestNotificationAmount(String body) {
       if (numeric == null || !numeric.isFinite || numeric <= 0) continue;
       bestScore = score;
       result = candidate;
+      ambiguous = false;
+    } else if (score == bestScore && candidate != result) {
+      // One alert may contain multiple completed transactions. Never guess
+      // which sum to post; leave the amount blank in the review dialog.
+      ambiguous = true;
     }
   }
-  return result;
+  return ambiguous && !allowAmbiguous ? '' : result;
 }
 
 /// Conservative default for the review dialog, never an automatic posting.
@@ -124,7 +130,8 @@ bool isBankTransactionNotification(String title, String body) {
   // A currency label without a readable amount is not a transaction.
   return transaction.hasMatch(text) &&
       currency.hasMatch(text) &&
-      suggestNotificationAmount(text).isNotEmpty &&
+      // Ambiguous multi-transaction alerts still belong in manual review.
+      suggestNotificationAmount(text, allowAmbiguous: true).isNotEmpty &&
       !sensitive.hasMatch(text) && !credentialWords.hasMatch(text) &&
       !additionalCredentials.hasMatch(text) &&
       !failedTransaction.hasMatch(text) && !notCompleted.hasMatch(text) &&

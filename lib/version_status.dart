@@ -1,23 +1,23 @@
-/// A rolling GitHub release tag is not a version. CI may include an
-/// explicit published package version in the release description.
+/// Parse a single published version from release notes. GitHub rolling tags
+/// are channels, not version numbers. Some CI release bodies put Version
+/// after a semicolon (e.g. "Windows ZIP; Version: 1.0.263").
 String publishedVersionFromRelease(String tag, String? notes) {
   final matches = RegExp(
-    r'^[ \t]*(?:Version|Версия):[ \t]*(v?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*\r?$',
+    r'(?:^|;)[ \t]*(?:Version|Версия):[ \t]*([vV]?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*(?=\r?$|;)',
     multiLine: true,
     caseSensitive: false,
   ).allMatches(notes ?? '').map((match) => match.group(1)!).toList();
-  // "v1.2.3" and "1.2.3" describe the same build. Do not suppress
-  // a valid update when release notes contain both notations.
   final uniqueVersions = matches
       .map((version) => version.replaceFirst(RegExp(r'^[vV]'), ''))
       .toSet();
-  // Conflicting version lines must not advertise an unverified update.
   if (uniqueVersions.length == 1) return matches.first;
   if (uniqueVersions.length > 1) return tag;
-  // Immutable, versioned tags are comparable even when release notes are
-  // missing. Rolling tags (e.g. kopilka-windows) remain unknown.
+  // Only immutable, explicitly numbered tags can be compared without notes.
   final versionedTag = RegExp(
-    r'^(?:all-hub|kopilka|shadow-rp|nova|eclipse-arena)-v?(\\d+\\.\\d+\\.\\d+(?:\\+\\d+)?)
+    r'^(?:all-hub|kopilka|shadow-rp|nova|eclipse-arena)-v?(\d+\.\d+\.\d+(?:\+\d+)?)$',
+    caseSensitive: false,
+  ).firstMatch(tag.trim());
+  return versionedTag?.group(1) ?? tag;
 }
 
 /// Compare only explicit numeric versions. Moving release tags such as

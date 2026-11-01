@@ -1,5 +1,29 @@
 import 'dart:convert';
 
+/// A failed pull-to-refresh must restore pagination and deduplication too.
+/// Restoring only cards made the next retry re-fetch page one and duplicate
+/// everything already visible. This snapshot stays in memory, never on disk.
+class MediaFeedRefreshSnapshot {
+  MediaFeedRefreshSnapshot({
+    required Iterable<Map<String, dynamic>> posts,
+    required this.nextPage,
+    required Iterable<String> seenIds,
+    required Iterable<String> seenUrls,
+    required Iterable<String> exhaustedTags,
+  })  : posts = List.unmodifiable(posts.map(_copyJsonPost)),
+        seenIds = Set.unmodifiable(seenIds),
+        seenUrls = Set.unmodifiable(seenUrls),
+        exhaustedTags = Set.unmodifiable(exhaustedTags) {
+    if (nextPage < 1) throw ArgumentError('Invalid pagination cursor');
+  }
+
+  final List<Map<String, dynamic>> posts;
+  final int nextPage;
+  final Set<String> seenIds;
+  final Set<String> seenUrls;
+  final Set<String> exhaustedTags;
+}
+
 /// Bounded, in-memory cache for Danbooru feed pages.
 ///
 /// Search terms and results are never written to preferences or disk by this

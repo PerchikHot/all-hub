@@ -10,6 +10,19 @@ void main() {
         contains('после обновления'));
   });
 
+  test('queue overflow and recovery are visible without notification contents', () {
+    final report = describeKopilkaListener({
+      'connected': true, 'lastSeen': 0, 'queued': 100,
+      'queueDropped': 3, 'queueRecoveries': 1,
+    });
+    expect(report, contains('3 уведомлений вытеснено'));
+    expect(report, contains('повреждения 1 раз'));
+    expect(report, isNot(contains('body')));
+    expect(describeKopilkaListener({
+      'lastSeen': 0, 'queueDropped': 0, 'queueRecoveries': 0,
+    }), isNot(contains('Внимание:')));
+  });
+
   test('listener disconnect diagnostics report rebind attempts without bank text', () {
     final report = describeKopilkaListener({
       'connected': false,

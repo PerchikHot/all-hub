@@ -592,6 +592,14 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final lastConnected = diagnostics['lastConnected'];
   final lastDisconnected = diagnostics['lastDisconnected'];
   final rebindRequests = diagnostics['rebindRequests'];
+  final dropped = diagnostics['queueDropped'];
+  final recoveries = diagnostics['queueRecoveries'];
+  final queueWarning = (dropped is int && dropped > 0
+          ? ' Внимание: $dropped уведомлений вытеснено из очереди (лимит 100).'
+          : '') +
+      (recoveries is int && recoveries > 0
+          ? ' Очередь восстановлена после повреждения $recoveries раз.'
+          : '');
   final reconnectInfo = !connected && lastDisconnected is int &&
           lastDisconnected > 0
       ? ' Последнее отключение: ${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().day.toString().padLeft(2, '0')}.${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().month.toString().padLeft(2, '0')}. '
@@ -603,12 +611,12 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
           ? 'Служба отключена — проверь разрешение и энергосбережение.'
           : 'Подключение службы ещё не подтверждено.') + reconnectInfo;
   if (lastSeen is! int || lastSeen <= 0) {
-    return '$connection Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.';
+    return '$connection Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.$queueWarning';
   }
   final bank = (diagnostics['lastBank'] ?? '').toString();
   final time = DateTime.fromMillisecondsSinceEpoch(lastSeen).toLocal();
   final stamp = '${time.day.toString().padLeft(2, '0')}.${time.month.toString().padLeft(2, '0')} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  return '$connection Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.';
+  return '$connection Последнее уведомление: ${bank.isEmpty ? 'банк' : bank}, $stamp · в очереди: ${queued is int && queued >= 0 ? queued : 0}.$queueWarning';
 }
 
 /// Counts supported-bank events observed by the native listener, including

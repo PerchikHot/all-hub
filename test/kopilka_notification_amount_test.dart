@@ -459,4 +459,15 @@ void main() {
     }), contains('Т-Банк: 0'));
   });
 
+  test('explicit merchant labels prefill editable note without guessing', () {
+    expect(suggestKopilkaMerchant('Т-Банк\nОплата 299 ₽\nМагазин: Пятёрочка'),
+        'Пятёрочка');
+    expect(suggestKopilkaMerchant('Ozon Банк\nMerchant: Ozon Shop'),
+        'Ozon Shop');
+    expect(suggestKopilkaMerchant('Газпромбанк\nТорговая точка — Аптека 36.6'),
+        'Аптека 36.6');
+    expect(suggestKopilkaMerchant('Оплата 300 ₽. Остаток 2000 ₽'), isNull);
+    expect(suggestKopilkaMerchant('Магазин: код подтверждения 1234'), isNull);
+  });
+
 }

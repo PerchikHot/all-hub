@@ -674,6 +674,23 @@ const kopilkaExpenseCategories = <String>[
   'Развлечения', 'Покупки', 'Другое',
 ];
 
+/// Extract a merchant only from an explicit label, not from arbitrary bank
+/// prose. The candidate is local and editable before the user approves import.
+String? suggestKopilkaMerchant(String notificationText) {
+  final match = RegExp(
+    r'(?:^|\n)\s*(?:магазин|торговая точка|merchant)\s*[:—-]\s*([^\n;]{2,80})',
+    caseSensitive: false,
+  ).firstMatch(notificationText);
+  if (match == null) return null;
+  final merchant = match.group(1)!.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (merchant.length < 2 || merchant.length > 64 ||
+      RegExp(r'\b(?:otp|pin|cvv|cvc|password)\b|код\s+подтверждения|парол',
+        caseSensitive: false).hasMatch(merchant)) {
+    return null;
+  }
+  return merchant;
+}
+
 /// Conservative, editable merchant suggestion for reviewed notifications.
 /// Bank names alone never determine a spending category.
 String suggestKopilkaCategory(String notificationText) {
@@ -1160,7 +1177,8 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           : notification == null ? '' : suggestNotificationAmount((notification['body'] ?? '').toString()));
     final note = TextEditingController(
       text: existing != null ? (existing['note'] ?? '').toString()
-          : notification == null ? '' : (notification['title'] ?? '').toString());
+          : notification == null ? '' : (suggestKopilkaMerchant(notificationText) ??
+              (notification['title'] ?? '').toString()));
     String? validationError;
     final saved = await showDialog<bool>(context: context, builder: (dialogContext) =>
       StatefulBuilder(builder: (dialogContext, update) => AlertDialog(

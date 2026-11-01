@@ -731,6 +731,8 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final lastConnected = diagnostics['lastConnected'];
   final lastDisconnected = diagnostics['lastDisconnected'];
   final rebindRequests = diagnostics['rebindRequests'];
+  final recoveryScan = diagnostics['lastRecoveryScan'];
+  final recoveryCandidates = diagnostics['recoveryCandidates'];
   final dropped = diagnostics['queueDropped'];
   final recoveries = diagnostics['queueRecoveries'];
   final queueCorrupt = diagnostics['queueCorrupt'] == true;
@@ -760,11 +762,16 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
       ? ' Последнее отключение: ${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().day.toString().padLeft(2, '0')}.${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().month.toString().padLeft(2, '0')}. '
           'Запросов переподключения: ${rebindRequests is int && rebindRequests >= 0 ? rebindRequests : 0}.'
       : '';
+  final recoveryInfo = recoveryScan is int && recoveryScan > 0
+      ? ' После переподключения проверено активных банковских уведомлений: '
+          '${recoveryCandidates is int && recoveryCandidates >= 0 ? recoveryCandidates : 0}. '
+          'Уже закрытые уведомления Android восстановить не может.'
+      : '';
   final connection = (connected
       ? 'Служба уведомлений подключена.'
       : lastConnected is int && lastConnected > 0
           ? 'Служба отключена — проверь разрешение и энергосбережение.'
-          : 'Подключение службы ещё не подтверждено.') + reconnectInfo;
+          : 'Подключение службы ещё не подтверждено.') + reconnectInfo + recoveryInfo;
   if (lastSeen is! int || lastSeen <= 0) {
     return '$connection Уведомлений от поддерживаемых банков ещё не получено. Открой банковское приложение и проверь доступ.$queueWarning';
   }

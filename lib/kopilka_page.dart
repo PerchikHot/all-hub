@@ -247,12 +247,15 @@ Map<String, dynamic>? confidentKopilkaAutoEntry(
       caseSensitive: false).hasMatch(text);
   final trustedIncome = RegExp(r'зарплат|кэшбэк|кешбэк|возврат\s+(?:покупк|оплат)|salary|cashback|refund',
       caseSensitive: false).hasMatch(text);
-  if (purchase == trustedIncome) return null;
+  final refund = RegExp(r'возврат\s+(?:покупк|оплат)|refund',
+      caseSensitive: false).hasMatch(text);
+  if ((!purchase && !trustedIncome) ||
+      (purchase && trustedIncome && !refund)) return null;
   final merchant = suggestKopilkaMerchant(text);
   final category = suggestKopilkaCategory(text);
   // A generic debit alert is not evidence of a merchant purchase.
-  if (purchase && merchant == null && category == 'Другое') return null;
-  final kind = purchase ? 'expense' : 'income';
+  if (purchase && !refund && merchant == null && category == 'Другое') return null;
+  final kind = trustedIncome ? 'income' : 'expense';
   final date = kopilkaConfirmedNotificationDate(event, now);
   if (possibleKopilkaDuplicateNotification(saved,
       bank: bank, kind: kind, amount: amount, postedAt: date).isNotEmpty) {

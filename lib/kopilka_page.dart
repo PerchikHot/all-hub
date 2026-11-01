@@ -707,7 +707,11 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final rebindRequests = diagnostics['rebindRequests'];
   final dropped = diagnostics['queueDropped'];
   final recoveries = diagnostics['queueRecoveries'];
-  final queueWarning = (dropped is int && dropped > 0
+  final writeFailure = diagnostics['lastQueueWriteFailed'];
+  final queueWarning = (writeFailure is int && writeFailure > 0
+          ? ' ВНИМАНИЕ: Android не смог сохранить банковское уведомление на диск. Проверь свободное место и повторно открой Копилку.'
+          : '') +
+      (dropped is int && dropped > 0
           ? ' Внимание: $dropped уведомлений вытеснено из очереди (лимит 100).'
           : '') +
       (recoveries is int && recoveries > 0

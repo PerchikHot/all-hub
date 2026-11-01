@@ -67,7 +67,9 @@ class MediaFeedMemoryCache {
   List<Map<String, dynamic>>? readStale(Uri request, {
     Duration maxAge = const Duration(hours: 2),
   }) {
-    if (maxAge < ttl) return null;
+    // This fallback must never exceed two hours, even if a caller supplies
+    // a larger duration. A stale page is not an offline archive.
+    if (maxAge < ttl || maxAge > const Duration(hours: 2)) return null;
     final entry = _pages[request.toString()];
     if (entry == null) return null;
     final age = _clock().difference(entry.createdAt);

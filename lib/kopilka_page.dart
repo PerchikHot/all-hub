@@ -733,6 +733,7 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final rebindRequests = diagnostics['rebindRequests'];
   final dropped = diagnostics['queueDropped'];
   final recoveries = diagnostics['queueRecoveries'];
+  final queueCorrupt = diagnostics['queueCorrupt'] == true;
   final queueFull = diagnostics['queueFullRejections'];
   final writeFailure = diagnostics['lastQueueWriteFailed'];
   final queueWarning = (writeFailure is int && writeFailure > 0
@@ -741,9 +742,11 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
       (dropped is int && dropped > 0
           ? ' Внимание: $dropped уведомлений вытеснено из очереди (лимит 100).'
           : '') +
-      (recoveries is int && recoveries > 0
-          ? ' ВНИМАНИЕ: очередь повреждена ($recoveries событий диагностики). Исходные данные не перезаписаны; автоматический импорт остановлен до восстановления.'
-          : '') +
+      (queueCorrupt
+          ? ' ВНИМАНИЕ: очередь повреждена. Исходные данные не перезаписаны; автоматический импорт остановлен до восстановления.'
+          : recoveries is int && recoveries > 0
+              ? ' Ранее обнаружены повреждения очереди: $recoveries. Текущее состояние очереди не отмечено как повреждённое.'
+              : '') +
       (queueFull is int && queueFull > 0
           ? ' ВНИМАНИЕ: очередь заполнена. $queueFull новых уведомлений не удалось сохранить. Открой Копилку и проверь операции.'
           : '');

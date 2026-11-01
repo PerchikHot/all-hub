@@ -246,6 +246,7 @@ class BankNotificationService : NotificationListenerService() {
         if (canStage) {
             editor.putString("auto_entries", staged!!.toString())
                 .putLong("last_native_auto_stage", System.currentTimeMillis())
+                .remove("last_native_stage_error")
         } else if (candidate != null) {
             editor.putString("last_native_stage_error",
                 if (staged == null) "ledger_corrupt" else "ledger_full")

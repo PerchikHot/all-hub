@@ -733,6 +733,7 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final rebindRequests = diagnostics['rebindRequests'];
   final dropped = diagnostics['queueDropped'];
   final recoveries = diagnostics['queueRecoveries'];
+  final queueFull = diagnostics['queueFullRejections'];
   final writeFailure = diagnostics['lastQueueWriteFailed'];
   final queueWarning = (writeFailure is int && writeFailure > 0
           ? ' ВНИМАНИЕ: Android не смог сохранить банковское уведомление на диск. Проверь свободное место и повторно открой Копилку.'
@@ -741,7 +742,10 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
           ? ' Внимание: $dropped уведомлений вытеснено из очереди (лимит 100).'
           : '') +
       (recoveries is int && recoveries > 0
-          ? ' Очередь восстановлена после повреждения $recoveries раз.'
+          ? ' ВНИМАНИЕ: очередь повреждена ($recoveries событий диагностики). Исходные данные не перезаписаны; автоматический импорт остановлен до восстановления.'
+          : '') +
+      (queueFull is int && queueFull > 0
+          ? ' ВНИМАНИЕ: очередь заполнена. $queueFull новых уведомлений не удалось сохранить. Открой Копилку и проверь операции.'
           : '');
   final reconnectInfo = !connected && lastDisconnected is int &&
           lastDisconnected > 0
@@ -793,6 +797,8 @@ String describeKopilkaListenerPipeline(Map<String, dynamic>? diagnostics,
     'not_completed' => 'операция не завершена',
     'not_transaction' => 'не финансовая операция',
     'no_amount' => 'нет однозначной суммы в рублях',
+    'queue_corrupt' => 'повреждённая очередь сохранена без перезаписи',
+    'queue_full' => 'очередь заполнена (100 событий)',
     _ => 'причина ещё не зарегистрирована',
   };
   final skipped = diagnostics['lastSkipped'];

@@ -84,4 +84,18 @@ void main() {
     expect(() => MediaFeedMemoryCache(maxEntries: 0), throwsArgumentError);
     expect(() => MediaFeedMemoryCache(ttl: Duration.zero), throwsArgumentError);
   });
+  test('repeated post IDs do not consume the 40-card media budget', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/repeated-gifs');
+    cache.store(request, [
+      for (var i = 0; i < 60; i++)
+        {'id': i ~/ 2, 'file_url': 'https://example.org/$i.gif'},
+    ]);
+    final page = cache.read(request)!;
+    expect(page, hasLength(30));
+    expect(page.map((post) => post['id']).toSet(), hasLength(30));
+    expect(page.first['file_url'], 'https://example.org/0.gif');
+  });
+
+
 }

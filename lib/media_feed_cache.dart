@@ -82,11 +82,21 @@ class MediaFeedMemoryCache {
     // Bound traversal as well as storage to keep a hostile feed finite.
     final snapshot = <Map<String, dynamic>>[];
     final seenIds = <String>{};
+    final seenMediaUrls = <String>{};
     for (final post in posts.take(200)) {
       final id = post['id'];
-      if (id is int || id is String) {
-        if (!seenIds.add(id.toString())) continue;
-      }
+      final idKey = id is int || id is String ? id.toString() : null;
+      // A mirrored upload may have a new post ID but the exact same image
+      // or GIF URL. Keep one card per actual media file in the cached page.
+      final mediaUrl = <String>['file_url', 'large_file_url', 'preview_file_url']
+          .map((field) => post[field])
+          .whereType<String>()
+          .where((url) => url.startsWith('https://') || url.startsWith('http://'))
+          .firstOrNull;
+      if (idKey != null && seenIds.contains(idKey)) continue;
+      if (mediaUrl != null && seenMediaUrls.contains(mediaUrl)) continue;
+      if (idKey != null) seenIds.add(idKey);
+      if (mediaUrl != null) seenMediaUrls.add(mediaUrl);
       snapshot.add(_copyJsonPost(post));
       if (snapshot.length == 40) break;
     }

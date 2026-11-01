@@ -217,7 +217,10 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build windows --release
+      # Keep Windows executable metadata aligned with the immutable release tag.
+      # Without this, PackageInfo reports the pubspec build (e.g. +12) while
+      # GitHub publishes +933, so All Hub always claims its own update is pending.
+      - run: flutter build windows --release --build-number ${{ github.run_number }}
       - name: Package portable Windows app
         shell: pwsh
         run: |

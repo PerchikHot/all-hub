@@ -236,7 +236,9 @@ class ProjectLauncher {
     final executable = prefs.getString('exe_$id');
     final version = prefs.getString('installed_version_$id');
     if (executable == null || executable.isEmpty ||
-        version == null || version.isEmpty) return null;
+        version == null || version.isEmpty) {
+      return null;
+    }
     try {
       return await File(executable).exists() ? version : null;
     } on FileSystemException {

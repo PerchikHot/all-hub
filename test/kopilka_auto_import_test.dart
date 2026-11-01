@@ -62,4 +62,27 @@ void main() {
     }];
     expect(confidentKopilkaAutoEntry(event, otherBank, now), isNull);
   });
+  test('disconnected listener does not block durable queued transactions', () {
+    expect(shouldImportQueuedKopilkaEvents(
+        permissionGranted: true, journalHealthy: true, queuedCount: 3), isTrue);
+    expect(shouldImportQueuedKopilkaEvents(
+        permissionGranted: false, journalHealthy: true, queuedCount: 3), isFalse);
+    expect(shouldImportQueuedKopilkaEvents(
+        permissionGranted: true, journalHealthy: false, queuedCount: 3), isFalse);
+    expect(shouldImportQueuedKopilkaEvents(
+        permissionGranted: true, journalHealthy: true, queuedCount: 0), isFalse);
+  });
+
+  test('corrupted journal is never interpreted as an empty history', () {
+    expect(decodeKopilkaJournal(null), isEmpty);
+    expect(decodeKopilkaJournal('[]'), isEmpty);
+    expect(decodeKopilkaJournal('[{"kind":"expense","amount":100}]'),
+        hasLength(1));
+    for (final raw in ['{broken', '{}', '[1]', '[null]',
+        '[{"kind":"expense"}, {"x":1}, false]']) {
+      expect(() => decodeKopilkaJournal(raw), throwsFormatException,
+          reason: raw);
+    }
+  });
+
 }

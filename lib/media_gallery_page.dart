@@ -24,7 +24,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final pageCache = MediaFeedMemoryCache(maxEntries: 16);
   final feedClient = MediaFeedClient();
   // Keep the visible feed when an explicit network refresh fails.
-  final refreshBackup = <Map<String, dynamic>>[];
+  MediaFeedRefreshSnapshot? refreshSnapshot;
   bool bypassPageCache = false;
   bool showingCachedPage = false;
   final favoritePosts = <Map<String, dynamic>>[];
@@ -259,9 +259,15 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   Future<void> search({bool bypassCache = false}) async {
     final q = queryController.text.trim();
     bypassPageCache = bypassCache;
-    refreshBackup
-      ..clear()
-      ..addAll(bypassCache && !favoritesOnly ? posts : const <Map<String, dynamic>>[]);
+    refreshSnapshot = bypassCache && !favoritesOnly && posts.isNotEmpty
+        ? MediaFeedRefreshSnapshot(
+            posts: posts,
+            nextPage: page,
+            seenIds: seenPostIds,
+            seenUrls: seenPostUrls,
+            exhaustedTags: exhaustedFeedTags,
+          )
+        : null;
     favoritesOnly = false;
     searchGeneration++;
     setState(() {
@@ -353,7 +359,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         query: requestedQuery,
       );
       setState(() {
-        refreshBackup.clear();
+        refreshSnapshot = null;
         if (usedCachedPage) showingCachedPage = true;
         fetchedPosts += data.length;
         filteredPosts += data.length - newPosts.length;
@@ -379,10 +385,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         setState(() {
           // A manual refresh must not turn a populated feed into a blank
           // screen when the source is temporarily offline or rate limited.
-          if (posts.isEmpty && refreshBackup.isNotEmpty) {
-            posts.addAll(refreshBackup);
+          final backup = refreshSnapshot;
+          if (posts.isEmpty && backup != null) {
+            posts.addAll(backup.posts);
+            seenPostIds..clear()..addAll(backup.seenIds);
+            seenPostUrls..clear()..addAll(backup.seenUrls);
+            exhaustedFeedTags..clear()..addAll(backup.exhaustedTags);
+            page = backup.nextPage;
+            showingCachedPage = true;
           }
-          refreshBackup.clear();
+          refreshSnapshot = null;
           accessDenied = e is MediaFeedRequestException && e.statusCode == 403;
           error = accessDenied
               ? 'Источник отклонил запрос (HTTP 403). Проверь доступ или открой поиск на сайте.'

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
-/// Consistent, offline project identity for All Hub cards.
-/// Distinct from optional user-supplied cover artwork.
+/// Show the real approved launcher artwork, not generic Material symbols.
+/// All Hub and Kopilka ship offline assets; the remaining three load their
+/// respective repository launcher artwork and persist in the disk cache.
 class VeyrionProjectIcon extends StatelessWidget {
   final String id;
   final double size;
@@ -9,32 +11,45 @@ class VeyrionProjectIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spec = switch (id) {
-      'all-hub' => (Icons.hub_rounded, const Color(0xFF56C9FF), 'AH'),
-      'eclipse-arena' => (Icons.sports_martial_arts_rounded, const Color(0xFFAA7DFF), 'EA'),
-      'shadow-rp' => (Icons.forum_rounded, const Color(0xFF55B5FF), 'RP'),
-      'kopilka' => (Icons.savings_rounded, const Color(0xFF66E3C0), '₽'),
-      'nova-game' => (Icons.auto_awesome_rounded, const Color(0xFFFF83D1), 'N'),
-      _ => (Icons.apps_rounded, const Color(0xFF90A9E8), 'APP'),
+    final local = switch (id) {
+      'all-hub' => 'assets/icons/all_hub.webp',
+      'kopilka' => 'assets/icons/kopilka.webp',
+      _ => null,
     };
+    final remote = switch (id) {
+      'eclipse-arena' =>
+        'https://raw.githubusercontent.com/PerchikHot/Eclipse-Arena-/main/assets/launcher.webp',
+      'shadow-rp' =>
+        'https://raw.githubusercontent.com/PerchikHot/Shadow-rp/main/assets/launcher.webp',
+      'nova-game' =>
+        'https://raw.githubusercontent.com/PerchikHot/-/main/assets/launcher.webp',
+      _ => null,
+    };
+    Widget fallback() => const ColoredBox(
+      color: Color(0xFF101B37),
+      child: Center(child: Icon(Icons.apps_rounded, color: Color(0xFF56C9FF))),
+    );
+    final Widget artwork;
+    if (local != null) {
+      artwork = Image.asset(local, width: size, height: size,
+          fit: BoxFit.cover, errorBuilder: (_, _, _) => fallback());
+    } else if (remote != null) {
+      artwork = CachedNetworkImage(imageUrl: remote,
+        width: size, height: size, fit: BoxFit.cover,
+        placeholder: (_, _) => fallback(),
+        errorWidget: (_, _, _) => fallback());
+    } else {
+      artwork = fallback();
+    }
     return Container(
       width: size, height: size,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * .24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [Color(0xFF203B76), Color(0xFF0A1228)]),
-        border: Border.all(color: spec.$2.withValues(alpha: .85), width: 1.5),
-        boxShadow: [BoxShadow(color: spec.$2.withValues(alpha: .24),
-          blurRadius: 18, spreadRadius: 1)],
+        border: Border.all(color: const Color(0xFF4A9DDB), width: 1.2),
+        boxShadow: const [BoxShadow(color: Color(0x44377DC8), blurRadius: 12)],
       ),
-      child: Stack(alignment: Alignment.center, children: [
-        Icon(spec.$1, size: size * .50, color: spec.$2),
-        Positioned(right: size * .08, bottom: size * .07,
-          child: Text(spec.$3, style: TextStyle(
-            fontSize: size * .12, fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: .82)))),
-      ]),
+      child: artwork,
     );
   }
 }

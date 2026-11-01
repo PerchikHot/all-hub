@@ -491,6 +491,14 @@ void main() {
     }), contains('Т-Банк: 0'));
   });
 
+  test('ambiguous bank alerts never invent a spending category', () {
+    expect(suggestKopilkaCategory('Оплата 200 ₽ Магазин: Пятёрочка'), 'Продукты');
+    expect(suggestKopilkaCategory('Оплата 200 ₽ Яндекс Go такси'), 'Транспорт');
+    expect(suggestKopilkaCategory(
+      'Оплата 200 ₽ Пятёрочка; Оплата 400 ₽ такси'), 'Другое');
+    expect(suggestKopilkaCategory('Оплата 200 ₽ неизвестный магазин'), 'Другое');
+  });
+
   test('explicit merchant labels prefill editable note without guessing', () {
     expect(suggestKopilkaMerchant('Т-Банк\nОплата 299 ₽\nМагазин: Пятёрочка'),
         'Пятёрочка');

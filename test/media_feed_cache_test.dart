@@ -16,6 +16,26 @@ void main() {
     expect(cache.read(request)!.single['id'], 1);
   });
 
+  test('nested GIF and image metadata cannot mutate a cached page', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/nested');
+    final original = <String, dynamic>{
+      'id': 1,
+      'media_asset': <String, dynamic>{
+        'variants': <dynamic>[<String, dynamic>{'url': 'safe.gif'}],
+      },
+    };
+    cache.store(request, [original]);
+    ((original['media_asset'] as Map)['variants'] as List).clear();
+    final first = cache.read(request)!.single;
+    final media = first['media_asset'] as Map;
+    expect((media['variants'] as List).single['url'], 'safe.gif');
+    ((media['variants'] as List).single as Map)['url'] = 'mutated.gif';
+    final second = cache.read(request)!.single;
+    expect((((second['media_asset'] as Map)['variants'] as List).single
+        as Map)['url'], 'safe.gif');
+  });
+
   test('cache expires and never persists results between instances', () {
     var now = DateTime.utc(2026, 10, 31);
     final request = Uri.parse('https://example.org/page');

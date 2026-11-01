@@ -59,6 +59,7 @@ class MainActivity : FlutterActivity() {
                             "rebindRequests" to prefs.getInt("rebind_requests", 0),
                             "queueRecoveries" to prefs.getInt("queue_recoveries", 0),
                             "queueDropped" to prefs.getInt("queue_dropped", 0),
+                            "queueFullRejections" to prefs.getInt("queue_full_rejections", 0),
                             "lastQueueDrop" to prefs.getLong("last_queue_drop", 0L),
                             "lastQueueWriteFailed" to prefs.getLong("last_queue_write_failed", 0L),
                             "bankEvents" to mapOf(

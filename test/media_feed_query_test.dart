@@ -54,12 +54,16 @@ void main() {
     expect(mediaFeedImageCandidates(post, highQuality: false).first,
         'https://cdn.example/314-preview.jpg');
     expect(mediaFeedImageCandidates(post, highQuality: true).first,
+        'https://cdn.example/314-preview.jpg');
+    expect(mediaFeedImageCandidates(post, highQuality: true).last,
         'https://cdn.example/314.gif');
     expect(shouldAutoplayFeedGif({...post, 'file_size': 5 * 1024 * 1024}),
         isTrue);
     expect(mediaFeedImageCandidates({...post, 'file_size': 5 * 1024 * 1024},
         highQuality: false).first, 'https://cdn.example/314.gif');
     expect(shouldAutoplayFeedGif({...post, 'file_size': null}), isFalse);
+    expect(mediaFeedImageCandidates({...post, 'file_size': null},
+        highQuality: true).first, 'https://cdn.example/314-preview.jpg');
   });
 
   test('GIF tab excludes static previews and oversized animated assets', () {

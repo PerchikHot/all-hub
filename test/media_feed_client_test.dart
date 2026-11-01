@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:all_hub/media_feed_client.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +42,53 @@ void main() {
     }));
     expect((await client.fetch(url)).single['id'], 42);
     expect(calls, 2);
+    client.close();
+  });
+
+  test('temporary connection failure retries without caching a blank page', () async {
+    var calls = 0;
+    final delays = <Duration>[];
+    final client = MediaFeedClient(
+      wait: (delay) async { delays.add(delay); },
+      client: MockClient((_) async {
+        calls++;
+        if (calls == 1) throw http.ClientException('temporary disconnect');
+        return http.Response('[{"id":19,"file_ext":"gif"}]', 200);
+      }),
+    );
+    expect((await client.fetch(url)).single['id'], 19);
+    expect(calls, 2);
+    expect(delays, [const Duration(milliseconds: 250)]);
+    client.close();
+  });
+
+  test('timeout retries, but repeated timeouts eventually surface', () async {
+    var calls = 0;
+    final client = MediaFeedClient(
+      wait: (_) async {},
+      client: MockClient((_) async {
+        calls++;
+        throw TimeoutException('offline');
+      }),
+    );
+    await expectLater(client.fetch(url), throwsA(isA<TimeoutException>()));
+    expect(calls, 2);
+    client.close();
+  });
+
+  test('HTTP 429 is not retried even when more attempts are allowed', () async {
+    var calls = 0;
+    final client = MediaFeedClient(maxAttempts: 3,
+      wait: (_) async {},
+      client: MockClient((_) async {
+        calls++;
+        return http.Response('rate limited', 429);
+      }),
+    );
+    await expectLater(client.fetch(url),
+      throwsA(isA<MediaFeedRequestException>().having(
+        (e) => e.statusCode, 'status', 429)));
+    expect(calls, 1);
     client.close();
   });
 

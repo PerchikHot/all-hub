@@ -243,6 +243,7 @@ class BankNotificationService : NotificationListenerService() {
             staged!!.put(JSONObject(candidate!!))
         }
         val editor = prefs.edit().putString("queue", current.toString())
+            .putBoolean("queue_corrupt", false)
         if (canStage) {
             editor.putString("auto_entries", staged!!.toString())
                 .putLong("last_native_auto_stage", System.currentTimeMillis())
@@ -251,7 +252,6 @@ class BankNotificationService : NotificationListenerService() {
             editor.putString("last_native_stage_error",
                 if (staged == null) "ledger_corrupt" else "ledger_full")
         }
-            .putBoolean("queue_corrupt", false)
         editor
             .putLong("last_accepted", System.currentTimeMillis())
             .putString("last_accepted_bank", bank)

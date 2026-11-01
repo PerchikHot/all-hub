@@ -1331,13 +1331,18 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
+    // Commit the journal last: a failure to persist UI settings must not
+    // leave a posted transaction on disk after the UI rolls it back.
+    final goalSaved = await prefs.setDouble('kopilka_goal_v1', goal);
+    final budgetSaved = await prefs.setDouble('kopilka_monthly_budget_v1', monthlyBudget);
+    final paydaySaved = await prefs.setInt('kopilka_payday_day_v1', paydayDay);
+    if (!goalSaved || !budgetSaved || !paydaySaved) {
+      throw StateError('Could not persist finance settings');
+    }
     final saved = await prefs.setString('kopilka_entries_v1', jsonEncode(entries));
     if (!saved) {
       throw StateError('Could not persist finance journal');
     }
-    await prefs.setDouble('kopilka_goal_v1', goal);
-    await prefs.setDouble('kopilka_monthly_budget_v1', monthlyBudget);
-    await prefs.setInt('kopilka_payday_day_v1', paydayDay);
   }
 
   double _sum(String bank) => entries.fold<double>(0, (sum, e) {

@@ -148,6 +148,39 @@ class BankAutoClassifierTest {
         }
     }
 
+    @Test fun equivalentAmountInDifferentTitleAndBodyAutoStagesOnce() {
+        // Android short/expanded previews need not use identical wording.
+        // Only one amount per field and the SAME numeric value is safe.
+        for (body in listOf(
+            "Оплата 250,00 руб. Магазин: Пятёрочка",
+            "Оплата 250 RUB; Продавец: Пятёрочка"
+        )) {
+            val staged = BankAutoClassifier.classify(
+                "Т-Банк", "Покупка 250 ₽", body,
+                "bank:alternate-preview", now - 60000, now)
+            assertNotNull(body, staged)
+            assertEquals(250.0, staged!!["amount"])
+            assertEquals("Пятёрочка", staged["note"])
+        }
+        val salary = BankAutoClassifier.classify(
+            "Газпромбанк", "Зарплата 20 260 ₽",
+            "Зачислено 20260.00 RUB", "bank:salary-preview",
+            now - 60000, now)
+        assertEquals("income", salary?.get("kind"))
+        // Never merge different amounts, multiple body amounts, or a
+        // second same-amount payment in a single expanded notification.
+        for (body in listOf(
+            "Оплата 251 ₽. Магазин: Пятёрочка",
+            "Оплата 250 ₽. Ещё оплата 250 ₽. Магазин: Пятёрочка",
+            "Оплата 250 ₽. Остаток 250 ₽. Магазин: Пятёрочка",
+            "Оплата 250 ₽. Код подтверждения 1234. Магазин: Пятёрочка"
+        )) {
+            assertNull(body, BankAutoClassifier.classify(
+                "Т-Банк", "Покупка 250 ₽", body,
+                "bank:unsafe-preview", now - 60000, now))
+        }
+    }
+
     @Test fun refusesTransfersMultipleAmountsAndUncertainMessages() {
         for (body in listOf(
             "Перевод 200 ₽\nМагазин: Пятёрочка",

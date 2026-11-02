@@ -148,11 +148,13 @@ void main() {
   test('diagnostics show native staging without raw bank messages', () {
     final message = describeKopilkaListener({
       'connected': true, 'lastSeen': 0, 'nativeAutoStaged': 2,
+      'nativeJournalPending': 2,
       'nativeStageError': 'ledger_full',
       'nativeAutoStagedTotal': 4, 'nativeReviewOnlyTotal': 9,
     });
-    expect(message, contains('Подготовлено Android для переноса в журнал: 2'));
+    expect(message, contains('Сохранено Android без запуска Flutter, ожидает сверки: 2'));
     expect(message, contains('нативный журнал заполнен'));
+    expect(message, contains('В автономном SQLite-журнале: 2'));
     expect(message, contains('подготовлено автоматически 4'));
     expect(message, contains('оставлено на проверку 9'));
     expect(message, isNot(contains('Пятёрочка')));

@@ -318,7 +318,7 @@ Map<String, dynamic>? confidentKopilkaAutoEntry(
       (purchase && trustedIncome && !refund)) {
     return null;
   }
-  final merchant = suggestKopilkaMerchant(text);
+  final merchant = suggestKopilkaMerchant(text, forAutomaticImport: true);
   final category = suggestKopilkaCategory(text);
   // The native listener requires a labelled merchant before automatic
   // expense staging. Match that rule in Flutter too: category keywords alone
@@ -997,7 +997,8 @@ const kopilkaExpenseCategories = <String>[
 
 /// Extract a merchant only from an explicit label, not from arbitrary bank
 /// prose. The candidate is local and editable before the user approves import.
-String? suggestKopilkaMerchant(String notificationText) {
+String? suggestKopilkaMerchant(String notificationText,
+    {bool forAutomaticImport = false}) {
   final match = RegExp(
     r'(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\n,;]{2,80})',
     caseSensitive: false,
@@ -1006,7 +1007,7 @@ String? suggestKopilkaMerchant(String notificationText) {
   final merchant = match.group(1)!.trim().replaceAll(RegExp(r'\s+'), ' ');
   if (merchant.length < 2 || merchant.length > 64 ||
       !RegExp(r'[A-Za-zА-Яа-яЁё]').hasMatch(merchant) ||
-      RegExp(r'\d').hasMatch(merchant) ||
+      (forAutomaticImport && RegExp(r'\d').hasMatch(merchant)) ||
       RegExp(r'\b(?:otp|pin|cvv|cvc|password)\b|код\s+подтверждения|парол',
         caseSensitive: false).hasMatch(merchant)) {
     return null;

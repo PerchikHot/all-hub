@@ -13,6 +13,13 @@ void main() {
     expect(suggestNotificationAmount('Оплата 100 ₽. Оплата 100 ₽'), '100');
   });
 
+  test('real pharmacy names with digits remain editable review hints', () {
+    expect(suggestKopilkaMerchant('Покупка 350 ₽. Магазин: Аптека 36.6'),
+        'Аптека 36.6');
+    expect(suggestKopilkaMerchant('Покупка 350 ₽. Магазин: Аптека 36.6',
+        forAutomaticImport: true), isNull);
+  });
+
   test('pending review preview never posts or invents a bank balance', () {
     final payment = <String, dynamic>{
       'title': 'Т-Банк', 'body': 'Оплата 1 250,50 ₽. Остаток 4 000 ₽',

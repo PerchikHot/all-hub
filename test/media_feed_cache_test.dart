@@ -104,7 +104,7 @@ void main() {
     final request = Uri.parse('https://example.org/full-mirrored-page');
     cache.store(request, [
       for (var i = 0; i < 40; i++)
-        {'id': i ~/ 2, 'file_url': 'https://cdn.example/$i.gif'},
+        {'id': i ~/ 2, 'file_url': 'https://cdn.example/$i.gif', 'file_ext': 'gif', 'file_size': 1024},
     ]);
     expect(cache.read(request), hasLength(20));
     expect(cache.sourcePageLength(request), 40);
@@ -117,7 +117,7 @@ void main() {
     final request = Uri.parse('https://example.org/repeated-gifs');
     cache.store(request, [
       for (var i = 0; i < 60; i++)
-        {'id': i ~/ 2, 'file_url': 'https://example.org/$i.gif'},
+        {'id': i ~/ 2, 'file_url': 'https://example.org/$i.gif', 'file_ext': 'gif', 'file_size': 1024},
     ]);
     final page = cache.read(request)!;
     expect(page, hasLength(30));
@@ -129,12 +129,12 @@ void main() {
     final cache = MediaFeedMemoryCache();
     final request = Uri.parse('https://example.org/mirrored-gifs');
     cache.store(request, [
-      {'id': 11, 'file_url': 'https://cdn.example/one.gif'},
-      {'id': 12, 'file_url': 'https://cdn.example/one.gif'},
-      {'id': 13, 'file_url': 'https://cdn.example/two.gif'},
-      {'id': 14, 'file_url': 'https://cdn.example/three.gif'},
-      {'id': 15, 'preview_file_url': 'https://cdn.example/three.gif'},
-      {'id': 16, 'file_url': 'https://cdn.example/four.gif'},
+      {'id': 11, 'file_url': 'https://cdn.example/one.gif', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 12, 'file_url': 'https://cdn.example/one.gif', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 13, 'file_url': 'https://cdn.example/two.gif', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 14, 'file_url': 'https://cdn.example/three.gif', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 15, 'preview_file_url': 'https://cdn.example/three.gif', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 16, 'file_url': 'https://cdn.example/four.gif', 'file_ext': 'gif', 'file_size': 1024},
     ]);
     final posts = cache.read(request)!;
     expect(posts.map((post) => post['id']).toList(), [11, 13, 14, 16]);
@@ -146,7 +146,7 @@ void main() {
     cache.store(request, [
       {
         'id': 31,
-        'file_url': 'https://cdn.example/original.gif',
+        'file_url': 'https://cdn.example/original.gif', 'file_ext': 'gif', 'file_size': 1024,
         'large_file_url': 'https://cdn.example/large.jpg',
         'preview_file_url': 'https://cdn.example/thumb.jpg',
       },
@@ -154,7 +154,7 @@ void main() {
       {'id': 32, 'file_url': 'https://cdn.example/large.jpg'},
       // Same media, but the mirror exposes only the preview.
       {'id': 33, 'preview_file_url': 'https://cdn.example/thumb.jpg'},
-      {'id': 34, 'file_url': 'https://cdn.example/unique.gif'},
+      {'id': 34, 'file_url': 'https://cdn.example/unique.gif', 'file_ext': 'gif', 'file_size': 1024},
     ]);
     expect(cache.read(request)!.map((post) => post['id']).toList(),
         [31, 34]);
@@ -177,10 +177,10 @@ void main() {
     final cache = MediaFeedMemoryCache();
     final request = Uri.parse('https://example.org/query-variants');
     cache.store(request, [
-      {'id': 1, 'file_url': 'https://cdn.donmai.us/a.gif?width=100'},
-      {'id': 2, 'file_url': 'https://cdn.donmai.us/a.gif?width=900'},
-      {'id': 3, 'file_url': 'https://cdn.example/a.gif?token=one'},
-      {'id': 4, 'file_url': 'https://cdn.example/a.gif?token=two'},
+      {'id': 1, 'file_url': 'https://cdn.donmai.us/a.gif?width=100', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 2, 'file_url': 'https://cdn.donmai.us/a.gif?width=900', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 3, 'file_url': 'https://cdn.example/a.gif?token=one', 'file_ext': 'gif', 'file_size': 1024},
+      {'id': 4, 'file_url': 'https://cdn.example/a.gif?token=two', 'file_ext': 'gif', 'file_size': 1024},
     ]);
     expect(cache.read(request)!.map((p) => p['id']).toList(), [1, 3, 4]);
   });

@@ -38,15 +38,15 @@ void main() {
         isNull);
     final first = <String, dynamic>{
       'id': 101, 'tag_string': 'transgender',
-      'file_url': 'https://cdn.donmai.us/1.gif?size=small',
+      'file_url': 'https://cdn.donmai.us/1.gif?size=small', 'file_ext': 'gif', 'file_size': 1024,
     };
     final mirrored = <String, dynamic>{
       'id': 102, 'tag_string': 'transgender',
-      'file_url': 'https://cdn.donmai.us/1.gif?size=large',
+      'file_url': 'https://cdn.donmai.us/1.gif?size=large', 'file_ext': 'gif', 'file_size': 1024,
     };
     final unique = <String, dynamic>{
       'id': 103, 'tag_string': 'transgender',
-      'file_url': 'https://cdn.donmai.us/2.gif',
+      'file_url': 'https://cdn.donmai.us/2.gif', 'file_ext': 'gif', 'file_size': 1024,
     };
     expect(filterNewMediaFeedPosts([first, mirrored, unique],
         selectedTag: 'transgender', kind: 'all', seenIds: <String>{})
@@ -109,6 +109,21 @@ void main() {
     expect(shouldAutoplayFeedGif({...post, 'file_size': null}), isFalse);
     expect(mediaFeedImageCandidates({...post, 'file_size': null},
         highQuality: true).first, 'https://cdn.example/314-preview.jpg');
+  });
+
+  test('GIF without a known size requires a static preview in the grid', () {
+    final post = <String, dynamic>{
+      'id': 77, 'file_ext': 'gif',
+      'file_url': 'https://cdn.example/unknown.gif',
+      'tag_string': 'transgender animated',
+    };
+    expect(mediaFeedAnimatedUrl(post), 'https://cdn.example/unknown.gif');
+    expect(mediaFeedImageCandidates(post, highQuality: false), isEmpty);
+    expect(isVisibleFeedPost(post, selectedTag: 'transgender',
+        kind: 'gif', seenIds: <String>{}), isFalse);
+    expect(mediaFeedImageCandidates({...post,
+        'preview_file_url': 'https://cdn.example/preview.jpg'},
+        highQuality: false), ['https://cdn.example/preview.jpg']);
   });
 
   test('oversized GIF without a static preview cannot exhaust feed memory', () {
@@ -244,7 +259,7 @@ void main() {
       'id': 11,
       'large_file_url': 'https://example.org/11.gif',
       'tag_string': 'futanari animated',
-      'file_ext': 'GIF',
+      'file_ext': 'GIF', 'file_size': 1024,
     };
     expect(isVisibleFeedPost(gif, selectedTag: 'futanari',
         kind: 'gif', seenIds: <String>{}), isTrue);
@@ -388,7 +403,7 @@ void main() {
     final animated = <String, dynamic>{
       'id': 17, 'tag_string': 'transgender erza_scarlet blue_hair',
       'file_ext': 'gif', 'rating': 's',
-      'file_url': 'https://example.org/17.gif',
+      'file_url': 'https://example.org/17.gif', 'file_ext': 'gif', 'file_size': 1024,
     };
     final wrongCategory = {...animated,
         'id': 18, 'tag_string': 'erza_scarlet blue_hair'};

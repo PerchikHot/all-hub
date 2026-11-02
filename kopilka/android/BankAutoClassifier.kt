@@ -42,8 +42,15 @@ internal object BankNotificationBody {
             RegexOption.IGNORE_CASE)
         val unique = mutableSetOf<String>()
         for (part in parts) for (match in amount.findAll(part)) {
-            val normalized = match.value.lowercase()
-                .replace(Regex("""[ \u00a0\u202f]"""), "").replace(',', '.')
+            // The same amount can appear as "250 ₽", "250 руб." and
+            // "250,00 RUB" across title, expanded text and InboxStyle lines.
+            // Compare numeric ruble values, not the display unit. A distinct
+            // balance or second purchase must still force manual review.
+            val digits = Regex("""\\d[\\d \\u00a0\\u202f]*(?:[.,]\\d{1,2})?""")
+                .find(match.value)?.value ?: return true
+            val normalized = digits.replace(Regex("""[ \\u00a0\\u202f]"""), "")
+                .replace(',', '.').toBigDecimalOrNull()
+                ?.stripTrailingZeros()?.toPlainString() ?: return true
             unique.add(normalized)
             if (unique.size > 1) return true
         }

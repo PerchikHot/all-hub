@@ -13,6 +13,38 @@ void main() {
     expect(nextAvailableMediaFeedPage(0, tags, <String>{}), isNull);
   });
 
+  test('trusted CDN query variants share identity without losing signed external URLs', () {
+    expect(mediaFeedIdentityUrl('https://cdn.donmai.us/1.gif?width=300'),
+        'https://cdn.donmai.us/1.gif');
+    expect(mediaFeedIdentityUrl('https://cdn.donmai.us/1.gif?width=900'),
+        'https://cdn.donmai.us/1.gif');
+    expect(mediaFeedIdentityUrl('https://cdn.example/1.gif?token=a'),
+        'https://cdn.example/1.gif?token=a');
+    expect(mediaFeedIdentityUrl('https://cdn.example/1.gif?token=b'),
+        'https://cdn.example/1.gif?token=b');
+    expect(mediaFeedIdentityUrl('https://user:pass@cdn.donmai.us/1.gif'),
+        isNull);
+    final first = <String, dynamic>{
+      'id': 101, 'tag_string': 'transgender',
+      'file_url': 'https://cdn.donmai.us/1.gif?size=small',
+    };
+    final mirrored = <String, dynamic>{
+      'id': 102, 'tag_string': 'transgender',
+      'file_url': 'https://cdn.donmai.us/1.gif?size=large',
+    };
+    final unique = <String, dynamic>{
+      'id': 103, 'tag_string': 'transgender',
+      'file_url': 'https://cdn.donmai.us/2.gif',
+    };
+    expect(filterNewMediaFeedPosts([first, mirrored, unique],
+        selectedTag: 'transgender', kind: 'all', seenIds: <String>{})
+        .map((post) => post['id']).toList(), [101, 103]);
+    expect(filterNewMediaFeedPosts([mirrored],
+        selectedTag: 'transgender', kind: 'all',
+        seenIds: <String>{'101'},
+        seenUrls: mediaFeedIdentityKeys(first)), isEmpty);
+  });
+
   test('GIF disk cache preserves animation while stills may be resized', () {
     expect(isAnimatedFeedAssetUrl('https://cdn.example/12.gif'), isTrue);
     expect(isAnimatedFeedAssetUrl('https://cdn.example/12.GIF'), isTrue);

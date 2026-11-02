@@ -6,6 +6,8 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.PackageInfo
+import java.security.MessageDigest
 import android.net.Uri
 import androidx.core.content.FileProvider
 import java.io.File
@@ -15,6 +17,58 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "allhub/launcher"
+
+    /** Compare certificate SHA-256, not filenames or GitHub repository names.
+     * Android still performs the final install-time signature validation.
+     * This preflight gives a clear error before opening the system installer.
+     */
+    private fun signerSha256(info: PackageInfo, includeRotationHistory: Boolean = false): Set<String> {
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val signing = info.signingInfo ?: return emptySet()
+            if (includeRotationHistory && !signing.hasMultipleSigners()) {
+                signing.signingCertificateHistory ?: signing.apkContentsSigners
+            } else signing.apkContentsSigners
+        } else {
+            @Suppress("DEPRECATION")
+            info.signatures ?: emptyArray()
+        }
+        return signatures.map { certificate ->
+            MessageDigest.getInstance("SHA-256").digest(certificate.toByteArray())
+                .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        }.toSet()
+    }
+
+    private fun verifyInstalledApkCompatibility(archive: PackageInfo, flags: Int) {
+        val installed = try {
+            packageManager.getPackageInfo(archive.packageName, flags)
+        } catch (_: PackageManager.NameNotFoundException) {
+            // A first-time install, or a package outside Android's allowed
+            // visibility scope. The system installer remains authoritative.
+            return
+        }
+        val oldSigners = signerSha256(installed)
+        val newSigners = signerSha256(archive)
+        if (oldSigners.isEmpty() || newSigners.isEmpty()) {
+            throw IllegalArgumentException("Невозможно проверить сертификат обновления APK")
+        }
+        // Android supports verified signing-key rotation for single-signer
+        // packages. Allow a new archive only when its signing lineage contains
+        // the installed certificate; Android verifies the lineage again.
+        val rotated = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            oldSigners.size == 1 && newSigners.size == 1 &&
+            signerSha256(archive, includeRotationHistory = true).containsAll(oldSigners)
+        if (oldSigners != newSigners && !rotated) {
+            throw IllegalArgumentException(
+                "Сертификат APK не совпадает с установленной версией. Обновление поверх запрещено")
+        }
+        val oldCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            installed.longVersionCode else @Suppress("DEPRECATION") installed.versionCode.toLong()
+        val newCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+            archive.longVersionCode else @Suppress("DEPRECATION") archive.versionCode.toLong()
+        if (newCode < oldCode) {
+            throw IllegalArgumentException("APK имеет более старый versionCode; данные не изменены")
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -84,7 +138,10 @@ class MainActivity : FlutterActivity() {
                                 // the selected app. Check the package archive before invoking
                                 // Android's user-confirmed system installer.
                                 val expected = call.argument<String>("expectedPackageName")
-                                val archive = packageManager.getPackageArchiveInfo(apk.absolutePath, 0)
+                                val signingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                                    PackageManager.GET_SIGNING_CERTIFICATES else
+                                    @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+                                val archive = packageManager.getPackageArchiveInfo(apk.absolutePath, signingFlags)
                                     ?: throw IllegalArgumentException("Invalid APK package archive")
                                 if (archive.packageName.isNullOrBlank()) {
                                     throw IllegalArgumentException("APK has no package name")
@@ -93,6 +150,7 @@ class MainActivity : FlutterActivity() {
                                     throw IllegalArgumentException(
                                         "APK package mismatch: expected $expected, got ${archive.packageName}")
                                 }
+                                verifyInstalledApkCompatibility(archive, signingFlags)
                                 val uri = FileProvider.getUriForFile(
                                     this, "${applicationContext.packageName}.fileprovider", apk)
                                 val intent = Intent(Intent.ACTION_VIEW).apply {

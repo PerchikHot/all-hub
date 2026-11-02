@@ -58,7 +58,7 @@ String suggestNotificationAmount(String body, {bool allowAmbiguous = false}) {
     caseSensitive: false,
   );
   final transactionWords = RegExp(
-    r'покупк|оплат|оплач|плат[её]ж|списан|перевод|пополнен|зачислен|поступил|сняти|возврат|выдан|purchase|payment|transfer|refund',
+    r'покупк|оплат|оплач|плат[её]ж|списан|перевод|пополнен|зачислен|поступил|зарплат|сняти|возврат|выдан|purchase|payment|transfer|refund|salary|payroll',
     caseSensitive: false,
   );
   final balanceWords = RegExp(
@@ -113,7 +113,7 @@ String suggestNotificationAmount(String body, {bool allowAmbiguous = false}) {
 /// expenses until the user explicitly selects another operation type.
 String suggestNotificationKind(String text) {
   final incoming = RegExp(
-    r'поступлен|поступил|зачислен|пополнен|пополнение|возврат|кэшбэк|кешбэк|refund|credited|deposit',
+    r'поступлен|поступил|зачислен|пополнен|пополнение|зарплат|возврат|кэшбэк|кешбэк|refund|credited|deposit|salary|payroll',
     caseSensitive: false,
   );
   final outgoing = RegExp(
@@ -131,7 +131,7 @@ String suggestNotificationKind(String text) {
 bool isBankTransactionNotification(String title, String body) {
   final text = '$title\n$body';
   final transaction = RegExp(
-    r'покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw',
+    r'покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|зарплат|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw|salary|payroll',
     caseSensitive: false,
   );
   final currency = RegExp(

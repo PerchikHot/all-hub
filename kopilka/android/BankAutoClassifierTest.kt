@@ -89,10 +89,11 @@ class BankAutoClassifierTest {
             "Ozon Банк", "Оплата 90 ₽ в магазине Аптека", "",
             "bank:title-location", now - 60000, now)
         assertEquals("Аптека", location?.get("note"))
-        // A vague title or an unlabelled store never becomes a fake payment.
-        assertNull(BankAutoClassifier.classify(
+        // A completed one-line payment with an exact amount and a named
+        // destination can be staged even without a separate merchant label.
+        assertEquals("Пятёрочке", BankAutoClassifier.classify(
             "Т-Банк", "Покупка 250 ₽ в Пятёрочке", "",
-            "bank:ambiguous-title", now - 60000, now))
+            "bank:direct-merchant", now - 60000, now)?.get("note"))
         assertNull(BankAutoClassifier.classify(
             "Т-Банк", "Код подтверждения оплаты 250 ₽. Магазин: Пятёрочка", "",
             "bank:otp-title", now - 60000, now))
@@ -160,12 +161,14 @@ class BankAutoClassifierTest {
             assertNotNull(body, result)
             assertEquals(250.5, result!!["amount"])
         }
-        // An unlabelled store mention is not evidence of a completed purchase.
-        // Explicit in-store locations are safe to import; free-form locations
-        // and merchant text containing possible card digits remain in review.
+        // Completed amount + destination in one line is unambiguous;
+        // vague generic locations and possible card suffixes remain review-only.
         assertEquals("Пятёрочка", parse("Покупка 250 ₽ в магазине Пятёрочка")?.get("note"))
         assertEquals("Аптека", parse("Оплата 90 ₽ в торговой точке Аптека")?.get("note"))
-        assertNull(parse("Покупка 250 ₽ в Пятёрочке"))
+        assertEquals("Пятёрочке", parse("Покупка 250 ₽ в Пятёрочке")?.get("note"))
+        assertNull(parse("Покупка 250 ₽ в приложении"))
+        assertNull(parse("Покупка 250 ₽ в интернете"))
+        assertNull(parse("Покупка 250 ₽ в Карта 1234"))
         assertNull(parse("Покупка 250 ₽ в магазине Карта 1234"))
         assertNull(parse("Покупка 250 ₽. Магазин: A"))
         // Punctuation and decorative placeholders are not merchants.

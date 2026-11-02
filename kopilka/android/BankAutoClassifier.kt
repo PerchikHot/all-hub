@@ -130,7 +130,21 @@ internal object BankAutoClassifier {
             RegexOption.IGNORE_CASE).let { pattern ->
             (pattern.find(body) ?: pattern.find(title))?.groupValues?.get(1)?.trim()
         }
-        val merchant = labelledMerchant ?: locationMerchant
+        // A complete single-line bank purchase can explicitly say
+        // "Покупка 250 ₽ в Пятёрочке" without a separate "Магазин:" label.
+        // Require the amount, transaction verb, preposition and a terminal
+        // merchant on the SAME line. Generic locations such as "в приложении"
+        // are not reliable merchant names and must stay in manual review.
+        val directMerchant = Regex(
+            """(?:^|[\n])\s*(?:покупка|оплата)\s+(?:на\s+сумму\s+)?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)\s+в\s+([^\r\n,;.!?]{2,60})\s*$""",
+            RegexOption.IGNORE_CASE
+        ).let { pattern ->
+            (pattern.find(body) ?: pattern.find(title))?.groupValues?.get(1)?.trim()
+        }?.takeUnless {
+            it.lowercase() in setOf("приложении", "интернете", "онлайне",
+                "банке", "рассрочку", "обработке", "ожидании")
+        }
+        val merchant = labelledMerchant ?: locationMerchant ?: directMerchant
         // A merchant containing digits could include a card suffix or code.
         // Never copy it into the minimal SQLite financial journal.
         if (purchase && !income && (merchant.isNullOrBlank() ||

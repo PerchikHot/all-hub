@@ -73,12 +73,26 @@ class MediaFeedClient {
           continue;
         }
         if (response.statusCode != 200) {
-          // 429 and 403 should not trigger a cascade of requests from the
-          // infinite feed. Respect short Retry-After seconds, capped to two
-          // minutes; never allow a hostile header to block the app forever.
+          // Stop consuming a rejected response instead of leaving its stream
+          // attached to a pooled connection. Never decode an HTML error page.
+          try {
+            await response.stream.drain<void>()
+                .timeout(const Duration(seconds: 2));
+          } catch (_) {
+            // Preserve the HTTP status, not a secondary drain error.
+          }
+          // Retry-After supports both delta-seconds and RFC 7231 HTTP dates.
+          // Bound even an extreme future date to two minutes.
           if (response.statusCode == 429 || response.statusCode == 403) {
-            final raw = response.headers['retry-after'];
-            final seconds = int.tryParse(raw?.trim() ?? '');
+            final raw = response.headers['retry-after']?.trim() ?? '';
+            var seconds = int.tryParse(raw);
+            if (seconds == null && raw.isNotEmpty) {
+              try {
+                seconds = HttpDate.parse(raw).difference(_clock()).inSeconds;
+              } on FormatException {
+                // Malformed headers use the safe default cooldown.
+              }
+            }
             final delay = response.statusCode == 403 ? 60 :
                 (seconds == null ? 30 : seconds.clamp(1, 120).toInt());
             _rateLimitUntil = _clock().add(Duration(seconds: delay));

@@ -62,6 +62,25 @@ void main() {
     }];
     expect(confidentKopilkaAutoEntry(event, otherBank, now), isNull);
   });
+  test('SQLite auto journal reconciles after permission is revoked', () {
+    // Permission only controls future notification capture. Existing
+    // durable SQLite payments must still reach the financial journal.
+    expect(shouldReconcileStagedKopilkaEntries(
+        journalHealthy: true, stagedCount: 2), isTrue);
+    expect(shouldReconcileStagedKopilkaEntries(
+        journalHealthy: true, stagedCount: 0), isFalse);
+    expect(shouldReconcileStagedKopilkaEntries(
+        journalHealthy: false, stagedCount: 2), isFalse);
+  });
+
+  test('corrupt review queue does not masquerade as empty queue', () {
+    expect(decodeKopilkaReviewQueue('[]'), isEmpty);
+    expect(decodeKopilkaReviewQueue('[{"key":"bank:1"}]'), hasLength(1));
+    for (final raw in ['{broken', '{}', '[', 'null', '"[]"']) {
+      expect(decodeKopilkaReviewQueue(raw), isNull, reason: raw);
+    }
+  });
+
   test('disconnected listener does not block durable queued transactions', () {
     expect(shouldImportQueuedKopilkaEvents(
         permissionGranted: true, journalHealthy: true, queuedCount: 3), isTrue);

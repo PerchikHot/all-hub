@@ -24,6 +24,26 @@ List<Map<String, dynamic>> decodeKopilkaJournal(String? raw) {
 /// A temporarily disconnected Android listener can still have durable queued
 /// transactions from before its disconnection. Import them after UI resumes
 /// when the user has granted access; never require a live service callback.
+/// SQLite-staged payments were already accepted by Android when access was
+/// granted. Revoking notification access stops future capture, but must not
+/// strand those previously persisted payments in the native journal.
+bool shouldReconcileStagedKopilkaEntries({
+  required bool journalHealthy,
+  required int stagedCount,
+}) => journalHealthy && stagedCount > 0;
+
+/// A corrupt legacy review queue must not prevent the independent SQLite
+/// journal from reconciling. Never treat damaged bytes as an empty queue:
+/// the UI must display a recovery warning and preserve the original bytes.
+List<dynamic>? decodeKopilkaReviewQueue(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    return decoded is List ? decoded : null;
+  } on FormatException {
+    return null;
+  }
+}
+
 bool shouldImportQueuedKopilkaEvents({
   required bool permissionGranted,
   required bool journalHealthy,
@@ -1349,7 +1369,6 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
     _refreshInProgress = true;
     try {
       final enabled = await _notifications.invokeMethod<bool>('enabled') ?? false;
-      final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
       final nativeDiagnostics = await _notifications.invokeMethod<Map<dynamic, dynamic>>('diagnostics');
       final diagnostics = nativeDiagnostics?.map(
         (key, value) => MapEntry(key.toString(), value));
@@ -1359,13 +1378,13 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
       // before recording the reviewed key must not cause a second import.
       reviewed.addAll(entries.map((e) => (e['notificationKey'] ?? '').toString())
           .where((key) => key.isNotEmpty));
-      final nativeEvents = jsonDecode(raw) as List;
       // Reconcile native transactions staged while the Flutter process was
       // closed. Save the financial journal BEFORE acknowledging each stage.
       // A crash after save is idempotent by notificationKey on next launch.
       final stagedRaw = await _notifications.invokeMethod<String>('autoEntries') ?? '[]';
       final stagedEvents = jsonDecode(stagedRaw) as List;
-      if (enabled && _journalHealthy) {
+      if (shouldReconcileStagedKopilkaEntries(
+          journalHealthy: _journalHealthy, stagedCount: stagedEvents.length)) {
         for (final staged in stagedEvents) {
           if (staged is! Map) continue;
           final event = Map<String, dynamic>.from(staged);
@@ -1388,6 +1407,21 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
           await _archiveNotificationKey(key);
           autoImportedThisSession++;
         }
+      }
+      // The review queue is a separate, older store. A malformed review
+      // queue cannot block the already completed SQLite reconciliation.
+      final raw = await _notifications.invokeMethod<String>('pending') ?? '[]';
+      final nativeEvents = decodeKopilkaReviewQueue(raw);
+      if (nativeEvents == null) {
+        if (mounted) {
+          setState(() {
+            notificationsEnabled = enabled;
+            listenerDiagnostics = diagnostics;
+            listenerError = 'Очередь уведомлений повреждена. Автономные '
+                'операции из SQLite сверены; исходная очередь сохранена.';
+          });
+        }
+        return;
       }
       // Retry native acknowledgement after a crash between saving the
       // journal and dismissing the notification. No unreviewed alert is lost.

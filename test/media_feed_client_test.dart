@@ -10,6 +10,44 @@ void main() {
     'tags': 'transgender filetype:gif', 'limit': '40', 'page': '1',
   });
 
+  test('concurrent identical feed pages share one request, then can refresh', () async {
+    var calls = 0;
+    final gate = Completer<http.Response>();
+    final client = MediaFeedClient(client: MockClient((_) {
+      calls++;
+      if (calls == 1) return gate.future;
+      return Future.value(http.Response('[{"id":22}]', 200));
+    }));
+    final first = client.fetch(url);
+    final second = client.fetch(url);
+    expect(identical(first, second), isTrue);
+    gate.complete(http.Response('[{"id":21}]', 200));
+    expect((await first).single['id'], 21);
+    expect((await second).single['id'], 21);
+    await Future<void>.delayed(Duration.zero);
+    expect((await client.fetch(url)).single['id'], 22);
+    expect(calls, 2);
+    client.close();
+  });
+
+  test('failed coalesced request is evicted for the next attempt', () async {
+    var calls = 0;
+    final client = MediaFeedClient(client: MockClient((_) async {
+      calls++;
+      return calls == 1 ? http.Response('forbidden', 403)
+          : http.Response('[{"id":23}]', 200);
+    }), clock: () => DateTime.utc(2026, 11, 2));
+    final first = client.fetch(url);
+    final second = client.fetch(url);
+    await expectLater(first, throwsA(isA<MediaFeedRequestException>()));
+    await expectLater(second, throwsA(isA<MediaFeedRequestException>()));
+    // A cooldown still protects the provider, even though the failed
+    // in-flight future itself is no longer retained.
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 1);
+    client.close();
+  });
+
   test('accepts bounded JSON and preserves post metadata', () async {
     final client = MediaFeedClient(client: MockClient((_) async =>
         http.Response(jsonEncode([{'id': 7, 'file_ext': 'gif'}]), 200)));

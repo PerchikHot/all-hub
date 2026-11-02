@@ -98,3 +98,9 @@ internal object BankStoragePolicy {
         )
     }
 }
+
+/** Pure replay policy shared by the Android ledger merge and its JVM tests. */
+internal object BankLedgerPolicy {
+    fun includeLegacy(key: String, alreadyPending: Boolean, acknowledged: Boolean): Boolean =
+        key.isNotBlank() && key.length <= 256 && !alreadyPending && !acknowledged
+}

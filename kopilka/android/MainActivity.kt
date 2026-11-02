@@ -43,16 +43,28 @@ class MainActivity : FlutterActivity() {
                             // pre-migration SharedPreferences fallback. A bad
                             // record is an error, never an empty replacement.
                             try {
-                                val merged = BankNativeJournal(this).use { it.pending() }
-                                val known = mutableSetOf<String>()
-                                for (i in 0 until merged.length()) {
-                                    known.add(merged.getJSONObject(i).getString("key"))
-                                }
-                                val legacy = org.json.JSONArray(
-                                    prefs.getString("auto_entries", "[]"))
-                                for (i in 0 until legacy.length()) {
-                                    val entry = legacy.getJSONObject(i)
-                                    if (known.add(entry.getString("key"))) merged.put(entry)
+                                val merged = BankNativeJournal(this).use { journal ->
+                                    val pending = journal.pending()
+                                    val known = mutableSetOf<String>()
+                                    for (i in 0 until pending.length()) {
+                                        known.add(pending.getJSONObject(i).getString("key"))
+                                    }
+                                    val legacy = org.json.JSONArray(
+                                        prefs.getString("auto_entries", "[]"))
+                                    for (i in 0 until legacy.length()) {
+                                        val entry = legacy.getJSONObject(i)
+                                        val key = entry.getString("key")
+                                        // An SQLite acknowledgement may have succeeded just
+                                        // before a legacy SharedPreferences write failed.
+                                        // Its durable tombstone must suppress replay.
+                                        val acknowledged = journal.wasAcknowledged(key)
+                                        if (BankLedgerPolicy.includeLegacy(
+                                                key, known.contains(key), acknowledged)) {
+                                            known.add(key)
+                                            pending.put(entry)
+                                        }
+                                    }
+                                    pending
                                 }
                                 result.success(merged.toString())
                             } catch (_: Exception) {
@@ -74,10 +86,16 @@ class MainActivity : FlutterActivity() {
                                         val entry = staged.getJSONObject(i)
                                         if (entry.optString("key") != key) remaining.put(entry)
                                     }
-                                    if (!prefs.edit().putString("auto_entries", remaining.toString()).commit()) {
-                                        result.error("LEDGER", "Cannot persist legacy acknowledgement", null)
-                                    } else if (!BankNativeJournal(this).use { it.acknowledge(key) }) {
+                                    // First persist the durable replay tombstone and remove
+                                    // SQLite staging atomically. If this fails, leave the
+                                    // legacy record untouched for a later retry.
+                                    if (!BankNativeJournal(this).use { it.acknowledge(key) }) {
                                         result.error("LEDGER", "Cannot acknowledge SQLite journal", null)
+                                    } else if (!prefs.edit().putString(
+                                            "auto_entries", remaining.toString()).commit()) {
+                                        // The legacy row may remain, but autoEntries filters
+                                        // it using the SQLite tombstone; no duplicate import.
+                                        result.error("LEDGER", "Cannot persist legacy acknowledgement", null)
                                     } else {
                                         result.success(null)
                                     }

@@ -104,4 +104,12 @@ class BankAutoClassifierTest {
         assertTrue(uncertain.retainRawForReview)
         assertTrue(uncertain.queueRejected)
     }
+
+    @Test fun acknowledgedLegacyRowsCannotReplayAfterPartialCommit() {
+        assertTrue(BankLedgerPolicy.includeLegacy("bank:1:123", false, false))
+        assertFalse(BankLedgerPolicy.includeLegacy("bank:1:123", true, false))
+        assertFalse(BankLedgerPolicy.includeLegacy("bank:1:123", false, true))
+        assertFalse(BankLedgerPolicy.includeLegacy("", false, false))
+        assertFalse(BankLedgerPolicy.includeLegacy("x".repeat(257), false, false))
+    }
 }

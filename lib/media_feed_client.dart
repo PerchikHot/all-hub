@@ -35,8 +35,23 @@ class MediaFeedClient {
   final DateTime Function() _clock;
   DateTime? _rateLimitUntil;
   int? _rateLimitStatus;
+  // Multiple scroll/refresh callers requesting the same page share one
+  // network operation. Failures are removed too, so retry remains possible.
+  final Map<Uri, Future<List<Map<String, dynamic>>>> _inFlight = {};
 
-  Future<List<Map<String, dynamic>>> fetch(Uri uri) async {
+  Future<List<Map<String, dynamic>>> fetch(Uri uri) {
+    final pending = _inFlight[uri];
+    if (pending != null) return pending;
+    final request = _fetchUnshared(uri);
+    _inFlight[uri] = request;
+    request.then<void>(
+      (_) { _inFlight.remove(uri); },
+      onError: (Object _, StackTrace __) { _inFlight.remove(uri); },
+    );
+    return request;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchUnshared(Uri uri) async {
     // Do not allow a future caller to use this HTTP client as an arbitrary
     // authenticated proxy. This feed only needs one public JSON endpoint.
     if (uri.scheme != 'https' || uri.host != 'danbooru.donmai.us' ||

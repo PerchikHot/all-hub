@@ -50,7 +50,7 @@ class BankAutoClassifierTest {
         val body = BankNotificationBody.select(
             "Операция по карте", "Покупка 250 ₽",
             listOf("Покупка 250 ₽", "Магазин: Пятёрочка"))
-        assertEquals("Покупка 250 ₽\\nМагазин: Пятёрочка", body)
+        assertEquals("Покупка 250 ₽\nМагазин: Пятёрочка", body)
         assertEquals("Пятёрочка", parse(body)?.get("note"))
 
         // The same rule works for explicit in-store locations.

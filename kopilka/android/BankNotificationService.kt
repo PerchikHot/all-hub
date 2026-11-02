@@ -226,7 +226,8 @@ class BankNotificationService : NotificationListenerService() {
         // is closed. Review-only events still require available queue space.
         // A high-confidence event is already durable in SQLite. Do not
         // reject it just because the legacy review queue is full.
-        if (current.length() >= MAX_PENDING && !nativeSaved) {
+        val storage = BankStoragePolicy.decide(nativeSaved, current.length(), MAX_PENDING)
+        if (storage.queueRejected) {
             prefs.edit().putInt("queue_full_rejections",
                 (prefs.getInt("queue_full_rejections", 0) + 1).coerceAtMost(100000000))
                 .putString("last_skip_reason", "queue_full")
@@ -236,7 +237,7 @@ class BankNotificationService : NotificationListenerService() {
         // Keep raw text only for review-only alerts and SQLite failures.
         // Confirmed events are already stored as minimal structured records,
         // so persisting the original bank notification would be unnecessary.
-        if (!nativeSaved) {
+        if (storage.retainRawForReview) {
             current.put(JSONObject().put("key", key).put("bank", bank)
                 .put("title", title).put("body", body).put("time", sbn.postTime))
         }

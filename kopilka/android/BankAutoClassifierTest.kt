@@ -77,4 +77,19 @@ class BankAutoClassifierTest {
         assertTrue(full.queueRejected)
     }
 
+
+    @Test fun damagedReviewQueueNeverBlocksDurableSqlitePayments() {
+        // The raw queue is deliberately unreadable. Do not clear or replace
+        // its bytes, but keep processing independently stored transactions.
+        val saved = BankStoragePolicy.decide(
+            nativeSaved = true, queued = 0, capacity = 500, queueReadable = false)
+        assertFalse(saved.retainRawForReview)
+        assertFalse(saved.queueRejected)
+        // An ambiguous alert cannot be retained safely until the user repairs
+        // the review queue. Never report it as a successful automatic import.
+        val uncertain = BankStoragePolicy.decide(
+            nativeSaved = false, queued = 0, capacity = 500, queueReadable = false)
+        assertTrue(uncertain.retainRawForReview)
+        assertTrue(uncertain.queueRejected)
+    }
 }

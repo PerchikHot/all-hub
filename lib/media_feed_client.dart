@@ -91,6 +91,8 @@ class MediaFeedClient {
                 seconds = HttpDate.parse(raw).difference(_clock()).inSeconds;
               } on FormatException {
                 // Malformed headers use the safe default cooldown.
+              } on HttpException {
+                // HttpDate.parse may report an invalid HTTP date this way.
               }
             }
             final delay = response.statusCode == 403 ? 60 :

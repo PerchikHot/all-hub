@@ -57,4 +57,24 @@ class BankAutoClassifierTest {
             "Покупка 250 ₽\nМагазин: Пятёрочка", "id",
             now - 25L * 60L * 60L * 1000L, now))
     }
+    @Test fun sqliteStagedPaymentsNeverRetainRawBankText() {
+        for (queued in listOf(0, 499, 500, 1000)) {
+            val decision = BankStoragePolicy.decide(
+                nativeSaved = true, queued = queued, capacity = 500)
+            assertFalse(decision.retainRawForReview)
+            assertFalse(decision.queueRejected)
+        }
+    }
+
+    @Test fun reviewOnlyAndSqliteFailuresKeepRawTextUntilReviewed() {
+        val available = BankStoragePolicy.decide(
+            nativeSaved = false, queued = 499, capacity = 500)
+        assertTrue(available.retainRawForReview)
+        assertFalse(available.queueRejected)
+        val full = BankStoragePolicy.decide(
+            nativeSaved = false, queued = 500, capacity = 500)
+        assertTrue(full.retainRawForReview)
+        assertTrue(full.queueRejected)
+    }
+
 }

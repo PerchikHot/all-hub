@@ -119,6 +119,30 @@ void main() {
     client.close();
   });
 
+  test('HTTP-date Retry-After cools down the entire media feed', () async {
+    var now = DateTime.utc(2026, 11, 2, 1, 0, 0);
+    var calls = 0;
+    final client = MediaFeedClient(
+      clock: () => now,
+      client: MockClient((_) async {
+        calls++;
+        return calls == 1
+            ? http.Response('slow down', 429, headers: {
+                'retry-after': 'Mon, 02 Nov 2026 01:01:30 GMT',
+              })
+            : http.Response('[{"id":27}]', 200);
+      }),
+    );
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()));
+    now = now.add(const Duration(seconds: 89));
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 1);
+    now = now.add(const Duration(seconds: 2));
+    expect((await client.fetch(url)).single['id'], 27);
+    expect(calls, 2);
+    client.close();
+  });
+
   test('HTTP 429 is not retried even when more attempts are allowed', () async {
     var calls = 0;
     final client = MediaFeedClient(maxAttempts: 3,

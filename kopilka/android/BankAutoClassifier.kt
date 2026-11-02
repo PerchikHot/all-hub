@@ -21,7 +21,16 @@ internal object BankNotificationBody {
         val amount = Regex(
             """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
             RegexOption.IGNORE_CASE)
-        return options.firstOrNull { amount.containsMatchIn(it) }
+        // Expanded previews may contain the amount but omit the merchant.
+        // Prefer a complete InboxStyle body when it includes both the amount
+        // and an explicitly labelled merchant. The listener still scans ALL
+        // representations for OTPs, failed payments and conflicting amounts.
+        val merchant = Regex(
+            """(?:^|[\\n.;])\\s*(?:магазин|торговая точка|продавец|merchant)\\s*[:：—-]\\s*[^\\r\\n,;]{2,80}|(?:^|[\\s.;])в\\s+(?:магазине|торговой\\s+точке)\\s+[^\\r\\n,;.!?]{2,80}""",
+            RegexOption.IGNORE_CASE)
+        return options.firstOrNull {
+            amount.containsMatchIn(it) && merchant.containsMatchIn(it)
+        } ?: options.firstOrNull { amount.containsMatchIn(it) }
             ?: options.firstOrNull() ?: ""
     }
 

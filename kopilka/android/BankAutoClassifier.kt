@@ -12,11 +12,33 @@ package com.veyrion.kopilka_app
  */
 internal object BankNotificationBody {
     fun select(normal: String, expanded: String, lines: List<String>): String {
-        if (expanded.isNotBlank()) return expanded
-        if (normal.isNotBlank()) return normal
-        if (lines.size > 8) return ""
-        val joined = lines.joinToString("\n").trim()
-        return if (joined.length <= 2048) joined else ""
+        // Some InboxStyle notifications show only a generic preview in
+        // EXTRA_TEXT, with the actual purchase in EXTRA_TEXT_LINES. Prefer
+        // a bounded field containing a currency amount over a generic one.
+        val joined = if (lines.size <= 8) lines.joinToString("\n").trim() else ""
+        val options = listOf(expanded, normal, joined)
+            .filter { it.isNotBlank() && it.length <= 2048 }
+        val amount = Regex(
+            """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
+            RegexOption.IGNORE_CASE)
+        return options.firstOrNull { amount.containsMatchIn(it) }
+            ?: options.firstOrNull() ?: ""
+    }
+
+    /** Different visible amounts must be reviewed, even when the selected
+     * preview contains only one. Repeated previews of the SAME amount are OK. */
+    fun hasConflictingAmounts(parts: List<String>): Boolean {
+        val amount = Regex(
+            """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
+            RegexOption.IGNORE_CASE)
+        val unique = mutableSetOf<String>()
+        for (part in parts) for (match in amount.findAll(part)) {
+            val normalized = match.value.lowercase()
+                .replace(Regex("""[ \u00a0\u202f]"""), "").replace(',', '.')
+            unique.add(normalized)
+            if (unique.size > 1) return true
+        }
+        return false
     }
 }
 

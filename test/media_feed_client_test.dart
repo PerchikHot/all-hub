@@ -219,6 +219,22 @@ void main() {
     client.close();
   });
 
+  test('HTTP 200 HTML login page is never treated as a media feed', () async {
+    final client = MediaFeedClient(client: MockClient((_) async =>
+        http.Response('<html>login</html>', 200,
+            headers: {'content-type': 'text/html; charset=utf-8'})));
+    await expectLater(client.fetch(url), throwsFormatException);
+    client.close();
+  });
+
+  test('JSON media type with charset remains supported', () async {
+    final client = MediaFeedClient(client: MockClient((_) async =>
+        http.Response('[{"id":101}]', 200,
+            headers: {'content-type': 'application/json; charset=utf-8'})));
+    expect((await client.fetch(url)).single['id'], 101);
+    client.close();
+  });
+
   test('rejects oversized, malformed and non-object responses', () async {
     for (final payload in ['not json', '[1,2]', '[null]',
         List.filled(101, <String, dynamic>{}).toString()]) {

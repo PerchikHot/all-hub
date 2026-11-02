@@ -122,6 +122,15 @@ class MediaFeedClient {
         }
         _rateLimitUntil = null;
         _rateLimitStatus = null;
+        // A CDN or captive portal can return HTTP 200 with an HTML login
+        // page. Reject it before JSON decoding; never poison the media grid.
+        // Missing Content-Type remains valid for older public API mirrors.
+        final mediaType = response.headers['content-type']
+            ?.split(';').first.trim().toLowerCase();
+        if (mediaType != null && mediaType != 'application/json' &&
+            !mediaType.endsWith('+json')) {
+          throw const FormatException('Media feed is not JSON');
+        }
         if (response.contentLength != null &&
             response.contentLength! > maxResponseBytes) {
           throw const FormatException('Feed response exceeds size limit');

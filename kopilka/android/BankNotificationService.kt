@@ -129,7 +129,7 @@ class BankNotificationService : NotificationListenerService() {
         // bounded lines as one message so ordinary classification, OTP
         // filtering and SQLite deduplication still apply.
         val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            ?.map { it.toString() }.orEmpty()
+            ?.take(9)?.map { it.toString().take(2049) }.orEmpty()
         val body = BankNotificationBody.select(normalText, expandedText, lines)
         // Never persist oversized or malformed notification payloads.
         if (body.isBlank() || body.length > 2048 || title.length > 200) {
@@ -139,6 +139,11 @@ class BankNotificationService : NotificationListenerService() {
         // Store transaction alerts only. Never retain OTP/login codes,
         // promotions or balance-only notifications in the local queue.
         val combined = title + " " + body
+        // Scan ALL visible representations for OTPs and failed payments.
+        // Choosing the richest purchase body must never hide a credential or
+        // cancellation present in a shorter notification preview.
+        val allVisible = listOf(title, normalText, expandedText)
+            .plus(lines).joinToString(" ")
         val transaction = Regex(
             """покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw""",
             RegexOption.IGNORE_CASE)
@@ -171,11 +176,11 @@ class BankNotificationService : NotificationListenerService() {
         // Record the first rejection reason as a fixed category only.
         // Never persist the rejected notification text or credentials.
         val skipReason = when {
-            sensitive.containsMatchIn(combined) ||
-                credentials.containsMatchIn(combined) ||
-                additionalCredentials.containsMatchIn(combined) -> "credentials"
-            notPosted.containsMatchIn(combined) ||
-                additionalUnposted.containsMatchIn(combined) -> "not_completed"
+            sensitive.containsMatchIn(allVisible) ||
+                credentials.containsMatchIn(allVisible) ||
+                additionalCredentials.containsMatchIn(allVisible) -> "credentials"
+            notPosted.containsMatchIn(allVisible) ||
+                additionalUnposted.containsMatchIn(allVisible) -> "not_completed"
             !transaction.containsMatchIn(combined) -> "not_transaction"
             !currency.containsMatchIn(combined) ||
                 !amount.containsMatchIn(combined) -> "no_amount"
@@ -234,8 +239,10 @@ class BankNotificationService : NotificationListenerService() {
         // Persist unambiguous events to an independent SQLite journal even
         // when Flutter is closed or the raw notification review queue is full.
         // No raw notification text is copied into the SQLite database.
-        val candidate = BankAutoClassifier.classify(
-            bank, title, body, key, sbn.postTime, System.currentTimeMillis())
+        val candidate = if (BankNotificationBody.hasConflictingAmounts(
+                listOf(title, normalText, expandedText).plus(lines))) null
+            else BankAutoClassifier.classify(
+                bank, title, body, key, sbn.postTime, System.currentTimeMillis())
         val nativeSaved = candidate != null && try {
             BankNativeJournal(this).use { it.stage(candidate) }
         } catch (_: Exception) {

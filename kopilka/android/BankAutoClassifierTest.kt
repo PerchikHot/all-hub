@@ -27,6 +27,22 @@ class BankAutoClassifierTest {
             listOf("Код подтверждения оплаты 250 ₽", "Магазин: Пятёрочка"))))
     }
 
+    @Test fun inboxStyleRichLinesAreUsedInsteadOfGenericPreview() {
+        val body = BankNotificationBody.select(
+            "Операция по карте", "", listOf("Покупка 250 ₽", "Магазин: Пятёрочка"))
+        assertNotNull(parse(body))
+        assertTrue(body.contains("Магазин: Пятёрочка"))
+        // The selected body must not override the listener's privacy scan.
+        assertFalse(BankNotificationBody.hasConflictingAmounts(
+            listOf("Покупка 250 ₽", body)))
+        assertTrue(BankNotificationBody.hasConflictingAmounts(
+            listOf("Покупка 250 ₽", body, "Остаток 2 000 ₽")))
+        assertFalse(BankNotificationBody.hasConflictingAmounts(
+            listOf("Покупка 250 ₽", "Покупка 250 ₽")))
+        assertEquals("", BankNotificationBody.select("", "",
+            List(9) { "Покупка 250 ₽" }))
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

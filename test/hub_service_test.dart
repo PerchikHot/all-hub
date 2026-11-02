@@ -251,6 +251,39 @@ void main() {
     expect(HubService.assetPlatform('Nova-debug.apk'), 'android');
   });
 
+  test('debug APKs never become one-tap production updates', () {
+    for (final name in [
+      'Nova-debug.apk', 'Nova-dev.apk', 'Nova-development.apk',
+      'Nova-snapshot.apk', 'Nova-test.apk', 'Nova-testonly.apk',
+    ]) {
+      expect(HubService.isProductionInstallAsset(name), isFalse,
+          reason: name);
+    }
+    expect(HubService.isProductionInstallAsset('Nova-release.apk'), isTrue);
+    expect(HubService.isProductionInstallAsset('Nova-Windows.zip'), isTrue);
+
+    Map<String, dynamic> asset(String tag, String name) => {
+      'name': name, 'size': 2048, 'state': 'uploaded',
+      'browser_download_url':
+          'https://github.com/PerchikHot/all-hub/releases/download/$tag/$name',
+    };
+    final chosen = HubService.latestPublishedAssets('PerchikHot/all-hub', [
+      {'tag_name': 'all-hub-v5', 'assets': [
+        asset('all-hub-v5', 'AllHub-debug.apk'),
+        asset('all-hub-v5', 'AllHub-Windows.zip'),
+      ]},
+      {'tag_name': 'all-hub-v4', 'assets': [
+        asset('all-hub-v4', 'AllHub-release.apk'),
+      ]},
+    ], 'all-hub');
+    expect(chosen.length, 2);
+    expect(chosen.singleWhere((a) => a.platform == 'android').version,
+        contains('4'));
+    expect(chosen.singleWhere((a) => a.platform == 'windows').version,
+        contains('5'));
+    expect(chosen.any((a) => a.name.contains('debug')), isFalse);
+  });
+
   test('Windows portable archives are recognized across common naming schemes', () {
     for (final name in [
       'Kopilka-Windows-portable.zip',

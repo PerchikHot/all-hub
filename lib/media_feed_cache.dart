@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'media_feed_query.dart';
 
 /// A failed pull-to-refresh must restore pagination and deduplication too.
 /// Restoring only cards made the next retry re-fetch page one and duplicate
@@ -93,11 +94,7 @@ class MediaFeedMemoryCache {
       // A post can expose an original GIF, a resized image and a preview.
       // Comparing only the first URL missed duplicates when mirrored posts
       // provided those fields in a different order or omitted one variant.
-      final mediaUrls = <String>['file_url', 'large_file_url', 'sample_url', 'preview_file_url']
-          .map((field) => post[field])
-          .whereType<String>()
-          .where((url) => url.startsWith('https://') || url.startsWith('http://'))
-          .toSet();
+      final mediaUrls = mediaFeedIdentityKeys(post);
       if (idKey != null && seenIds.contains(idKey)) continue;
       if (mediaUrls.any(seenMediaUrls.contains)) continue;
       if (idKey != null) seenIds.add(idKey);

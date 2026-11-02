@@ -236,8 +236,10 @@ class HubService {
   /// only, but never mix older assets into a newer OS version's choices.
   static List<HubAsset> latestPublishedAssets(
       String repo, List<dynamic> releases, String? projectId) {
-    final selected = <HubAsset>[];
-    final coveredPlatforms = <String>{};
+    // Keep one newest usable release per platform. A rolling tag may be
+    // republished after a higher numbered release, so publication time alone
+    // must not make the launcher offer a numeric downgrade.
+    final selectedByPlatform = <String, List<HubAsset>>{};
     // GitHub's Releases API is not reliably ordered by publication time:
     // an old tag edited today can appear before a newly published version.
     // Sort by published_at, keeping API order as a stable fallback for
@@ -279,7 +281,6 @@ class HubService {
         final platform = assetPlatform(name);
         final url = (rawAsset['browser_download_url'] ?? '').toString();
         if (platform == null || !isProductionInstallAsset(name) ||
-            coveredPlatforms.contains(platform) ||
             !isTrustedReleaseAssetUrl(repo, url,
                 expectedName: name, expectedTag: tag)) {
           continue;
@@ -291,14 +292,23 @@ class HubService {
         thisRelease.add(HubAsset(name, url, platform, publishedVersion,
             releaseNotes: notes, sha256Digest: digest));
       }
-      selected.addAll(thisRelease);
-      coveredPlatforms.addAll(thisRelease.map((asset) => asset.platform));
-      if (coveredPlatforms.contains('android') &&
-          coveredPlatforms.contains('windows')) {
-        break;
+      for (final platform in const ['android', 'windows']) {
+        final candidates = thisRelease.where(
+          (asset) => asset.platform == platform).toList();
+        if (candidates.isEmpty) continue;
+        final existing = selectedByPlatform[platform];
+        if (existing == null ||
+            comparePublishedVersions(existing.first.version,
+                candidates.first.version) == -1) {
+          // Keep all matching formats from the same release (e.g. ZIP/EXE).
+          // If versions cannot be compared, the first/newest published
+          // candidate wins, preserving the established rolling-tag behavior.
+          selectedByPlatform[platform] = candidates;
+        }
       }
     }
-    return selected;
+    return selectedByPlatform.values
+        .expand((assets) => assets).toList(growable: false);
   }
 
   static Future<ProjectStatus> inspect(String repo, {String? projectId}) async {

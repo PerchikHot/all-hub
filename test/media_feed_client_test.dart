@@ -96,6 +96,29 @@ void main() {
     client.close();
   });
 
+  test('rate-limit cooldown avoids repeated requests while scrolling', () async {
+    var now = DateTime.utc(2026, 11, 1);
+    var calls = 0;
+    final client = MediaFeedClient(
+      clock: () => now,
+      client: MockClient((_) async {
+        calls++;
+        if (calls == 1) {
+          return http.Response('limited', 429, headers: {'retry-after': '90'});
+        }
+        return http.Response('[{"id":9}]', 200);
+      }),
+    );
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()));
+    await expectLater(client.fetch(url.replace(queryParameters: {'page': '2'})),
+        throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 1, reason: 'Do not hammer a rate-limited media API');
+    now = now.add(const Duration(seconds: 91));
+    expect((await client.fetch(url)).single['id'], 9);
+    expect(calls, 2);
+    client.close();
+  });
+
   test('HTTP 429 is not retried even when more attempts are allowed', () async {
     var calls = 0;
     final client = MediaFeedClient(maxAttempts: 3,

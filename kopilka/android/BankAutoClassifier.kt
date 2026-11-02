@@ -26,7 +26,7 @@ internal object BankNotificationBody {
         // and an explicitly labelled merchant. The listener still scans ALL
         // representations for OTPs, failed payments and conflicting amounts.
         val merchant = Regex(
-            """(?:^|[\\n.;])\\s*(?:магазин|торговая точка|продавец|merchant)\\s*[:：—-]\\s*[^\\r\\n,;]{2,80}|(?:^|[\\s.;])в\\s+(?:магазине|торговой\\s+точке)\\s+[^\\r\\n,;.!?]{2,80}""",
+            """(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*[^\r\n,;]{2,80}|(?:^|[\s.;])в\s+(?:магазине|торговой\s+точке)\s+[^\r\n,;.!?]{2,80}""",
             RegexOption.IGNORE_CASE)
         return options.firstOrNull {
             amount.containsMatchIn(it) && merchant.containsMatchIn(it)

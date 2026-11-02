@@ -20,6 +20,28 @@ void main() {
     expect(HubService.latestPublishedAssets('PerchikHot/all-hub', release, 'all-hub'), isEmpty);
   });
 
+  test('published date beats GitHub API order for rolling versioned releases', () {
+    Map<String, dynamic> release(String tag, String date) => {
+      'tag_name': tag, 'published_at': date,
+      'assets': [{
+        'name': 'AllHub-Android.apk', 'size': 1024, 'state': 'uploaded',
+        'browser_download_url':
+            'https://github.com/PerchikHot/all-hub/releases/download/$tag/AllHub-Android.apk',
+      }],
+    };
+    // Observed GitHub behavior: v0.7.8+997 appeared ahead of +1045
+    // although +1045 was published later. Never offer a downgrade.
+    final selected = HubService.latestPublishedAssets(
+      'PerchikHot/all-hub', [
+        release('all-hub-v0.7.8+997', '2026-11-02T02:51:32Z'),
+        release('all-hub-v0.7.8+1045', '2026-11-02T11:53:27Z'),
+        release('all-hub-v0.7.8+996', '2026-11-02T01:53:02Z'),
+      ], 'all-hub');
+    expect(selected.length, 1);
+    expect(selected.single.url, contains('v0.7.8+1045'));
+    expect(selected.single.version, contains('1045'));
+  });
+
   test('newest installable release wins separately for Android and Windows', () {
     Map<String, dynamic> asset(String tag, String name,
         {int size = 500, String state = 'uploaded'}) => {

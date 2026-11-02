@@ -162,6 +162,123 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
         uri.userInfo.isNotEmpty || uri.hasFragment) {
       continue;
     }
+    // Video and archive assets are not decodable image tiles. Use a
+    // published JPEG/WEBP preview instead; otherwise skip the post rather
+    // than filling the Pinterest grid with a permanently blank tile.
+    if (RegExp(r'\\.(?:mp4|webm|mov|swf|zip)
+    // decode a 12-24 MiB animation in each visible feed tile.
+    if (!autoplay && animated != null && value == animated) continue;
+    if (seen.add(value)) {
+      urls.add(value);
+    }
+  }
+  if (!autoplay && animated != null && seen.add(animated)) {
+    urls.add(animated);
+  }
+  return urls;
+}
+
+/// Select the first usable HTTPS URL without hiding valid fallbacks.
+String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}) {
+  final urls = mediaFeedImageCandidates(post, highQuality: highQuality);
+  return urls.isEmpty ? null : urls.first;
+}
+
+/// Identify a media file across differently parameterized CDN previews.
+/// Only Danbooru-owned hosts are normalized: on an unrelated CDN the query
+/// may select entirely different files, so stripping it would hide artwork.
+/// This is a deduplication key only; downloads keep their original URLs.
+String? mediaFeedIdentityUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty || uri.hasFragment) {
+    return null;
+  }
+  final host = uri.host.toLowerCase();
+  if (host == 'donmai.us' || host.endsWith('.donmai.us')) {
+    // Uri.replace(query: null) preserves the original query in Dart.
+    // Split the serialized HTTPS URL instead, retaining encoded path bytes.
+    return uri.toString().split('?').first;
+  }
+  return uri.toString();
+}
+
+Set<String> mediaFeedIdentityKeys(Map<String, dynamic> post) {
+  final keys = <String>{};
+  for (final field in ['file_url', 'large_file_url',
+                       'sample_url', 'preview_file_url']) {
+    final value = post[field];
+    if (value is String) {
+      final identity = mediaFeedIdentityUrl(value);
+      if (identity != null) {
+        keys.add(identity);
+      }
+    }
+  }
+  return keys;
+}
+
+/// Remove duplicate IDs within a single API response as well as across pages.
+/// This function does not mutate the caller's seen set; the UI commits IDs
+/// only after confirming the response still belongs to the active search.
+List<Map<String, dynamic>> filterNewMediaFeedPosts(
+  Iterable<Map<String, dynamic>> candidates, {
+  required String selectedTag,
+  required String kind,
+  required Set<String> seenIds,
+  Set<String> seenUrls = const <String>{},
+  String query = '',
+}) {
+  final pageSeen = <String>{...seenIds};
+  // The API can return the same image under different post IDs. Avoid
+  // showing identical thumbnail URLs twice on a single loaded page.
+  // Track every usable CDN variant, not only the first thumbnail. A GIF
+  // mirrored on the next page may use a new preview URL but the same original.
+  final pageUrls = <String>{...seenUrls};
+  final result = <Map<String, dynamic>>[];
+  for (final post in candidates) {
+    if (!isVisibleFeedPost(post, selectedTag: selectedTag,
+        kind: kind, seenIds: pageSeen, query: query)) {
+      continue;
+    }
+    final urls = mediaFeedIdentityKeys(post);
+    if (urls.isEmpty || urls.any(pageUrls.contains)) continue;
+    pageUrls.addAll(urls);
+    pageSeen.add((post['id'] ?? '').toString());
+    result.add(post);
+  }
+  return result;
+}
+
+
+/// Clamp API-supplied image proportions so portrait and landscape posts can
+/// coexist in a Pinterest-style masonry grid without enormous layout tiles.
+double mediaFeedTileAspectRatio(Map<String, dynamic> post) {
+  final width = post['image_width'];
+  final height = post['image_height'];
+  if (width is! num || height is! num ||
+      !width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
+    return 0.72;
+  }
+  return (width.toDouble() / height.toDouble()).clamp(0.55, 1.45).toDouble();
+}
+
+/// Find the next page for a category that has not reached the end of its API
+/// results. Each category has its own page sequence in the interleaved feed.
+/// Returning null prevents exhausted categories from starving the other one.
+int? nextAvailableMediaFeedPage(
+  int requestedPage, List<String> enabledTags, Set<String> exhaustedTags,
+) {
+  if (requestedPage < 1 || enabledTags.isEmpty) return null;
+  for (var offset = 0; offset < enabledTags.length; offset++) {
+    final candidate = requestedPage + offset;
+    final tag = enabledTags[(candidate - 1) % enabledTags.length];
+    if (!exhaustedTags.contains(tag)) return candidate;
+  }
+  return null;
+}
+, caseSensitive: false)
+        .hasMatch(uri.path)) continue;
     // Keep a large GIF as a fallback only. An HD preference must not
     // decode a 12-24 MiB animation in each visible feed tile.
     if (!autoplay && animated != null && value == animated) continue;

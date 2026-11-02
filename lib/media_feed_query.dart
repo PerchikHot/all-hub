@@ -170,14 +170,14 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
         .any(lowerPath.endsWith)) {
       continue;
     }
-    // Keep a large GIF as a fallback only; do not autoplay large assets.
-    if (!autoplay && animated != null && value == animated) continue;
+    // A large/unknown-size GIF is not a safe masonry fallback: if all
+    // JPEG previews fail, CachedNetworkImage would decode the original
+    // animation in the scrolling grid and exhaust mobile memory.
+    // The dedicated viewer still opens mediaFeedAnimatedUrl() on tap.
+    if (lowerPath.endsWith('.gif') && !autoplay) continue;
     if (seen.add(value)) {
       urls.add(value);
     }
-  }
-  if (!autoplay && animated != null && seen.add(animated)) {
-    urls.add(animated);
   }
   return urls;
 }

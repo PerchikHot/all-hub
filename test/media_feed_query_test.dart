@@ -99,8 +99,9 @@ void main() {
         'https://cdn.example/314-preview.jpg');
     expect(mediaFeedImageCandidates(post, highQuality: true).first,
         'https://cdn.example/314-preview.jpg');
-    expect(mediaFeedImageCandidates(post, highQuality: true).last,
-        'https://cdn.example/314.gif');
+    expect(mediaFeedAnimatedUrl(post), 'https://cdn.example/314.gif');
+    expect(mediaFeedImageCandidates(post, highQuality: true),
+        isNot(contains('https://cdn.example/314.gif')));
     expect(shouldAutoplayFeedGif({...post, 'file_size': 5 * 1024 * 1024}),
         isTrue);
     expect(mediaFeedImageCandidates({...post, 'file_size': 5 * 1024 * 1024},
@@ -108,6 +109,21 @@ void main() {
     expect(shouldAutoplayFeedGif({...post, 'file_size': null}), isFalse);
     expect(mediaFeedImageCandidates({...post, 'file_size': null},
         highQuality: true).first, 'https://cdn.example/314-preview.jpg');
+  });
+
+  test('oversized GIF without a static preview cannot exhaust feed memory', () {
+    final oversized = <String, dynamic>{
+      'id': 999,
+      'file_ext': 'gif',
+      'file_size': 30 * 1024 * 1024,
+      'file_url': 'https://cdn.example/huge.gif',
+      'tag_string': 'transgender animated',
+    };
+    expect(mediaFeedAnimatedUrl(oversized), isNull);
+    expect(mediaFeedImageCandidates(oversized, highQuality: false), isEmpty);
+    expect(mediaFeedImageCandidates(oversized, highQuality: true), isEmpty);
+    expect(isVisibleFeedPost(oversized, selectedTag: 'transgender',
+        kind: 'gif', seenIds: <String>{}), isFalse);
   });
 
   test('GIF tab excludes static previews and oversized animated assets', () {

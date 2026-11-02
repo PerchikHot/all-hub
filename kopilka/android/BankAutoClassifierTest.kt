@@ -59,6 +59,29 @@ class BankAutoClassifierTest {
             "Ozon Банк")?.get("kind"))
     }
 
+    @Test fun repeatedAndroidTitleAndExpandedBodyAreOnePayment() {
+        // Expanded notifications often repeat the exact short title.
+        val result = BankAutoClassifier.classify(
+            "Т-Банк", "Покупка 250 ₽",
+            "Покупка 250 ₽. Магазин: Пятёрочка",
+            "bank:repeated:1", now - 60000, now)
+        assertNotNull(result)
+        assertEquals(250.0, result!!["amount"])
+        assertEquals("Пятёрочка", result["note"])
+        // Different amounts, multiple body amounts, transfers and OTPs
+        // must still go to review, never to automatic SQLite import.
+        for (body in listOf(
+            "Покупка 350 ₽. Магазин: Пятёрочка",
+            "Покупка 250 ₽. Ещё 250 ₽. Магазин: Пятёрочка",
+            "Покупка 250 ₽. Перевод. Магазин: Пятёрочка",
+            "Покупка 250 ₽. Код подтверждения 1234. Магазин: Пятёрочка"
+        )) {
+            assertNull(body, BankAutoClassifier.classify(
+                "Т-Банк", "Покупка 250 ₽", body,
+                "bank:repeated:2", now - 60000, now))
+        }
+    }
+
     @Test fun refusesTransfersMultipleAmountsAndUncertainMessages() {
         for (body in listOf(
             "Перевод 200 ₽\nМагазин: Пятёрочка",

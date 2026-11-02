@@ -35,7 +35,17 @@ internal object BankAutoClassifier {
         val amountPattern = Regex(
             """(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)""",
             RegexOption.IGNORE_CASE)
-        val matches = amountPattern.findAll(text).toList()
+        // Android often repeats the short title verbatim at the start of
+        // the expanded notification body. Treat that exact preview as one
+        // payment, but never collapse different amounts or separate events.
+        // All security/rejection keywords are still checked in BOTH fields.
+        val preview = title.trim()
+        val repeatedPreview = preview.isNotEmpty() &&
+            body.trimStart().startsWith(preview) &&
+            amountPattern.findAll(preview).count() == 1 &&
+            amountPattern.findAll(body).count() == 1
+        val amountSource = if (repeatedPreview) body else text
+        val matches = amountPattern.findAll(amountSource).toList()
         if (matches.size != 1) return null
         val digits = Regex("""\d[\d \u00a0\u202f]*(?:[.,]\d{1,2})?""")
             .find(matches[0].value)?.value ?: return null

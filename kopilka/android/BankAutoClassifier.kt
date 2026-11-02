@@ -58,6 +58,16 @@ internal object BankNotificationBody {
     }
 }
 
+/** Native pre-filter must not drop salaries that the classifier accepts.
+ * Keep this testable without Android runtime or access to bank notifications.
+ */
+internal object BankNotificationGate {
+    private val transaction = Regex(
+        """покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|зарплат|purchase|payment|transfer|refund|credited|deposit|withdraw|salary""",
+        RegexOption.IGNORE_CASE)
+    fun hasTransactionMarker(text: String): Boolean = transaction.containsMatchIn(text)
+}
+
 internal object BankAutoClassifier {
     fun classify(bank: String, title: String, body: String, key: String,
                  postedAt: Long, now: Long): Map<String, Any>? {

@@ -110,6 +110,15 @@ class BankAutoClassifierTest {
         assertNotNull(parse("Зарплата 20 000 ₽", "Газпромбанк"))
     }
 
+    @Test fun pendingAuthorizationIsNeverACompletedPurchase() {
+        for (body in listOf(
+            "Подтверждение оплаты 250 ₽. Магазин: Пятёрочка",
+            "Авторизация оплаты 250 ₽. Магазин: Пятёрочка",
+            "Резервирование суммы 250 ₽. Магазин: Пятёрочка"
+        )) assertNull(body, parse(body))
+        assertNotNull(parse("Оплата 250 ₽. Магазин: Пятёрочка"))
+    }
+
     @Test fun futureSalaryIsNeverRecordedAsCompletedIncome() {
         assertNull(parse("Зарплата 20 260 ₽ будет зачислена завтра", "Газпромбанк"))
         assertNull(parse("Salary 20260 RUB will be credited tomorrow", "Газпромбанк"))

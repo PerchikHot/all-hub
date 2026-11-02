@@ -66,6 +66,21 @@ void main() {
     }
   });
 
+  test('pending authorization and confirmation requests never auto-post', () {
+    for (final body in [
+      'Подтверждение оплаты 250 ₽. Магазин: Пятёрочка',
+      'Авторизация оплаты 250 ₽. Магазин: Пятёрочка',
+      'Резервирование суммы 250 ₽. Магазин: Пятёрочка',
+    ]) {
+      expect(confidentKopilkaAutoEntry(
+          alert('pending-auth', 'Т-Банк', body), [], now), isNull,
+          reason: body);
+    }
+    expect(confidentKopilkaAutoEntry(
+        alert('completed', 'Т-Банк',
+            'Оплата 250 ₽. Магазин: Пятёрочка'), [], now), isNotNull);
+  });
+
   test('same-value duplicate and possible own-account transfer are not auto-posted', () {
     final event = alert('t-2', 'Т-Банк',
         'Покупка 250 ₽\nМагазин: Пятёрочка');

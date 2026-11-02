@@ -87,6 +87,12 @@ class BankAutoClassifierTest {
         assertNotNull(parse("Зарплата 20 000 ₽", "Газпромбанк"))
     }
 
+    @Test fun futureSalaryIsNeverRecordedAsCompletedIncome() {
+        assertNull(parse("Зарплата 20 260 ₽ будет зачислена завтра", "Газпромбанк"))
+        assertNull(parse("Salary 20260 RUB will be credited tomorrow", "Газпромбанк"))
+        assertNotNull(parse("Зарплата 20 260 ₽", "Газпромбанк"))
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

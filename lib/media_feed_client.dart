@@ -80,7 +80,7 @@ class MediaFeedClient {
             final raw = response.headers['retry-after'];
             final seconds = int.tryParse(raw?.trim() ?? '');
             final delay = response.statusCode == 403 ? 60 :
-                (seconds == null ? 30 : seconds.clamp(1, 120));
+                (seconds == null ? 30 : seconds.clamp(1, 120).toInt());
             _rateLimitUntil = _clock().add(Duration(seconds: delay));
             _rateLimitStatus = response.statusCode;
           }

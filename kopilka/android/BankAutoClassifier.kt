@@ -4,6 +4,22 @@ package com.veyrion.kopilka_app
 // notification listener. No model, network, bank API or Flutter engine needed.
 // Only explicit posted purchases with a named merchant and explicit income
 // qualify. Transfers, balance alerts, and multiple amounts remain in review.
+/**
+ * Inbox-style bank notifications sometimes expose only EXTRA_TEXT_LINES.
+ * Prefer the expanded/ordinary body; never concatenate duplicate previews.
+ * A bounded fallback keeps the existing classifier and privacy filters in
+ * charge of deciding whether a payment can be persisted.
+ */
+internal object BankNotificationBody {
+    fun select(normal: String, expanded: String, lines: List<String>): String {
+        if (expanded.isNotBlank()) return expanded
+        if (normal.isNotBlank()) return normal
+        if (lines.size > 8) return ""
+        val joined = lines.joinToString("\n").trim()
+        return if (joined.length <= 2048) joined else ""
+    }
+}
+
 internal object BankAutoClassifier {
     fun classify(bank: String, title: String, body: String, key: String,
                  postedAt: Long, now: Long): Map<String, Any>? {

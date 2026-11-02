@@ -362,11 +362,14 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         seenIds: seenPostIds, seenUrls: seenPostUrls,
         query: requestedQuery,
       );
+      // Cache deduplicates repeated media before rendering. Its length must
+      // never decide whether the *server* exhausted a 40-post page.
+      final sourceCount = pageCache.sourcePageLength(uri) ?? data.length;
       setState(() {
         refreshSnapshot = null;
         if (usedCachedPage) showingCachedPage = true;
-        fetchedPosts += data.length;
-        filteredPosts += data.length - newPosts.length;
+        fetchedPosts += sourceCount;
+        filteredPosts += sourceCount - newPosts.length;
         for (final post in newPosts) {
           seenPostIds.add((post['id'] ?? '').toString());
           // Remember all original/sample/preview URLs across page loads.
@@ -379,7 +382,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           posts.removeRange(0, posts.length - maxVisiblePosts);
         }
         // One sparse category must not stop another category's pagination.
-        if (data.length < pageSize) exhaustedFeedTags.add(selectedTag);
+        if (sourceCount < pageSize) exhaustedFeedTags.add(selectedTag);
         page = effectivePage + 1;
         hasMore = emptyPageRetries < 8 &&
             nextAvailableMediaFeedPage(

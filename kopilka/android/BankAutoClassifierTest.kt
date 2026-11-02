@@ -9,6 +9,24 @@ class BankAutoClassifierTest {
         BankAutoClassifier.classify(bank, "Операция", body,
             "com.bank:1:1793541540000", now - 60000, now)
 
+    @Test fun inboxStyleBankBodyFallbackIsBoundedAndPreservesPrivacyGate() {
+        assertEquals("Покупка 250 ₽\\nМагазин: Пятёрочка",
+            BankNotificationBody.select("", "",
+                listOf("Покупка 250 ₽", "Магазин: Пятёрочка")))
+        assertNotNull(parse(BankNotificationBody.select("", "",
+            listOf("Покупка 250 ₽", "Магазин: Пятёрочка"))))
+        assertEquals("expanded", BankNotificationBody.select(
+            "ordinary", "expanded", listOf("stale")))
+        assertEquals("ordinary", BankNotificationBody.select(
+            "ordinary", "", listOf("stale")))
+        assertEquals("", BankNotificationBody.select("", "",
+            List(9) { "Покупка 250 ₽" }))
+        assertEquals("", BankNotificationBody.select("", "",
+            listOf("x".repeat(2049))))
+        assertNull(parse(BankNotificationBody.select("", "",
+            listOf("Код подтверждения оплаты 250 ₽", "Магазин: Пятёрочка"))))
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

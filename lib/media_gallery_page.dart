@@ -272,7 +272,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     searchGeneration++;
     setState(() {
       activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
-      posts.clear();
+      // Keep the previous cards visible while pull-to-refresh fetches page 1.
+      // Replace them atomically only after the new page is validated.
+      if (refreshSnapshot == null) posts.clear();
       seenPostIds.clear();
       seenPostUrls.clear();
       exhaustedFeedTags.clear();
@@ -366,6 +368,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       // never decide whether the *server* exhausted a 40-post page.
       final sourceCount = pageCache.sourcePageLength(uri) ?? data.length;
       setState(() {
+        // A successful refresh replaces old cards rather than appending the
+        // new page to them. The old grid remained visible during the request.
+        if (refreshSnapshot != null) posts.clear();
         refreshSnapshot = null;
         if (usedCachedPage) showingCachedPage = true;
         fetchedPosts += sourceCount;
@@ -394,8 +399,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           // A manual refresh must not turn a populated feed into a blank
           // screen when the source is temporarily offline or rate limited.
           final backup = refreshSnapshot;
-          if (posts.isEmpty && backup != null) {
-            posts.addAll(backup.posts);
+          if (backup != null) {
+            posts..clear()..addAll(backup.posts);
             seenPostIds..clear()..addAll(backup.seenIds);
             seenPostUrls..clear()..addAll(backup.seenUrls);
             exhaustedFeedTags..clear()..addAll(backup.exhaustedTags);

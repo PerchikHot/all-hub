@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:all_hub/project_launcher.dart';
 import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +31,29 @@ void main() {
       ProjectLauncher.runInstallExclusive('../outside', () async => 0),
       throwsArgumentError,
     );
+  });
+
+  test('resumable APK restarts after stale GitHub HTTP 416 range', () async {
+    final directory = await Directory.systemTemp.createTemp('allhub-range-');
+    final file = File('${directory.path}/partial.apk.download');
+    final ranges = <String?>[];
+    final client = MockClient((request) async {
+      ranges.add(request.headers['Range']);
+      if (ranges.length == 1) {
+        return http.Response('', 416);
+      }
+      return http.Response('new-apk-bytes', 200);
+    });
+    try {
+      await file.writeAsBytes([1, 2, 3, 4]);
+      await ProjectLauncher.downloadResumableApk(
+          client, Uri.parse('https://github.com/example/release.apk'), file);
+      expect(ranges, ['bytes=4-', null]);
+      expect(await file.readAsString(), 'new-apk-bytes');
+    } finally {
+      client.close();
+      await directory.delete(recursive: true);
+    }
   });
 
   test('Windows version receipt requires an existing registered EXE', () async {

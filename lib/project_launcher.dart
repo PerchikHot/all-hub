@@ -384,7 +384,8 @@ class ProjectLauncher {
 
   /// Download with resumable HTTP Range requests. GitHub release asset links
   /// redirect to short-lived URLs, so each retry starts at the public URL.
-  static Future<void> _downloadResumable(
+  @visibleForTesting
+  static Future<void> downloadResumableApk(
     http.Client client, Uri uri, File temporary,
   ) async {
     const maxAttempts = 5;
@@ -396,6 +397,16 @@ class ProjectLauncher {
       try {
         final response = await client.send(request)
             .timeout(const Duration(seconds: 40));
+        if (response.statusCode == 416 && existing > 0) {
+          // GitHub rolling releases can replace an APK at the same URL.
+          // An old partial file may then be longer than the new asset.
+          // HTTP 416 means our saved Range cannot be resumed. Restart from
+          // byte zero rather than retrying the same invalid Range five times.
+          await response.stream.drain<void>();
+          await temporary.delete();
+          downloadProgress.value = 0;
+          continue;
+        }
         if (response.statusCode != 200 && response.statusCode != 206) {
           throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
         }
@@ -541,7 +552,7 @@ class ProjectLauncher {
       final temporary = File('${apk.path}.download');
       try {
         downloadProgress.value = 0;
-        await _downloadResumable(client, uri, temporary);
+        await downloadResumableApk(client, uri, temporary);
         if (await temporary.length() < 1024) {
           throw const FormatException('APK слишком мал');
         }
@@ -565,7 +576,7 @@ class ProjectLauncher {
           if (sha256Digest == null) rethrow;
           if (await temporary.exists()) await temporary.delete();
           downloadProgress.value = 0;
-          await _downloadResumable(client, uri, temporary);
+          await downloadResumableApk(client, uri, temporary);
           await verifyDownloadedDigest(temporary, sha256Digest);
         }
         if (await apk.exists()) await apk.delete();

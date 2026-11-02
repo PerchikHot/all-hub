@@ -39,13 +39,24 @@ class MainActivity : FlutterActivity() {
                     "autoEntries" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                         synchronized(BankNotificationService.queueLock) {
-                            // A damaged ledger is an error, never an empty array.
-                            val raw = prefs.getString("auto_entries", "[]") ?: "[]"
+                            // Include the independent SQLite journal and the
+                            // pre-migration SharedPreferences fallback. A bad
+                            // record is an error, never an empty replacement.
                             try {
-                                org.json.JSONArray(raw)
-                                result.success(raw)
-                            } catch (_: org.json.JSONException) {
-                                result.error("LEDGER", "Native auto ledger is corrupt", null)
+                                val merged = BankNativeJournal(this).pending()
+                                val known = mutableSetOf<String>()
+                                for (i in 0 until merged.length()) {
+                                    known.add(merged.getJSONObject(i).getString("key"))
+                                }
+                                val legacy = org.json.JSONArray(
+                                    prefs.getString("auto_entries", "[]"))
+                                for (i in 0 until legacy.length()) {
+                                    val entry = legacy.getJSONObject(i)
+                                    if (known.add(entry.getString("key"))) merged.put(entry)
+                                }
+                                result.success(merged.toString())
+                            } catch (_: Exception) {
+                                result.error("LEDGER", "Native auto journal cannot be read", null)
                             }
                         }
                     }
@@ -63,10 +74,12 @@ class MainActivity : FlutterActivity() {
                                         val entry = staged.getJSONObject(i)
                                         if (entry.optString("key") != key) remaining.put(entry)
                                     }
-                                    if (prefs.edit().putString("auto_entries", remaining.toString()).commit()) {
-                                        result.success(null)
+                                    if (!prefs.edit().putString("auto_entries", remaining.toString()).commit()) {
+                                        result.error("LEDGER", "Cannot persist legacy acknowledgement", null)
+                                    } else if (!BankNativeJournal(this).acknowledge(key)) {
+                                        result.error("LEDGER", "Cannot acknowledge SQLite journal", null)
                                     } else {
-                                        result.error("LEDGER", "Cannot persist auto ledger acknowledgement", null)
+                                        result.success(null)
                                     }
                                 } catch (_: Exception) {
                                     result.error("LEDGER", "Cannot update native auto ledger", null)
@@ -82,7 +95,11 @@ class MainActivity : FlutterActivity() {
                         result.success(mapOf(
                             "queued" to count,
                             "nativeAutoStaged" to try {
-                                org.json.JSONArray(prefs.getString("auto_entries", "[]")).length()
+                                org.json.JSONArray(prefs.getString("auto_entries", "[]")).length() +
+                                    BankNativeJournal(this).count()
+                            } catch (_: Exception) { -1 },
+                            "nativeJournalPending" to try {
+                                BankNativeJournal(this).count()
                             } catch (_: Exception) { -1 },
                             "nativeAutoStagedTotal" to prefs.getInt("native_auto_staged_count", 0),
                             "nativeReviewOnlyTotal" to prefs.getInt("native_review_only_count", 0),

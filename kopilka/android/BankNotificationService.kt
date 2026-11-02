@@ -215,8 +215,15 @@ class BankNotificationService : NotificationListenerService() {
             // notification to avoid duplicate pending transactions.
             if (existingKey == key || existingKey.startsWith("$key:")) return
         }
+        // Persist unambiguous events to an independent SQLite journal even
+        // when Flutter is closed or the raw notification review queue is full.
+        // No raw notification text is copied into the SQLite database.
+        val candidate = BankAutoClassifier.classify(
+            bank, title, body, key, sbn.postTime, System.currentTimeMillis())
+        val nativeSaved = candidate != null &&
+            BankNativeJournal(this).stage(candidate)
         // Never silently evict older, unprocessed payments while Flutter
-        // is closed. Reject new events and expose queue pressure instead.
+        // is closed. Review-only events still require available queue space.
         if (current.length() >= MAX_PENDING) {
             prefs.edit().putInt("queue_full_rejections",
                 (prefs.getInt("queue_full_rejections", 0) + 1).coerceAtMost(100000000))
@@ -235,9 +242,9 @@ class BankNotificationService : NotificationListenerService() {
         } catch (_: org.json.JSONException) {
             null
         }
-        val candidate = BankAutoClassifier.classify(
-            bank, title, body, key, sbn.postTime, System.currentTimeMillis())
-        val canStage = candidate != null && staged != null &&
+        // Older APKs used SharedPreferences as the staging ledger. Keep it
+        // only as a fallback if SQLite cannot persist this event.
+        val canStage = candidate != null && !nativeSaved && staged != null &&
             staged.length() < MAX_PENDING
         if (canStage) {
             staged!!.put(JSONObject(candidate!!))
@@ -250,7 +257,7 @@ class BankNotificationService : NotificationListenerService() {
             editor.putInt("native_review_only_count",
                 (prefs.getInt("native_review_only_count", 0) + 1)
                     .coerceAtMost(100000000))
-        } else if (canStage) {
+        } else if (canStage || nativeSaved) {
             editor.putInt("native_auto_staged_count",
                 (prefs.getInt("native_auto_staged_count", 0) + 1)
                     .coerceAtMost(100000000))
@@ -258,6 +265,9 @@ class BankNotificationService : NotificationListenerService() {
         if (canStage) {
             editor.putString("auto_entries", staged!!.toString())
                 .putLong("last_native_auto_stage", System.currentTimeMillis())
+                .remove("last_native_stage_error")
+        } else if (nativeSaved) {
+            editor.putLong("last_native_auto_stage", System.currentTimeMillis())
                 .remove("last_native_stage_error")
         } else if (candidate != null) {
             editor.putString("last_native_stage_error",

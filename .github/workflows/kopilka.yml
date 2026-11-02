@@ -87,6 +87,9 @@ jobs:
           (folder / 'BankAutoClassifier.kt').write_text(
               (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/BankAutoClassifier.kt')
                   .read_text(encoding='utf-8'), encoding='utf-8')
+          (folder / 'BankNativeJournal.kt').write_text(
+              (Path(os.environ['GITHUB_WORKSPACE']) / 'kopilka/android/BankNativeJournal.kt')
+                  .read_text(encoding='utf-8'), encoding='utf-8')
           tests = Path('android/app/src/test/kotlin/com/veyrion/kopilka_app')
           tests.mkdir(parents=True, exist_ok=True)
           (tests / 'BankAutoClassifierTest.kt').write_text(

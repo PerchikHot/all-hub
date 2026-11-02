@@ -803,13 +803,17 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
   final staged = diagnostics['nativeAutoStaged'];
   final stageError = diagnostics['nativeStageError'];
   final stageSummary = staged is int && staged >= 0
-      ? ' Подготовлено Android для переноса в журнал: $staged.'
+      ? ' Сохранено Android без запуска Flutter, ожидает сверки: $staged.'
       : ' Нативный журнал автосохранения требует проверки.';
   final stageWarning = stageError == 'ledger_corrupt'
       ? ' ВНИМАНИЕ: нативный журнал повреждён; исходные данные сохранены.'
       : stageError == 'ledger_full'
           ? ' ВНИМАНИЕ: нативный журнал заполнен.'
           : '';
+  final nativeJournalPending = diagnostics['nativeJournalPending'];
+  final sqliteSummary = nativeJournalPending is int && nativeJournalPending >= 0
+      ? ' В автономном SQLite-журнале: $nativeJournalPending.'
+      : ' Автономный SQLite-журнал недоступен или требует восстановления.';
   final nativeStagedTotal = diagnostics['nativeAutoStagedTotal'];
   final nativeReviewTotal = diagnostics['nativeReviewOnlyTotal'];
   final classifierSummary = nativeStagedTotal is int && nativeReviewTotal is int &&
@@ -848,7 +852,7 @@ String describeKopilkaListener(Map<String, dynamic>? diagnostics) {
               : '') +
       (queueFull is int && queueFull > 0
           ? ' ВНИМАНИЕ: очередь заполнена. $queueFull новых уведомлений не удалось сохранить. Открой Копилку и проверь операции.'
-          : '') + stageSummary + classifierSummary + stageWarning;
+          : '') + stageSummary + sqliteSummary + classifierSummary + stageWarning;
   final reconnectInfo = !connected && lastDisconnected is int &&
           lastDisconnected > 0
       ? ' Последнее отключение: ${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().day.toString().padLeft(2, '0')}.${DateTime.fromMillisecondsSinceEpoch(lastDisconnected).toLocal().month.toString().padLeft(2, '0')}. '

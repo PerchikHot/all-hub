@@ -43,9 +43,20 @@ internal class BankNativeJournal(context: Context) :
                 put("posted_at", timestamp)
             }
             // Duplicate notifications do not replace existing records.
-            writableDatabase.insertWithOnConflict(
+            val db = writableDatabase
+            val inserted = db.insertWithOnConflict(
                 "native_entries", null, values, SQLiteDatabase.CONFLICT_IGNORE)
-            true
+            if (inserted != -1L) {
+                true
+            } else {
+                // CONFLICT_IGNORE returns -1 for an existing key. Treat that
+                // as idempotent success only after verifying the durable row.
+                // Never claim an event was staged when SQLite did not write it.
+                db.query(
+                    "native_entries", arrayOf("notification_key"),
+                    "notification_key = ?", arrayOf(key), null, null, null, "1"
+                ).use { it.moveToFirst() }
+            }
         } catch (_: Exception) {
             false
         }

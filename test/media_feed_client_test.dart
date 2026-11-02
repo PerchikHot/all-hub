@@ -249,6 +249,58 @@ void main() {
     client.close();
   });
 
+  test('bounds parallel page requests and releases slots in FIFO order', () async {
+    final gates = List.generate(3, (_) => Completer<http.Response>());
+    final calledPages = <String>[];
+    final client = MediaFeedClient(maxConcurrentRequests: 2,
+      client: MockClient((request) {
+        calledPages.add(request.url.queryParameters['page']!);
+        return gates[calledPages.length - 1].future;
+      }),
+    );
+    final first = client.fetch(url);
+    final second = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '2',
+    }));
+    final third = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '3',
+    }));
+    await Future<void>.delayed(Duration.zero);
+    expect(calledPages, ['1', '2']);
+    gates[0].complete(http.Response('[{"id":1}]', 200));
+    expect((await first).single['id'], 1);
+    await Future<void>.delayed(Duration.zero);
+    expect(calledPages, ['1', '2', '3']);
+    gates[1].complete(http.Response('[{"id":2}]', 200));
+    gates[2].complete(http.Response('[{"id":3}]', 200));
+    expect((await second).single['id'], 2);
+    expect((await third).single['id'], 3);
+    client.close();
+  });
+
+  test('queued pages respect a cooldown set by an earlier request', () async {
+    var calls = 0;
+    final gate = Completer<http.Response>();
+    final client = MediaFeedClient(maxConcurrentRequests: 1,
+      clock: () => DateTime.utc(2026, 11, 2),
+      client: MockClient((_) {
+        calls++;
+        return gate.future;
+      }),
+    );
+    final first = client.fetch(url);
+    final queued = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '2',
+    }));
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 1);
+    gate.complete(http.Response('limited', 429));
+    await expectLater(first, throwsA(isA<MediaFeedRequestException>()));
+    await expectLater(queued, throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 1, reason: 'Queued pages must not bypass rate limits');
+    client.close();
+  });
+
   test('rejects non-feed URLs and invalid budgets', () async {
     final client = MediaFeedClient(client: MockClient((_) async =>
         http.Response('[]', 200)));

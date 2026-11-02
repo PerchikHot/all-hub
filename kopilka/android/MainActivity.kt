@@ -161,9 +161,26 @@ class MainActivity : FlutterActivity() {
                             try {
                                 val current = org.json.JSONArray(prefs.getString("queue", "[]"))
                                 val remaining = org.json.JSONArray()
+                                var wasQueued = false
                                 for (i in 0 until current.length()) {
                                     val item = current.getJSONObject(i)
-                                    if (item.optString("key") != key) remaining.put(item)
+                                    if (item.optString("key") == key) wasQueued = true
+                                    else remaining.put(item)
+                                }
+                                // Never create an acknowledgement for an arbitrary key:
+                                // only a notification actually shown in the review queue
+                                // can be dismissed. A stale UI dismissal is idempotent.
+                                if (!wasQueued) {
+                                    result.success(null)
+                                    return@setMethodCallHandler
+                                }
+                                // Persist the replay tombstone FIRST. A failed SQLite
+                                // write leaves the raw review alert untouched. This
+                                // tombstone survives the 1000-key preferences ring and
+                                // does not remove an independently staged payment.
+                                if (!BankNativeJournal(this).use { it.acknowledgeReview(key) }) {
+                                    result.error("LEDGER", "Cannot persist review dismissal", null)
+                                    return@setMethodCallHandler
                                 }
                                 // Persist both the removal and a bounded replay
                                 // tombstone atomically. Active Android notifications

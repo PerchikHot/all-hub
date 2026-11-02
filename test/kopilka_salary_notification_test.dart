@@ -6,8 +6,8 @@ void main() {
     const title = 'Зарплата';
     const body = '20 260 ₽ за октябрь';
     expect(isBankTransactionNotification(title, body), isTrue);
-    expect(suggestNotificationAmount('$title\\n$body'), '20260');
-    expect(suggestNotificationKind('$title\\n$body'), 'income');
+    expect(suggestNotificationAmount('$title\n$body'), '20260');
+    expect(suggestNotificationKind('$title\n$body'), 'income');
     expect(kopilkaPendingReviewPreview({'title': title, 'body': body}),
         contains('Возможный доход'));
   });

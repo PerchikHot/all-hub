@@ -278,6 +278,31 @@ void main() {
     client.close();
   });
 
+  test('closing feed rejects queued pages without issuing stale requests', () async {
+    final gate = Completer<http.Response>();
+    var calls = 0;
+    final client = MediaFeedClient(maxConcurrentRequests: 1,
+      client: MockClient((_) {
+        calls++;
+        return gate.future;
+      }),
+    );
+    final active = client.fetch(url);
+    final queued = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '2',
+    }));
+    final rejected = expectLater(queued, throwsStateError);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 1);
+    client.close();
+    client.close(); // Idempotent during widget disposal.
+    await rejected;
+    await expectLater(client.fetch(url), throwsStateError);
+    gate.complete(http.Response('[{"id":1}]', 200));
+    expect((await active).single['id'], 1);
+    expect(calls, 1, reason: 'No network request may start after close');
+  });
+
   test('queued pages respect a cooldown set by an earlier request', () async {
     var calls = 0;
     final gate = Completer<http.Response>();

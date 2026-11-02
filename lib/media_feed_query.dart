@@ -188,7 +188,9 @@ String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}
 String? mediaFeedIdentityUrl(String url) {
   final uri = Uri.tryParse(url);
   if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
-      uri.userInfo.isNotEmpty || uri.hasFragment) return null;
+      uri.userInfo.isNotEmpty || uri.hasFragment) {
+    return null;
+  }
   final host = uri.host.toLowerCase();
   if (host == 'donmai.us' || host.endsWith('.donmai.us')) {
     return uri.replace(query: null).toString();

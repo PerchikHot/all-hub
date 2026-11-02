@@ -143,11 +143,15 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       temp = File('${destination.path}.part');
       final sink = temp.openWrite();
       var received = 0;
+      final signature = <int>[];
       try {
         // Abort stalled CDN streams rather than keeping a spinner forever.
         await for (final chunk in response.stream.timeout(
             const Duration(seconds: 25))) {
           received += chunk.length;
+          if (signature.length < 16) {
+            signature.addAll(chunk.take(16 - signature.length));
+          }
           if (received > 200 * 1024 * 1024) {
             throw Exception('Файл больше 200 МБ');
           }
@@ -161,6 +165,9 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
         await sink.flush();
         if (!isCompleteMediaDownload(received, response.contentLength)) {
           throw const FormatException('Неполный медиафайл: размер не совпал с ответом сервера');
+        }
+        if (!hasMediaFileSignature(safeName, signature)) {
+          throw const FormatException('Файл не соответствует формату изображения или видео');
         }
       } finally {
         await sink.close();

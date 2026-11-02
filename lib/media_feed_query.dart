@@ -203,7 +203,9 @@ Set<String> mediaFeedIdentityKeys(Map<String, dynamic> post) {
     final value = post[field];
     if (value is String) {
       final identity = mediaFeedIdentityUrl(value);
-      if (identity != null) keys.add(identity);
+      if (identity != null) {
+        keys.add(identity);
+      }
     }
   }
   return keys;

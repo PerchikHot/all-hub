@@ -238,9 +238,32 @@ class HubService {
       String repo, List<dynamic> releases, String? projectId) {
     final selected = <HubAsset>[];
     final coveredPlatforms = <String>{};
-    for (final raw in releases) {
+    // GitHub's Releases API is not reliably ordered by publication time:
+    // an old tag edited today can appear before a newly published version.
+    // Sort by published_at, keeping API order as a stable fallback for
+    // malformed/legacy responses without dates.
+    final ordered = <({int index, Map<String, dynamic> release,
+        DateTime? published})>[];
+    for (var index = 0; index < releases.length; index++) {
+      final raw = releases[index];
       if (raw is! Map<String, dynamic>) continue;
-      final release = raw;
+      final published = DateTime.tryParse(
+        (raw['published_at'] ?? raw['created_at'] ?? '').toString());
+      ordered.add((index: index, release: raw, published: published));
+    }
+    ordered.sort((a, b) {
+      if (a.published != null && b.published != null) {
+        final timeOrder = b.published!.compareTo(a.published!);
+        if (timeOrder != 0) return timeOrder;
+      } else if (a.published != null) {
+        return -1;
+      } else if (b.published != null) {
+        return 1;
+      }
+      return a.index.compareTo(b.index);
+    });
+    for (final item in ordered) {
+      final release = item.release;
       if (release['draft'] == true || release['prerelease'] == true) continue;
       final tag = (release['tag_name'] ?? '').toString();
       if (projectId != null && !releaseMatchesProject(tag, projectId)) {

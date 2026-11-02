@@ -221,7 +221,7 @@ class BankNotificationService : NotificationListenerService() {
         val candidate = BankAutoClassifier.classify(
             bank, title, body, key, sbn.postTime, System.currentTimeMillis())
         val nativeSaved = candidate != null &&
-            BankNativeJournal(this).stage(candidate)
+            BankNativeJournal(this).use { it.stage(candidate) }
         // Never silently evict older, unprocessed payments while Flutter
         // is closed. Review-only events still require available queue space.
         if (current.length() >= MAX_PENDING) {

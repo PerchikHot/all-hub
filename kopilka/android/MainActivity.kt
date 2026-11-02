@@ -43,7 +43,7 @@ class MainActivity : FlutterActivity() {
                             // pre-migration SharedPreferences fallback. A bad
                             // record is an error, never an empty replacement.
                             try {
-                                val merged = BankNativeJournal(this).pending()
+                                val merged = BankNativeJournal(this).use { it.pending() }
                                 val known = mutableSetOf<String>()
                                 for (i in 0 until merged.length()) {
                                     known.add(merged.getJSONObject(i).getString("key"))
@@ -76,7 +76,7 @@ class MainActivity : FlutterActivity() {
                                     }
                                     if (!prefs.edit().putString("auto_entries", remaining.toString()).commit()) {
                                         result.error("LEDGER", "Cannot persist legacy acknowledgement", null)
-                                    } else if (!BankNativeJournal(this).acknowledge(key)) {
+                                    } else if (!BankNativeJournal(this).use { it.acknowledge(key) }) {
                                         result.error("LEDGER", "Cannot acknowledge SQLite journal", null)
                                     } else {
                                         result.success(null)
@@ -96,10 +96,10 @@ class MainActivity : FlutterActivity() {
                             "queued" to count,
                             "nativeAutoStaged" to try {
                                 org.json.JSONArray(prefs.getString("auto_entries", "[]")).length() +
-                                    BankNativeJournal(this).count()
+                                    BankNativeJournal(this).use { it.count() }
                             } catch (_: Exception) { -1 },
                             "nativeJournalPending" to try {
-                                BankNativeJournal(this).count()
+                                BankNativeJournal(this).use { it.count() }
                             } catch (_: Exception) { -1 },
                             "nativeAutoStagedTotal" to prefs.getInt("native_auto_staged_count", 0),
                             "nativeReviewOnlyTotal" to prefs.getInt("native_review_only_count", 0),

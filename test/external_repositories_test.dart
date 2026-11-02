@@ -56,6 +56,32 @@ void main() {
   });
 
 
+  test('verification rejects redirects, forged inputs and oversized metadata', () async {
+    final repo = ExternalRepository.parse('Example/Widget')!;
+    var requests = 0;
+    final redirect = MockClient((request) async {
+      requests++;
+      expect(request.followRedirects, isFalse);
+      expect(request.headers.containsKey('Authorization'), isFalse);
+      return http.Response('', 302, headers: {
+        'location': 'https://untrusted.example/collect',
+      });
+    });
+    await expectLater(ExternalRepositoryStore.verifyPublic(repo,
+        client: redirect), throwsStateError);
+    expect(requests, 1);
+
+    final oversized = MockClient((_) async => http.Response(
+        '{"full_name":"Example/Widget","private":false}' +
+            ' ' * (128 * 1024), 200));
+    await expectLater(ExternalRepositoryStore.verifyPublic(repo,
+        client: oversized), throwsFormatException);
+    await expectLater(ExternalRepositoryStore.verifyPublic(
+        const ExternalRepository('bad owner', 'Widget'), client: redirect),
+        throwsFormatException);
+    expect(requests, 1, reason: 'Invalid names never reach the network');
+  });
+
   test('portable catalog backup round-trips and rejects unsafe entries', () {
     final backup = ExternalRepositoryStore.exportBackup([
       ExternalRepository.parse('Example/One')!,

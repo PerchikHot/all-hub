@@ -224,15 +224,22 @@ class BankNotificationService : NotificationListenerService() {
             BankNativeJournal(this).use { it.stage(candidate) }
         // Never silently evict older, unprocessed payments while Flutter
         // is closed. Review-only events still require available queue space.
-        if (current.length() >= MAX_PENDING) {
+        // A high-confidence event is already durable in SQLite. Do not
+        // reject it just because the legacy review queue is full.
+        if (current.length() >= MAX_PENDING && !nativeSaved) {
             prefs.edit().putInt("queue_full_rejections",
                 (prefs.getInt("queue_full_rejections", 0) + 1).coerceAtMost(100000000))
                 .putString("last_skip_reason", "queue_full")
                 .putLong("last_skipped", System.currentTimeMillis()).commit()
             return
         }
-        current.put(JSONObject().put("key", key).put("bank", bank)
-            .put("title", title).put("body", body).put("time", sbn.postTime))
+        // Keep raw text only for review-only alerts and SQLite failures.
+        // Confirmed events are already stored as minimal structured records,
+        // so persisting the original bank notification would be unnecessary.
+        if (!nativeSaved) {
+            current.put(JSONObject().put("key", key).put("bank", bank)
+                .put("title", title).put("body", body).put("time", sbn.postTime))
+        }
         // Record strictly classified transactions in a separate durable
         // native ledger while Flutter is not running. The UI reconciles this
         // ledger with its journal on resume; uncertain alerts remain review-only.

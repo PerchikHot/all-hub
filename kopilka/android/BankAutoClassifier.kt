@@ -64,3 +64,25 @@ internal object BankAutoClassifier {
             "autoImported" to true, "nativeClassifier" to 1)
     }
 }
+
+/**
+ * Decide whether a bank notification still needs its raw text retained.
+ * Successfully staged high-confidence events have a minimal durable SQLite
+ * representation; review-only events and SQLite failures need the legacy
+ * review queue. A full review queue must not reject a SQLite-staged payment.
+ */
+internal data class BankStorageDecision(
+    val retainRawForReview: Boolean,
+    val queueRejected: Boolean
+)
+
+internal object BankStoragePolicy {
+    fun decide(nativeSaved: Boolean, queued: Int, capacity: Int): BankStorageDecision {
+        require(queued >= 0 && capacity > 0)
+        val retainRaw = !nativeSaved
+        return BankStorageDecision(
+            retainRawForReview = retainRaw,
+            queueRejected = retainRaw && queued >= capacity
+        )
+    }
+}

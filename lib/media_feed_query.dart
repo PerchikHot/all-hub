@@ -165,8 +165,10 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
     // Video and archive assets are not decodable image tiles. Use a
     // published JPEG/WEBP preview instead; otherwise skip the post rather
     // than filling the Pinterest grid with a permanently blank tile.
-    if (RegExp(r'\\.(?:mp4|webm|mov|swf|zip)
-    // decode a 12-24 MiB animation in each visible feed tile.
+    final lowerPath = uri.path.toLowerCase();
+    if (const ['.mp4', '.webm', '.mov', '.swf', '.zip']
+        .any(lowerPath.endsWith)) continue;
+    // Keep a large GIF as a fallback only; do not autoplay large assets.
     if (!autoplay && animated != null && value == animated) continue;
     if (seen.add(value)) {
       urls.add(value);

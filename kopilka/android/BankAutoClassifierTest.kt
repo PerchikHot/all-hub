@@ -43,6 +43,18 @@ class BankAutoClassifierTest {
             List(9) { "Покупка 250 ₽" }))
     }
 
+    @Test fun equivalentRubleFormatsAcrossPreviewsDoNotBlockAutomaticJournal() {
+        assertFalse(BankNotificationBody.hasConflictingAmounts(listOf(
+            "Покупка 250 ₽", "Покупка 250,00 руб.",
+            "Оплата 250 RUB; Магазин: Пятёрочка")))
+        assertFalse(BankNotificationBody.hasConflictingAmounts(listOf(
+            "Покупка 1 250,50 ₽", "Оплата 1250.50 RUB")))
+        assertTrue(BankNotificationBody.hasConflictingAmounts(listOf(
+            "Покупка 250 ₽", "Остаток 2 500 руб.")))
+        assertTrue(BankNotificationBody.hasConflictingAmounts(listOf(
+            "Покупка 250 ₽", "Ещё покупка 250,01 ₽")))
+    }
+
     @Test fun richestInboxStyleBodyWinsOverIncompleteAmountPreview() {
         // Real banks may show only an amount in EXTRA_BIG_TEXT while the
         // merchant appears in EXTRA_TEXT_LINES. The previous first-amount

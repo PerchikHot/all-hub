@@ -76,7 +76,8 @@ void main() {
       'queueFullRejections': 2, 'queueCorrupt': true,
     });
     expect(report, contains('3 уведомлений вытеснено'));
-    expect(report, contains('очередь повреждена'));
+    expect(report, contains('очередь ручной проверки повреждена'));
+    expect(report, contains('продолжают сохраняться в отдельный SQLite-журнал'));
     expect(report, contains('Исходные данные не перезаписаны'));
     expect(report, contains('2 новых уведомлений не удалось сохранить'));
     expect(report, isNot(contains('body')));

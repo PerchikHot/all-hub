@@ -114,6 +114,26 @@ void main() {
     expect(posts.map((post) => post['id']).toList(), [11, 13, 14, 16]);
   });
 
+  test('alternate GIF sizes and preview URLs do not repeat mirrored media', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/mixed-variants');
+    cache.store(request, [
+      {
+        'id': 31,
+        'file_url': 'https://cdn.example/original.gif',
+        'large_file_url': 'https://cdn.example/large.jpg',
+        'preview_file_url': 'https://cdn.example/thumb.jpg',
+      },
+      // Same media, but the mirror only exposes the resized variant.
+      {'id': 32, 'file_url': 'https://cdn.example/large.jpg'},
+      // Same media, but the mirror exposes only the preview.
+      {'id': 33, 'preview_file_url': 'https://cdn.example/thumb.jpg'},
+      {'id': 34, 'file_url': 'https://cdn.example/unique.gif'},
+    ]);
+    expect(cache.read(request)!.map((post) => post['id']).toList(),
+        [31, 34]);
+  });
+
   test('failed refresh restores exact page cursor and deduplication', () {
     final posts = <Map<String, dynamic>>[
       {'id': 11, 'media_asset': {'variants': ['original.gif']}},

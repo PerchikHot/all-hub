@@ -28,7 +28,12 @@ class BankAutoClassifierTest {
             assertEquals(250.5, result!!["amount"])
         }
         // An unlabelled store mention is not evidence of a completed purchase.
-        assertNull(parse("Покупка 250 ₽ в магазине Пятёрочка"))
+        // Explicit in-store locations are safe to import; free-form locations
+        // and merchant text containing possible card digits remain in review.
+        assertEquals("Пятёрочка", parse("Покупка 250 ₽ в магазине Пятёрочка")?.get("note"))
+        assertEquals("Аптека", parse("Оплата 90 ₽ в торговой точке Аптека")?.get("note"))
+        assertNull(parse("Покупка 250 ₽ в Пятёрочке"))
+        assertNull(parse("Покупка 250 ₽ в магазине Карта 1234"))
         assertNull(parse("Покупка 250 ₽. Магазин: A"))
         assertEquals("income", parse("Зарплата поступила 20 000 ₽",
             "Газпромбанк")?.get("kind"))

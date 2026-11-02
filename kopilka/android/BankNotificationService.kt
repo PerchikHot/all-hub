@@ -125,7 +125,12 @@ class BankNotificationService : NotificationListenerService() {
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
         val normalText = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         val expandedText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-        val body = if (expandedText.isNotBlank()) expandedText else normalText
+        // InboxStyle alerts can contain only EXTRA_TEXT_LINES. Treat the
+        // bounded lines as one message so ordinary classification, OTP
+        // filtering and SQLite deduplication still apply.
+        val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.map { it.toString() }.orEmpty()
+        val body = BankNotificationBody.select(normalText, expandedText, lines)
         // Never persist oversized or malformed notification payloads.
         if (body.isBlank() || body.length > 2048 || title.length > 200) {
             markFiltered(bankId, "invalid_payload")
@@ -304,6 +309,10 @@ class BankNotificationService : NotificationListenerService() {
         // Distinguish conservative review-only alerts from durable automatic
         // candidates without retaining any additional private message text.
         if (candidate == null) {
+            // The bank event passed the privacy gate but was too ambiguous
+            // for automatic accounting. Report only a fixed reason, not text.
+            editor.putString("last_skip_reason", "review_required")
+                .putLong("last_skipped", System.currentTimeMillis())
             editor.putInt("native_review_only_count",
                 (prefs.getInt("native_review_only_count", 0) + 1)
                     .coerceAtMost(100000000))

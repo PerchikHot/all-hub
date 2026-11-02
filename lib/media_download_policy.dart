@@ -39,3 +39,39 @@ bool isCompleteMediaDownload(int receivedBytes, int? expectedBytes) {
   }
   return expectedBytes == null || receivedBytes == expectedBytes;
 }
+
+/// Reject HTML error pages and empty/truncated headers masquerading as a
+/// successful GIF/video download. Check only a small prefix, never decode
+/// entire videos in memory. This is format validation, not a virus scanner.
+bool hasMediaFileSignature(String fileName, List<int> prefix) {
+  bool at(int offset, List<int> magic) =>
+      offset >= 0 && prefix.length >= offset + magic.length &&
+      List.generate(magic.length, (i) => prefix[offset + i] == magic[i])
+          .every((matches) => matches);
+  final extension = fileName.split('.').last.toLowerCase();
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return at(0, [0xff, 0xd8, 0xff]);
+    case 'png':
+      return at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case 'gif':
+      return at(0, [71, 73, 70, 56, 55, 97]) ||
+          at(0, [71, 73, 70, 56, 57, 97]);
+    case 'webp':
+      return at(0, [82, 73, 70, 70]) &&
+          at(8, [87, 69, 66, 80]);
+    case 'bmp':
+      return at(0, [66, 77]);
+    case 'webm':
+      return at(0, [0x1a, 0x45, 0xdf, 0xa3]);
+    case 'mp4':
+      return at(4, [102, 116, 121, 112]); // ISO BMFF ftyp
+    case 'mov':
+      return at(4, [102, 116, 121, 112]) ||
+          at(4, [109, 111, 111, 118]) || // QuickTime moov
+          at(4, [119, 105, 100, 101]); // QuickTime wide
+    default:
+      return false;
+  }
+}

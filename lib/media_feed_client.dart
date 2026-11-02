@@ -65,7 +65,8 @@ class MediaFeedClient {
           ..headers['Accept'] = 'application/json';
         final response = await _client.send(request)
             .timeout(const Duration(seconds: 18));
-        if (response.statusCode >= 500 && attempt + 1 < maxAttempts) {
+        if (response.statusCode >= 500 && attempt + 1 < maxAttempts &&
+            !response.headers.containsKey('retry-after')) {
           // Do not leave an unread response attached to the connection.
           await response.stream.drain<void>()
               .timeout(const Duration(seconds: 5));
@@ -83,7 +84,8 @@ class MediaFeedClient {
           }
           // Retry-After supports both delta-seconds and RFC 7231 HTTP dates.
           // Bound even an extreme future date to two minutes.
-          if (response.statusCode == 429 || response.statusCode == 403) {
+          if (response.statusCode == 429 || response.statusCode == 403 ||
+              response.statusCode == 503) {
             final raw = response.headers['retry-after']?.trim() ?? '';
             var seconds = int.tryParse(raw);
             if (seconds == null && raw.isNotEmpty) {
@@ -96,7 +98,8 @@ class MediaFeedClient {
               }
             }
             final delay = response.statusCode == 403 ? 60 :
-                (seconds == null ? 30 : seconds.clamp(1, 120).toInt());
+                (seconds == null ? (response.statusCode == 503 ? 15 : 30)
+                    : seconds.clamp(1, 120).toInt());
             _rateLimitUntil = _clock().add(Duration(seconds: delay));
             _rateLimitStatus = response.statusCode;
           }

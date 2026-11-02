@@ -65,6 +65,28 @@ void main() {
     client.close();
   });
 
+  test('HTTP 503 Retry-After stops retries and cools down feed requests', () async {
+    var now = DateTime.utc(2026, 11, 2);
+    var calls = 0;
+    final client = MediaFeedClient(
+      clock: () => now,
+      client: MockClient((_) async {
+        calls++;
+        return calls == 1
+            ? http.Response('maintenance', 503, headers: {'retry-after': '45'})
+            : http.Response('[{"id":51}]', 200);
+      }),
+    );
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()
+        .having((e) => e.statusCode, 'status', 503)));
+    await expectLater(client.fetch(url), throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 1, reason: 'Do not hammer a provider during maintenance');
+    now = now.add(const Duration(seconds: 46));
+    expect((await client.fetch(url)).single['id'], 51);
+    expect(calls, 2);
+    client.close();
+  });
+
   test('temporary connection failure retries without caching a blank page', () async {
     var calls = 0;
     final delays = <Duration>[];

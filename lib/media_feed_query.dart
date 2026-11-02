@@ -181,6 +181,34 @@ String? mediaFeedImageUrl(Map<String, dynamic> post, {required bool highQuality}
   return urls.isEmpty ? null : urls.first;
 }
 
+/// Identify a media file across differently parameterized CDN previews.
+/// Only Danbooru-owned hosts are normalized: on an unrelated CDN the query
+/// may select entirely different files, so stripping it would hide artwork.
+/// This is a deduplication key only; downloads keep their original URLs.
+String? mediaFeedIdentityUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty || uri.hasFragment) return null;
+  final host = uri.host.toLowerCase();
+  if (host == 'donmai.us' || host.endsWith('.donmai.us')) {
+    return uri.replace(query: null).toString();
+  }
+  return uri.toString();
+}
+
+Set<String> mediaFeedIdentityKeys(Map<String, dynamic> post) {
+  final keys = <String>{};
+  for (final field in ['file_url', 'large_file_url',
+                       'sample_url', 'preview_file_url']) {
+    final value = post[field];
+    if (value is String) {
+      final identity = mediaFeedIdentityUrl(value);
+      if (identity != null) keys.add(identity);
+    }
+  }
+  return keys;
+}
+
 /// Remove duplicate IDs within a single API response as well as across pages.
 /// This function does not mutate the caller's seen set; the UI commits IDs
 /// only after confirming the response still belongs to the active search.
@@ -204,7 +232,7 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
         kind: kind, seenIds: pageSeen, query: query)) {
       continue;
     }
-    final urls = mediaFeedImageCandidates(post, highQuality: false);
+    final urls = mediaFeedIdentityKeys(post);
     if (urls.isEmpty || urls.any(pageUrls.contains)) continue;
     pageUrls.addAll(urls);
     pageSeen.add((post['id'] ?? '').toString());

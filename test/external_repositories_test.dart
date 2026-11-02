@@ -72,8 +72,7 @@ void main() {
     expect(requests, 1);
 
     final oversized = MockClient((_) async => http.Response(
-        '{"full_name":"Example/Widget","private":false}' +
-            ' ' * (128 * 1024), 200));
+        '{"full_name":"Example/Widget","private":false}${' ' * (128 * 1024)}', 200));
     await expectLater(ExternalRepositoryStore.verifyPublic(repo,
         client: oversized), throwsFormatException);
     await expectLater(ExternalRepositoryStore.verifyPublic(

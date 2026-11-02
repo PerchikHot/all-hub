@@ -17,18 +17,35 @@ import org.json.JSONObject
  * The notification key is unique, so listener reconnections are idempotent.
  */
 internal class BankNativeJournal(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "kopilka_native_journal.db", null, 1) {
+    SQLiteOpenHelper(context.applicationContext, "kopilka_native_journal.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE native_entries (" +
                 "notification_key TEXT PRIMARY KEY NOT NULL, " +
                 "payload TEXT NOT NULL, posted_at INTEGER NOT NULL)"
         )
+        db.execSQL(CREATE_ACK_TABLE)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Never drop financial records during a schema migration.
-        throw IllegalStateException("Native finance journal requires migration")
+        // Keep every unimported v1 payment during migration.
+        if (oldVersion == 1 && newVersion == 2) db.execSQL(CREATE_ACK_TABLE)
+        else throw IllegalStateException("Unsupported native journal migration")
+    }
+
+    companion object {
+        private const val CREATE_ACK_TABLE =
+            "CREATE TABLE native_acknowledged (" +
+                "notification_key TEXT PRIMARY KEY NOT NULL, ack_at INTEGER NOT NULL)"
+    }
+
+    /** A durable replay tombstone outlives the 1000-entry preferences ring. */
+    fun wasAcknowledged(key: String): Boolean {
+        if (key.isBlank() || key.length > 256) return false
+        readableDatabase.query("native_acknowledged", arrayOf("notification_key"),
+            "notification_key = ?", arrayOf(key), null, null, null, "1").use {
+            return it.moveToFirst()
+        }
     }
 
     fun stage(candidate: Map<String, Any>): Boolean {
@@ -42,20 +59,29 @@ internal class BankNativeJournal(context: Context) :
                 put("payload", JSONObject(candidate).toString())
                 put("posted_at", timestamp)
             }
-            // Duplicate notifications do not replace existing records.
+            // Serialize staging with acknowledgement: a listener reconnect
+            // must never recreate a payment that Flutter already imported.
             val db = writableDatabase
-            val inserted = db.insertWithOnConflict(
-                "native_entries", null, values, SQLiteDatabase.CONFLICT_IGNORE)
-            if (inserted != -1L) {
-                true
-            } else {
-                // CONFLICT_IGNORE returns -1 for an existing key. Treat that
-                // as idempotent success only after verifying the durable row.
-                // Never claim an event was staged when SQLite did not write it.
-                db.query(
-                    "native_entries", arrayOf("notification_key"),
-                    "notification_key = ?", arrayOf(key), null, null, null, "1"
-                ).use { it.moveToFirst() }
+            db.beginTransaction()
+            try {
+                val done = db.query("native_acknowledged",
+                    arrayOf("notification_key"), "notification_key = ?",
+                    arrayOf(key), null, null, null, "1").use { it.moveToFirst() }
+                if (done) {
+                    db.setTransactionSuccessful()
+                    true // Idempotent: no new record and no raw-text fallback.
+                } else {
+                    val inserted = db.insertWithOnConflict(
+                        "native_entries", null, values, SQLiteDatabase.CONFLICT_IGNORE)
+                    val durable = inserted != -1L || db.query(
+                        "native_entries", arrayOf("notification_key"),
+                        "notification_key = ?", arrayOf(key), null, null, null, "1"
+                    ).use { it.moveToFirst() }
+                    if (durable) db.setTransactionSuccessful()
+                    durable
+                }
+            } finally {
+                db.endTransaction()
             }
         } catch (_: Exception) {
             false
@@ -86,9 +112,22 @@ internal class BankNativeJournal(context: Context) :
     fun acknowledge(key: String): Boolean {
         if (key.isBlank() || key.length > 256) return false
         return try {
-            writableDatabase.delete(
-                "native_entries", "notification_key = ?", arrayOf(key))
-            true
+            val db = writableDatabase
+            db.beginTransaction()
+            try {
+                val values = ContentValues().apply {
+                    put("notification_key", key)
+                    put("ack_at", System.currentTimeMillis())
+                }
+                // Tombstone and removal must commit together, never separately.
+                db.insertWithOnConflict("native_acknowledged", null, values,
+                    SQLiteDatabase.CONFLICT_IGNORE)
+                db.delete("native_entries", "notification_key = ?", arrayOf(key))
+                db.setTransactionSuccessful()
+                true
+            } finally {
+                db.endTransaction()
+            }
         } catch (_: Exception) {
             false
         }

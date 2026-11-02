@@ -410,6 +410,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       }
     } finally {
       if (mounted && generation == searchGeneration) {
+        // A pull-to-refresh bypasses cache for its first request only.
+        // Otherwise every subsequent scroll would hammer the public API.
+        bypassPageCache = false;
         setState(() => loading = false);
         // GIFs are sparse: continue scanning a few pages before showing an
         // empty gallery. Also try the other enabled category automatically.
@@ -423,7 +426,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
 
   // A failed next page should not discard images already loaded into the feed.
   Future<void> retryFailedPage() async {
-    if (loading || posts.isEmpty) return;
+    // A failed first page leaves an empty gallery: retry must still work.
+    if (loading || favoritesOnly) return;
     setState(() {
       error = '';
       accessDenied = false;

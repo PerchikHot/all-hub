@@ -209,6 +209,14 @@ class BankNotificationService : NotificationListenerService() {
         for (i in 0 until acknowledged.length()) {
             if (acknowledged.optString(i) == key) return
         }
+        // The bounded legacy acknowledgement ring can forget old keys.
+        // Durable SQLite tombstones suppress replay after listener reconnect.
+        try {
+            if (BankNativeJournal(this).use { it.wasAcknowledged(key) }) return
+        } catch (_: Exception) {
+            // A broken database must not silently discard a new payment.
+            // Continue through the conservative legacy review path.
+        }
         for (i in 0 until current.length()) {
             val existingKey = current.optJSONObject(i)?.optString("key").orEmpty()
             // Old builds appended a body hash. Treat them as the same

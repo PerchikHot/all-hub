@@ -99,6 +99,19 @@ void main() {
     expect(() => MediaFeedMemoryCache(maxEntries: 0), throwsArgumentError);
     expect(() => MediaFeedMemoryCache(ttl: Duration.zero), throwsArgumentError);
   });
+  test('deduplicated full API page must not prematurely end pagination', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/full-mirrored-page');
+    cache.store(request, [
+      for (var i = 0; i < 40; i++)
+        {'id': i ~/ 2, 'file_url': 'https://cdn.example/$i.gif'},
+    ]);
+    expect(cache.read(request), hasLength(20));
+    expect(cache.sourcePageLength(request), 40);
+    cache.clear();
+    expect(cache.sourcePageLength(request), isNull);
+  });
+
   test('repeated post IDs do not consume the 40-card media budget', () {
     final cache = MediaFeedMemoryCache();
     final request = Uri.parse('https://example.org/repeated-gifs');

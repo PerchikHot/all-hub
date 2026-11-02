@@ -101,7 +101,9 @@ class MediaFeedMemoryCache {
       final hasMediaFields = const ['file_url', 'large_file_url',
           'sample_url', 'preview_file_url'].any(post.containsKey);
       if (hasMediaFields && (mediaUrls.isEmpty ||
-          mediaFeedImageUrl(post, highQuality: false) == null)) continue;
+          mediaFeedImageUrl(post, highQuality: false) == null)) {
+        continue;
+      }
       if (idKey != null && seenIds.contains(idKey)) continue;
       if (mediaUrls.any(seenMediaUrls.contains)) continue;
       if (idKey != null) seenIds.add(idKey);

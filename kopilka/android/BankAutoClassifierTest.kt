@@ -43,6 +43,29 @@ class BankAutoClassifierTest {
             List(9) { "Покупка 250 ₽" }))
     }
 
+    @Test fun richestInboxStyleBodyWinsOverIncompleteAmountPreview() {
+        // Real banks may show only an amount in EXTRA_BIG_TEXT while the
+        // merchant appears in EXTRA_TEXT_LINES. The previous first-amount
+        // selection incorrectly sent these confident purchases to review.
+        val body = BankNotificationBody.select(
+            "Операция по карте", "Покупка 250 ₽",
+            listOf("Покупка 250 ₽", "Магазин: Пятёрочка"))
+        assertEquals("Покупка 250 ₽\\nМагазин: Пятёрочка", body)
+        assertEquals("Пятёрочка", parse(body)?.get("note"))
+
+        // The same rule works for explicit in-store locations.
+        assertEquals("Покупка 90 ₽ в магазине Аптека",
+            BankNotificationBody.select("Покупка 90 ₽", "",
+                listOf("Покупка 90 ₽ в магазине Аптека")))
+
+        // Multiple amounts in the full notification remain unsafe even if
+        // the selected body contains a single valid purchase.
+        assertTrue(BankNotificationBody.hasConflictingAmounts(listOf(
+            "Покупка 250 ₽", body, "Остаток 500 ₽")))
+        // An OTP in a non-selected preview must still be caught by the
+        // listener's allVisible privacy scan, not by selection alone.
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

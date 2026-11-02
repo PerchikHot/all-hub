@@ -147,6 +147,18 @@ void main() {
     expect(cache.read(request)!.map((p) => p['id']).toList(), [81, 83]);
   });
 
+  test('cache collapses trusted CDN query variants but preserves external signed files', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/query-variants');
+    cache.store(request, [
+      {'id': 1, 'file_url': 'https://cdn.donmai.us/a.gif?width=100'},
+      {'id': 2, 'file_url': 'https://cdn.donmai.us/a.gif?width=900'},
+      {'id': 3, 'file_url': 'https://cdn.example/a.gif?token=one'},
+      {'id': 4, 'file_url': 'https://cdn.example/a.gif?token=two'},
+    ]);
+    expect(cache.read(request)!.map((p) => p['id']).toList(), [1, 3, 4]);
+  });
+
   test('failed refresh restores exact page cursor and deduplication', () {
     final posts = <Map<String, dynamic>>[
       {'id': 11, 'media_asset': {'variants': ['original.gif']}},

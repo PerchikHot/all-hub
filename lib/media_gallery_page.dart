@@ -371,8 +371,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           seenPostIds.add((post['id'] ?? '').toString());
           // Remember all original/sample/preview URLs across page loads.
           // Otherwise a mirror with a new preview reappears as another card.
-          seenPostUrls.addAll(
-              mediaFeedImageCandidates(post, highQuality: false));
+          seenPostUrls.addAll(mediaFeedIdentityKeys(post));
         }
         posts.addAll(newPosts);
         emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;

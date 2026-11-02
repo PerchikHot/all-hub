@@ -1,8 +1,38 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('bounded release API never follows redirects or loads oversized JSON', () async {
+    const api = 'https://api.github.com/repos/Example/App/releases?per_page=100';
+    var calls = 0;
+    final client = MockClient((request) async {
+      calls++;
+      expect(request.followRedirects, isFalse);
+      expect(request.headers['User-Agent'], 'AllHub');
+      return http.Response('x' * 2049, 200);
+    });
+    await expectLater(HubService.boundedGitHubGet(Uri.parse(api),
+        client: client, maxBytes: 2048), throwsFormatException);
+    expect(calls, 1);
+    await expectLater(HubService.boundedGitHubGet(
+        Uri.parse('https://api.github.com.evil.test/repos/Example/App'),
+        client: client), throwsFormatException);
+    await expectLater(HubService.boundedGitHubGet(
+        Uri.parse('https://api.github.com:443/repos/Example/App'),
+        client: client), throwsFormatException);
+    expect(calls, 1);
+
+    final redirected = MockClient((_) async => http.Response('',
+        302, headers: {'location': 'https://evil.test/download'}));
+    final response = await HubService.boundedGitHubGet(Uri.parse(api),
+        client: redirected);
+    expect(response.statusCode, 302);
+  });
+
+
   test('release SHA-256 digest is propagated and malformed digests rejected', () {
     final digest = List.filled(64, 'a').join();
     expect(HubService.parseSha256Digest('sha256:$digest'), digest);

@@ -35,6 +35,42 @@ class ProjectStatus {
 }
 
 class HubService {
+  /// Read GitHub API JSON with a strict memory budget. Large release lists
+  /// must not freeze the Pinterest feed or exhaust memory on Android.
+  /// API redirects are never followed, and only the canonical API host is used.
+  static Future<http.Response> boundedGitHubGet(Uri uri,
+      {http.Client? client, int maxBytes = 2 * 1024 * 1024}) async {
+    if (uri.scheme != 'https' || uri.authority != 'api.github.com' ||
+        !uri.path.startsWith('/repos/') || uri.userInfo.isNotEmpty ||
+        uri.hasPort || maxBytes <= 0) {
+      throw const FormatException('Недопустимый адрес GitHub API');
+    }
+    final ownClient = client ?? http.Client();
+    try {
+      final request = http.Request('GET', uri)
+        ..followRedirects = false
+        ..headers.addAll(_headers);
+      final streamed = await ownClient.send(request)
+          .timeout(const Duration(seconds: 12));
+      if (streamed.contentLength != null &&
+          streamed.contentLength! > maxBytes) {
+        throw const FormatException('Ответ GitHub превышает лимит памяти');
+      }
+      final bytes = <int>[];
+      await for (final chunk in streamed.stream
+          .timeout(const Duration(seconds: 12))) {
+        if (chunk.length > maxBytes - bytes.length) {
+          throw const FormatException('Ответ GitHub превышает лимит памяти');
+        }
+        bytes.addAll(chunk);
+      }
+      return http.Response.bytes(bytes, streamed.statusCode,
+          headers: streamed.headers, request: request);
+    } finally {
+      if (client == null) ownClient.close();
+    }
+  }
+
   /// Reject malformed catalogs before caching them. A broken network response
   /// must not replace the last working offline catalog or crash startup.
   static List<HubProject>? parseCatalog(String source) {
@@ -316,11 +352,12 @@ class HubService {
       // Third-party cards need published releases, not private CI metadata.
       // Skipping Actions halves their anonymous GitHub API requests.
       final responses = await Future.wait([
-        http.get(Uri.parse('https://api.github.com/repos/$repo/releases?per_page=100'), headers: _headers)
-          .timeout(const Duration(seconds: 12)),
+        boundedGitHubGet(Uri.parse(
+            'https://api.github.com/repos/$repo/releases?per_page=100')),
         if (projectId != null)
-          http.get(Uri.parse('https://api.github.com/repos/$repo/actions/runs?per_page=15'), headers: _headers)
-            .timeout(const Duration(seconds: 12)),
+          boundedGitHubGet(Uri.parse(
+              'https://api.github.com/repos/$repo/actions/runs?per_page=15'),
+              maxBytes: 1024 * 1024),
       ]);
       final assets = <HubAsset>[];
       String? version, workflow, actionsUrl;

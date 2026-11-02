@@ -116,6 +116,27 @@ jobs:
           if not app.exists():
               raise SystemExit('Android app Gradle configuration not found')
           text = app.read_text()
+          # Flutter's generated template may request an NDK not present on
+          # the runner. Reuse the installed NDK already used for libllama.so
+          # instead of downloading a second toolchain (r28 hit Premature EOF).
+          ndk_root = Path(os.environ['ANDROID_HOME']) / 'ndk'
+          installed = [p for p in ndk_root.iterdir() if p.is_dir() and
+              (p / 'source.properties').is_file() and
+              (p / 'build/cmake/android.toolchain.cmake').is_file()]
+          ndk_home = Path(os.environ.get('ANDROID_NDK_HOME', '/missing'))
+          if ndk_home in installed:
+              selected_ndk = ndk_home
+          elif installed:
+              selected_ndk = sorted(installed,
+                  key=lambda p: [int(part) for part in p.name.split('.')])[-1]
+          else:
+              raise SystemExit('No complete Android NDK installed')
+          text, ndk_count = re.subn(
+              r'ndkVersion\\s*=\\s*(?:flutter\\.ndkVersion|"[^"]+")',
+              f'ndkVersion = "{selected_ndk.name}"', text, count=1)
+          if ndk_count != 1:
+              raise SystemExit('Could not pin generated app NDK version')
+          print(f'Using installed Android NDK {selected_ndk.name}')
           text, count = re.subn(r'compileSdk(?:Version)?\s*(?:=\s*)?(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 36' if app.suffix == '.kts' else 'compileSdkVersion 36', text, count=1)
           if count != 1:
               raise SystemExit('Could not update app compileSdk')

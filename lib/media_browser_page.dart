@@ -21,6 +21,28 @@ double? mediaTransferProgress(int received, int? total) {
   return (received / total).clamp(0.0, 1.0).toDouble();
 }
 
+/// Reserve a distinct Windows download filename before copying. Repeated
+/// saves of the same GIF must never overwrite the user's earlier download.
+/// Exclusive creation prevents two concurrent downloads choosing one path.
+Future<File> reserveUniqueMediaFile(Directory directory, String fileName) async {
+  if (fileName.isEmpty || fileName.contains('/') || fileName.contains('\\\\')) {
+    throw const FormatException('Invalid media filename');
+  }
+  final dot = fileName.lastIndexOf('.');
+  final stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+  final extension = dot > 0 ? fileName.substring(dot) : '';
+  for (var index = 0; index < 1000; index++) {
+    final suffix = index == 0 ? '' : ' ($index)';
+    final candidate = File('${directory.path}${Platform.pathSeparator}$stem$suffix$extension');
+    try {
+      return await candidate.create(exclusive: true);
+    } on PathExistsException {
+      continue;
+    }
+  }
+  throw const FileSystemException('Too many copies of this media filename');
+}
+
 Future<void> migrateAllHubMedia() => MediaBrowserPage.migrateLegacyMedia();
 
 class MediaBrowserPage extends StatefulWidget {
@@ -185,8 +207,14 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
           if (home == null) throw StateError('Папка пользователя не найдена');
           final downloads = Directory('$home${Platform.pathSeparator}Downloads${Platform.pathSeparator}All Hub');
           await downloads.create(recursive: true);
-          final target = File('${downloads.path}${Platform.pathSeparator}${destination.uri.pathSegments.last}');
-          await destination.copy(target.path);
+          final target = await reserveUniqueMediaFile(
+              downloads, destination.uri.pathSegments.last);
+          try {
+            await destination.copy(target.path);
+          } catch (_) {
+            await target.delete();
+            rethrow;
+          }
           finalPath = target.path;
         }
       } finally {

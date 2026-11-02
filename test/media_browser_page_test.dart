@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/media_browser_page.dart';
 
@@ -9,6 +10,23 @@ void main() {
     expect(mediaTransferProgress(5, null), isNull);
     expect(mediaTransferProgress(5, 0), isNull);
     expect(mediaTransferProgress(-1, 100), isNull);
+  });
+
+  test('Windows media downloads reserve unique filenames without overwrite', () async {
+    final folder = await Directory.systemTemp.createTemp('allhub-media-test-');
+    try {
+      final first = await reserveUniqueMediaFile(folder, 'animation.gif');
+      await first.writeAsString('original GIF');
+      final second = await reserveUniqueMediaFile(folder, 'animation.gif');
+      expect(second.uri.pathSegments.last, 'animation (1).gif');
+      expect(await first.readAsString(), 'original GIF');
+      final third = await reserveUniqueMediaFile(folder, 'animation.gif');
+      expect(third.uri.pathSegments.last, 'animation (2).gif');
+      expect(() => reserveUniqueMediaFile(folder, '../escape.gif'),
+          throwsA(isA<FormatException>()));
+    } finally {
+      await folder.delete(recursive: true);
+    }
   });
 
   test('direct GIFs and images use the internal viewer on Android and Windows', () {

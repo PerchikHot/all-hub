@@ -109,6 +109,27 @@ internal class BankNativeJournal(context: Context) :
         }
     }
 
+    /**
+     * A dismissed review alert must not reappear after the bounded preferences
+     * acknowledgement ring rolls over. Persist its key in SQLite BEFORE
+     * removing the raw review entry. Unlike acknowledge(), do not delete a
+     * separately staged automatic payment with the same key.
+     */
+    fun acknowledgeReview(key: String): Boolean {
+        if (key.isBlank() || key.length > 256) return false
+        return try {
+            val values = ContentValues().apply {
+                put("notification_key", key)
+                put("ack_at", System.currentTimeMillis())
+            }
+            writableDatabase.insertWithOnConflict(
+                "native_acknowledged", null, values, SQLiteDatabase.CONFLICT_IGNORE
+            ) != -1L || wasAcknowledged(key)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun acknowledge(key: String): Boolean {
         if (key.isBlank() || key.length > 256) return false
         return try {

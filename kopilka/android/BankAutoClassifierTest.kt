@@ -93,6 +93,23 @@ class BankAutoClassifierTest {
         assertNotNull(parse("Зарплата 20 260 ₽", "Газпромбанк"))
     }
 
+    @Test fun accruedSalaryAndRequestedRefundRequireReview() {
+        // A bank may announce an accrual or refund application before the
+        // money reaches the account. Do not inflate the balance in advance.
+        for (body in listOf(
+            "Начислена зарплата 20 260 ₽",
+            "Зарплата 20 260 ₽ планируется",
+            "Заявка на возврат покупки 350 ₽",
+            "Оформлен возврат покупки 350 ₽",
+            "Зарплата 20 260 ₽ приостановлена",
+            "Зарплата 20 260 ₽ не одобрена"
+        )) assertNull(body, parse(body, "Газпромбанк"))
+        assertEquals("income", parse(
+            "Зачислена зарплата 20 260 ₽", "Газпромбанк")?.get("kind"))
+        assertEquals("income", parse(
+            "Возврат покупки 350 ₽", "Ozon Банк")?.get("kind"))
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

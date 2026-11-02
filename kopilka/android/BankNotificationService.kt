@@ -184,15 +184,18 @@ class BankNotificationService : NotificationListenerService() {
         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
         // A damaged queue may contain payments not yet saved in the journal.
         // Preserve the original bytes rather than replacing them with [].
-        val current = try {
+        // A corrupt legacy review queue must remain untouched, but must not
+        // prevent a *structured* high-confidence event from reaching SQLite.
+        // Previously this early return disabled autonomous accounting entirely.
+        val current: JSONArray? = try {
             JSONArray(prefs.getString("queue", "[]"))
         } catch (ignored: org.json.JSONException) {
             prefs.edit().putBoolean("queue_corrupt", true)
                 .putInt("queue_recoveries",
-                (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000))
+                    (prefs.getInt("queue_recoveries", 0) + 1).coerceAtMost(100000000))
                 .putString("last_skip_reason", "queue_corrupt")
                 .putLong("last_skipped", System.currentTimeMillis()).commit()
-            return
+            null
         }
         val key = "${sbn.packageName}:${sbn.id}:${sbn.postTime}"
         // A previously acknowledged alert may still be visible in the
@@ -217,7 +220,7 @@ class BankNotificationService : NotificationListenerService() {
             // A broken database must not silently discard a new payment.
             // Continue through the conservative legacy review path.
         }
-        for (i in 0 until current.length()) {
+        if (current != null) for (i in 0 until current.length()) {
             val existingKey = current.optJSONObject(i)?.optString("key").orEmpty()
             // Old builds appended a body hash. Treat them as the same
             // notification to avoid duplicate pending transactions.
@@ -228,8 +231,25 @@ class BankNotificationService : NotificationListenerService() {
         // No raw notification text is copied into the SQLite database.
         val candidate = BankAutoClassifier.classify(
             bank, title, body, key, sbn.postTime, System.currentTimeMillis())
-        val nativeSaved = candidate != null &&
+        val nativeSaved = candidate != null && try {
             BankNativeJournal(this).use { it.stage(candidate) }
+        } catch (_: Exception) {
+            false // Database open failures must preserve the review fallback.
+        }
+        if (current == null) {
+            // Never overwrite corrupt queue bytes with an empty JSON array.
+            // SQLite is independently durable, so confirmed transactions
+            // remain available for Flutter reconciliation after recovery.
+            if (nativeSaved) {
+                prefs.edit()
+                    .putLong("last_native_auto_stage", System.currentTimeMillis())
+                    .putInt("native_auto_staged_count",
+                        (prefs.getInt("native_auto_staged_count", 0) + 1)
+                            .coerceAtMost(100000000))
+                    .remove("last_native_stage_error").commit()
+            }
+            return
+        }
         // Never silently evict older, unprocessed payments while Flutter
         // is closed. Review-only events still require available queue space.
         // A high-confidence event is already durable in SQLite. Do not

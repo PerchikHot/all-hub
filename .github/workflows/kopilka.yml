@@ -163,6 +163,56 @@ jobs:
           grep -F 'android.service.notification.NotificationListenerService' /tmp/kopilka-manifest.txt
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
+      - name: Verify Kopilka Android in-place upgrade identity
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/kopilka-release.jks ]; then
+            echo "Debug-signed test APK: release publication remains disabled."
+            exit 0
+          fi
+          APK=dist/Kopilka-Android.apk
+          test -s "$APK"
+          APKSIGNER="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" && test -x "$AAPT"
+          cert() {
+            "$APKSIGNER" verify --print-certs "$1" |
+              sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1
+          }
+          package_line() {
+            "$AAPT" dump badging "$1" | grep '^package:' | head -n 1
+          }
+          NEW_CERT="$(cert "$APK")"
+          NEW_PACKAGE="$(package_line "$APK")"
+          test -n "$NEW_CERT" && test -n "$NEW_PACKAGE"
+          if gh release view kopilka-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir -p "$RUNNER_TEMP/kopilka-previous"
+            gh release download kopilka-latest --repo "$GITHUB_REPOSITORY" \
+              --pattern 'Kopilka-Android.apk' --dir "$RUNNER_TEMP/kopilka-previous"
+            OLD="$RUNNER_TEMP/kopilka-previous/Kopilka-Android.apk"
+            test -s "$OLD"
+            OLD_CERT="$(cert "$OLD")"
+            OLD_PACKAGE="$(package_line "$OLD")"
+            test -n "$OLD_CERT" && test "$OLD_CERT" = "$NEW_CERT" || {
+              echo "::error::Kopilka Android certificate SHA-256 changed; update would require uninstall"; exit 1;
+            }
+            OLD_ID="$(echo "$OLD_PACKAGE" | grep -o "name='[^']*'" | head -n 1)"
+            NEW_ID="$(echo "$NEW_PACKAGE" | grep -o "name='[^']*'" | head -n 1)"
+            test "$OLD_ID" = "$NEW_ID" || {
+              echo "::error::Kopilka Android application ID changed"; exit 1;
+            }
+            OLD_CODE="$(echo "$OLD_PACKAGE" | grep -o "versionCode='[0-9]*'" | cut -d "'" -f 2)"
+            NEW_CODE="$(echo "$NEW_PACKAGE" | grep -o "versionCode='[0-9]*'" | cut -d "'" -f 2)"
+            test -n "$OLD_CODE" && test -n "$NEW_CODE" && test "$NEW_CODE" -gt "$OLD_CODE" || {
+              echo "::error::Kopilka versionCode must increase ($OLD_CODE -> $NEW_CODE)"; exit 1;
+            }
+            echo "Kopilka in-place update verified: same package and signing SHA-256, $OLD_CODE -> $NEW_CODE"
+          else
+            echo "No previous Kopilka Android release to compare."
+          fi
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:

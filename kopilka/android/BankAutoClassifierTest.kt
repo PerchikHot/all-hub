@@ -10,7 +10,7 @@ class BankAutoClassifierTest {
             "com.bank:1:1793541540000", now - 60000, now)
 
     @Test fun inboxStyleBankBodyFallbackIsBoundedAndPreservesPrivacyGate() {
-        assertEquals("Покупка 250 ₽\\nМагазин: Пятёрочка",
+        assertEquals("Покупка 250 ₽\nМагазин: Пятёрочка",
             BankNotificationBody.select("", "",
                 listOf("Покупка 250 ₽", "Магазин: Пятёрочка")))
         assertNotNull(parse(BankNotificationBody.select("", "",

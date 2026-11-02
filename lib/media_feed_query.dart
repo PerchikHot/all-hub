@@ -193,7 +193,9 @@ String? mediaFeedIdentityUrl(String url) {
   }
   final host = uri.host.toLowerCase();
   if (host == 'donmai.us' || host.endsWith('.donmai.us')) {
-    return uri.replace(query: null).toString();
+    // Uri.replace(query: null) preserves the original query in Dart.
+    // Split the serialized HTTPS URL instead, retaining encoded path bytes.
+    return uri.toString().split('?').first;
   }
   return uri.toString();
 }

@@ -320,8 +320,10 @@ Map<String, dynamic>? confidentKopilkaAutoEntry(
   }
   final merchant = suggestKopilkaMerchant(text);
   final category = suggestKopilkaCategory(text);
-  // A generic debit alert is not evidence of a merchant purchase.
-  if (purchase && !refund && merchant == null && category == 'Другое') {
+  // The native listener requires a labelled merchant before automatic
+  // expense staging. Match that rule in Flutter too: category keywords alone
+  // (or decorative merchant placeholders) are not proof of a posted purchase.
+  if (purchase && !refund && merchant == null) {
     return null;
   }
   final kind = trustedIncome ? 'income' : 'expense';
@@ -997,12 +999,14 @@ const kopilkaExpenseCategories = <String>[
 /// prose. The candidate is local and editable before the user approves import.
 String? suggestKopilkaMerchant(String notificationText) {
   final match = RegExp(
-    r'(?:^|\n)\s*(?:магазин|торговая точка|merchant)\s*[:—-]\s*([^\n;]{2,80})',
+    r'(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\n,;]{2,80})',
     caseSensitive: false,
   ).firstMatch(notificationText);
   if (match == null) return null;
   final merchant = match.group(1)!.trim().replaceAll(RegExp(r'\s+'), ' ');
   if (merchant.length < 2 || merchant.length > 64 ||
+      !RegExp(r'[A-Za-zА-Яа-яЁё]').hasMatch(merchant) ||
+      RegExp(r'\d').hasMatch(merchant) ||
       RegExp(r'\b(?:otp|pin|cvv|cvc|password)\b|код\s+подтверждения|парол',
         caseSensitive: false).hasMatch(merchant)) {
     return null;

@@ -48,6 +48,24 @@ void main() {
     }
   });
 
+  test('Flutter and Android agree on explicit merchants and review-only placeholders', () {
+    final inline = confidentKopilkaAutoEntry(alert('inline', 'Т-Банк',
+        'Покупка 250 ₽. Магазин: Пятёрочка'), [], now);
+    expect(inline?['note'], 'Пятёрочка');
+    final seller = confidentKopilkaAutoEntry(alert('seller', 'Т-Банк',
+        'Оплата 90 ₽; Продавец: Аптека'), [], now);
+    expect(seller?['note'], 'Аптека');
+    for (final body in [
+      'Покупка 250 ₽. Магазин: ---',
+      'Payment 250 RUB. Merchant: ???',
+      'Покупка 250 ₽. Магазин: Карта 1234',
+      'Покупка 250 ₽ в Пятёрочке',
+    ]) {
+      expect(confidentKopilkaAutoEntry(
+          alert('unsafe', 'Т-Банк', body), [], now), isNull, reason: body);
+    }
+  });
+
   test('same-value duplicate and possible own-account transfer are not auto-posted', () {
     final event = alert('t-2', 'Т-Банк',
         'Покупка 250 ₽\nМагазин: Пятёрочка');

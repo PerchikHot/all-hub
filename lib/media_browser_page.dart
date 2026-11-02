@@ -25,7 +25,7 @@ double? mediaTransferProgress(int received, int? total) {
 /// saves of the same GIF must never overwrite the user's earlier download.
 /// Exclusive creation prevents two concurrent downloads choosing one path.
 Future<File> reserveUniqueMediaFile(Directory directory, String fileName) async {
-  if (fileName.isEmpty || fileName.contains('/') || fileName.contains('\\\\')) {
+  if (fileName.isEmpty || fileName.contains('/') || fileName.contains('\\')) {
     throw const FormatException('Invalid media filename');
   }
   final dot = fileName.lastIndexOf('.');

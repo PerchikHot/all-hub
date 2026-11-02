@@ -82,21 +82,42 @@ class ExternalRepositoryStore {
   /// public source. This does not guarantee that release binaries are safe.
   static Future<void> verifyPublic(ExternalRepository repo,
       {http.Client? client}) async {
+    // A user-provided repository name is not permission to follow redirects
+    // to arbitrary servers. Never send credentials or cache unverified data.
+    final parsed = ExternalRepository.parse(repo.fullName);
+    if (parsed == null || parsed.fullName != repo.fullName) {
+      throw const FormatException('Неверный адрес репозитория');
+    }
     final ownClient = client ?? http.Client();
     try {
-      final response = await ownClient.get(
-        Uri.https('api.github.com', '/repos/${repo.fullName}'),
-        headers: const {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'AllHub',
-        },
-      ).timeout(const Duration(seconds: 12));
+      final request = http.Request('GET',
+          Uri.https('api.github.com', '/repos/${repo.fullName}'))
+        ..followRedirects = false
+        ..headers['Accept'] = 'application/vnd.github+json'
+        ..headers['User-Agent'] = 'AllHub';
+      final response = await ownClient.send(request)
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) {
+        // GitHub redirects and 403/429 rate limits must never be interpreted
+        // as proof that a repository is public.
         throw StateError(response.statusCode == 404
             ? 'Публичный репозиторий не найден'
             : 'Не удалось проверить репозиторий: HTTP ${response.statusCode}');
       }
-      final decoded = jsonDecode(response.body);
+      const maxMetadataBytes = 128 * 1024;
+      if (response.contentLength != null &&
+          response.contentLength! > maxMetadataBytes) {
+        throw const FormatException('Ответ GitHub слишком большой');
+      }
+      final bytes = <int>[];
+      await for (final chunk in response.stream
+          .timeout(const Duration(seconds: 12))) {
+        if (chunk.length > maxMetadataBytes - bytes.length) {
+          throw const FormatException('Ответ GitHub слишком большой');
+        }
+        bytes.addAll(chunk);
+      }
+      final decoded = jsonDecode(utf8.decode(bytes));
       if (decoded is! Map<String, dynamic> ||
           decoded['private'] != false || decoded['archived'] == true ||
           decoded['disabled'] == true ||

@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
+@Suppress("DEPRECATION")
 class MainActivity : FlutterActivity() {
     private val channelName = "allhub/launcher"
 
@@ -29,7 +30,6 @@ class MainActivity : FlutterActivity() {
                 signing.signingCertificateHistory ?: signing.apkContentsSigners
             } else signing.apkContentsSigners
         } else {
-            @Suppress("DEPRECATION")
             info.signatures ?: emptyArray()
         }
         return signatures.map { certificate ->
@@ -62,9 +62,9 @@ class MainActivity : FlutterActivity() {
                 "Сертификат APK не совпадает с установленной версией. Обновление поверх запрещено")
         }
         val oldCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            installed.longVersionCode else @Suppress("DEPRECATION") installed.versionCode.toLong()
+            installed.longVersionCode else installed.versionCode.toLong()
         val newCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-            archive.longVersionCode else @Suppress("DEPRECATION") archive.versionCode.toLong()
+            archive.longVersionCode else archive.versionCode.toLong()
         if (newCode < oldCode) {
             throw IllegalArgumentException("APK имеет более старый versionCode; данные не изменены")
         }
@@ -140,7 +140,7 @@ class MainActivity : FlutterActivity() {
                                 val expected = call.argument<String>("expectedPackageName")
                                 val signingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                                     PackageManager.GET_SIGNING_CERTIFICATES else
-                                    @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+                                    PackageManager.GET_SIGNATURES
                                 val archive = packageManager.getPackageArchiveInfo(apk.absolutePath, signingFlags)
                                     ?: throw IllegalArgumentException("Invalid APK package archive")
                                 if (archive.packageName.isNullOrBlank()) {

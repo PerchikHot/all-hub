@@ -237,10 +237,12 @@ class BankNotificationService : NotificationListenerService() {
             false // Database open failures must preserve the review fallback.
         }
         if (current == null) {
+            val recovery = BankStoragePolicy.decide(
+                nativeSaved, 0, MAX_PENDING, queueReadable = false)
             // Never overwrite corrupt queue bytes with an empty JSON array.
             // SQLite is independently durable, so confirmed transactions
             // remain available for Flutter reconciliation after recovery.
-            if (nativeSaved) {
+            if (!recovery.queueRejected) {
                 prefs.edit()
                     .putLong("last_native_auto_stage", System.currentTimeMillis())
                     .putInt("native_auto_staged_count",

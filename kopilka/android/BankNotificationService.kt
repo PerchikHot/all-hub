@@ -243,8 +243,20 @@ class BankNotificationService : NotificationListenerService() {
             // SQLite is independently durable, so confirmed transactions
             // remain available for Flutter reconciliation after recovery.
             if (!recovery.queueRejected) {
+                val acceptedAt = System.currentTimeMillis()
+                // Keep diagnostics truthful even when only the independent
+                // SQLite path can accept a payment. Do not clear the corrupt
+                // review queue or report its raw contents as recovered.
                 prefs.edit()
-                    .putLong("last_native_auto_stage", System.currentTimeMillis())
+                    .putLong("last_native_auto_stage", acceptedAt)
+                    .putLong("last_accepted", acceptedAt)
+                    .putString("last_accepted_bank", bank)
+                    .putInt("accepted_count",
+                        (prefs.getInt("accepted_count", 0) + 1)
+                            .coerceAtMost(100000000))
+                    .putInt("bank_accepted_" + bankId,
+                        (prefs.getInt("bank_accepted_" + bankId, 0) + 1)
+                            .coerceAtMost(100000000))
                     .putInt("native_auto_staged_count",
                         (prefs.getInt("native_auto_staged_count", 0) + 1)
                             .coerceAtMost(100000000))

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -18,12 +19,16 @@ class MediaFeedClient {
     http.Client? client,
     this.maxResponseBytes = 2 * 1024 * 1024,
     this.maxAttempts = 2,
+    this.maxConcurrentRequests = 3,
+    this.maxQueuedRequests = 24,
     Future<void> Function(Duration)? wait,
     DateTime Function()? clock,
   }) : _client = client ?? http.Client(),
        _wait = wait ?? ((duration) => Future<void>.delayed(duration)),
        _clock = clock ?? DateTime.now {
-    if (maxResponseBytes < 1 || maxAttempts < 1 || maxAttempts > 3) {
+    if (maxResponseBytes < 1 || maxAttempts < 1 || maxAttempts > 3 ||
+        maxConcurrentRequests < 1 || maxConcurrentRequests > 8 ||
+        maxQueuedRequests < 1 || maxQueuedRequests > 100) {
       throw ArgumentError('Invalid feed request budget');
     }
   }
@@ -31,6 +36,10 @@ class MediaFeedClient {
   final http.Client _client;
   final int maxResponseBytes;
   final int maxAttempts;
+  final int maxConcurrentRequests;
+  final int maxQueuedRequests;
+  int _activeRequests = 0;
+  final Queue<Completer<void>> _waiting = Queue<Completer<void>>();
   final Future<void> Function(Duration) _wait;
   final DateTime Function() _clock;
   DateTime? _rateLimitUntil;
@@ -59,6 +68,37 @@ class MediaFeedClient {
         uri.hasFragment || uri.hasPort) {
       throw ArgumentError('Unsupported media feed endpoint');
     }
+    await _acquireRequestSlot();
+    try {
+      return await _fetchNetwork(uri);
+    } finally {
+      _releaseRequestSlot();
+    }
+  }
+
+  Future<void> _acquireRequestSlot() async {
+    if (_activeRequests < maxConcurrentRequests && _waiting.isEmpty) {
+      _activeRequests++;
+      return;
+    }
+    if (_waiting.length >= maxQueuedRequests) {
+      throw StateError('Too many pending media pages');
+    }
+    final waiter = Completer<void>();
+    _waiting.addLast(waiter);
+    await waiter.future;
+  }
+
+  void _releaseRequestSlot() {
+    if (_waiting.isNotEmpty) {
+      // Transfer the active slot directly to the oldest waiting page.
+      _waiting.removeFirst().complete();
+    } else {
+      _activeRequests--;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchNetwork(Uri uri) async {
     // The provider's rate limit applies across pages. While cooling down,
     // return a clear error immediately so the UI can show its cached GIFs
     // instead of sending another request for every scroll or filter change.

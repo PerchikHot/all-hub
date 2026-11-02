@@ -78,6 +78,15 @@ class BankAutoClassifierTest {
         // listener's allVisible privacy scan, not by selection alone.
     }
 
+    @Test fun nativeGateDoesNotDropSalaryOrRefundBeforeClassification() {
+        for (text in listOf("Зарплата 20 000 ₽", "Salary 20000 RUB",
+                "Возврат покупки 250 ₽", "Кэшбэк 10 ₽")) {
+            assertTrue(text, BankNotificationGate.hasTransactionMarker(text))
+        }
+        assertFalse(BankNotificationGate.hasTransactionMarker("Вход в приложение"))
+        assertNotNull(parse("Зарплата 20 000 ₽", "Газпромбанк"))
+    }
+
     @Test fun acceptsExplicitMerchantLabelsAndIncome() {
         for (label in listOf("Магазин: Пятёрочка", "Торговая точка — Пятёрочка",
                 "Продавец: Пятёрочка", "Merchant: Grocery")) {

@@ -77,12 +77,15 @@ internal data class BankStorageDecision(
 )
 
 internal object BankStoragePolicy {
-    fun decide(nativeSaved: Boolean, queued: Int, capacity: Int): BankStorageDecision {
+    fun decide(nativeSaved: Boolean, queued: Int, capacity: Int,
+               queueReadable: Boolean = true): BankStorageDecision {
         require(queued >= 0 && capacity > 0)
         val retainRaw = !nativeSaved
+        // A broken review queue cannot be overwritten. Independently staged
+        // SQLite payments are still safe; uncertain events must wait.
         return BankStorageDecision(
             retainRawForReview = retainRaw,
-            queueRejected = retainRaw && queued >= capacity
+            queueRejected = retainRaw && (!queueReadable || queued >= capacity)
         )
     }
 }

@@ -144,9 +144,6 @@ class BankNotificationService : NotificationListenerService() {
         // cancellation present in a shorter notification preview.
         val allVisible = listOf(title, normalText, expandedText)
             .plus(lines).joinToString(" ")
-        val transaction = Regex(
-            """покупк|оплат|оплач|плат[её]ж|списан|перевод|поступ|зачисл|пополн|возврат|кэшбэк|кешбэк|сняти|выдач|purchase|payment|transfer|refund|credited|deposit|withdraw""",
-            RegexOption.IGNORE_CASE)
         val currency = Regex("""₽|руб(?:\.|ль|ля|лей)?|\bRUB\b""", RegexOption.IGNORE_CASE)
         val sensitive = Regex(
             """код\s+(?:подтверждения|входа|для\s+(?:входа|подтверждения)|операции|из\s+смс)|(?:sms|смс)[-\s]*код|одноразов(?:ый|ого)\s+код|никому\s+не\s+сообщайте|verification\s+code|one[- ]time\s+(?:password|code)|\bOTP\b""",
@@ -181,7 +178,7 @@ class BankNotificationService : NotificationListenerService() {
                 additionalCredentials.containsMatchIn(allVisible) -> "credentials"
             notPosted.containsMatchIn(allVisible) ||
                 additionalUnposted.containsMatchIn(allVisible) -> "not_completed"
-            !transaction.containsMatchIn(combined) -> "not_transaction"
+            !BankNotificationGate.hasTransactionMarker(combined) -> "not_transaction"
             !currency.containsMatchIn(combined) ||
                 !amount.containsMatchIn(combined) -> "no_amount"
             else -> null

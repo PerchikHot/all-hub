@@ -45,7 +45,7 @@ internal object BankAutoClassifier {
         // Some bank notifications use an explicit location phrase rather than
         // "Магазин:". Only "в магазине/торговой точке" is unambiguous enough
         // for background import; a free-form "в <name>" stays in review.
-        val locationMerchant = Regex("""\bв\s+(?:магазине|торговой\s+точке)\s+([^\r\n,;.!?]{2,80})""",
+        val locationMerchant = Regex("""(?:^|[\s.;])в\s+(?:магазине|торговой\s+точке)\s+([^\r\n,;.!?]{2,80})""",
             RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
         val merchant = labelledMerchant ?: locationMerchant
         // A merchant containing digits could include a card suffix or code.

@@ -97,6 +97,23 @@ class BankNotificationService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
+        // OEM notification extras may be malformed or throw while being read.
+        // One broken bank alert must not crash the listener and stop all
+        // subsequent autonomous transactions. Never log the raw payload.
+        try {
+            processBankNotification(sbn)
+        } catch (_: RuntimeException) {
+            try {
+                getSharedPreferences("kopilka_notifications", MODE_PRIVATE).edit()
+                    .putString("last_skip_reason", "notification_exception")
+                    .putLong("last_skipped", System.currentTimeMillis()).apply()
+            } catch (_: RuntimeException) {
+                // The Android process may be shutting down; do not crash it.
+            }
+        }
+    }
+
+    private fun processBankNotification(sbn: StatusBarNotification) {
         val (bank, bankId) = when (sbn.packageName) {
             "com.idamob.tinkoff.android" -> Pair("Т-Банк", "tbank")
             "ru.gazprombank.android.mobilebank.app" -> Pair("Газпромбанк", "gazprom")

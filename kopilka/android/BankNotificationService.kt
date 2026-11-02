@@ -151,7 +151,7 @@ class BankNotificationService : NotificationListenerService() {
         // The native queue must reject unposted payments and
         // credential alerts BEFORE storing their text on disk.
         val notPosted = Regex(
-            """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+списан|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b|требует\s+подтверждени|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|\bwill\s+be\s+(?:charged|debited|paid)\b""",
+            """отклон[её]н|не\s+(?:выполнен|прошл[ао]|провед[её]н|подтвержд[её]н|заверш[её]н)|неуспешн|отмен[её]н|недостаточн[а-яё]*\s+средств|ожида[её]т\s+подтверждени|в\s+обработк|запланирован[а-яё]*|ожидается\s+(?:завтра|послезавтра)|будет\s+(?:списан[а-яё]*|зачислен[а-яё]*|поступ[а-яё]*|выплачен[а-яё]*)|declined|rejected|failed|cancelled|canceled|pending|processing|scheduled|upcoming|insufficient\s+funds|\bblocked\b|\bsuspended\b|требует\s+подтверждени|подтвердите\s+(?:операцию|плат[её]ж|перевод|оплату)|requires\s+confirmation|authorization\s+required|\bwill\s+be\s+(?:charged|debited|credited|deposited|paid)\b""",
             RegexOption.IGNORE_CASE)
         // Keep the native privacy filter aligned with the Dart
         // review gate: never persist text of unposted payments.

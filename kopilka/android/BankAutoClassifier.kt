@@ -46,9 +46,9 @@ internal object BankNotificationBody {
             // "250,00 RUB" across title, expanded text and InboxStyle lines.
             // Compare numeric ruble values, not the display unit. A distinct
             // balance or second purchase must still force manual review.
-            val digits = Regex("""\\d[\\d \\u00a0\\u202f]*(?:[.,]\\d{1,2})?""")
+            val digits = Regex("""\d[\d \u00a0\u202f]*(?:[.,]\d{1,2})?""")
                 .find(match.value)?.value ?: return true
-            val normalized = digits.replace(Regex("""[ \\u00a0\\u202f]"""), "")
+            val normalized = digits.replace(Regex("""[ \u00a0\u202f]"""), "")
                 .replace(',', '.').toBigDecimalOrNull()
                 ?.stripTrailingZeros()?.toPlainString() ?: return true
             unique.add(normalized)

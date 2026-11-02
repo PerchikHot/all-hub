@@ -21,6 +21,26 @@ void main() {
     expect(confidentKopilkaAutoEntry(event, [entry], now), isNull);
   });
 
+  test('identical title/body payment previews import once, conflicting ones do not', () {
+    final posted = alert('repeat', 'Т-Банк',
+        'Оплата 250,00 руб.\\nМагазин: Пятёрочка')
+      ..['title'] = 'Покупка 250 ₽';
+    final entry = confidentKopilkaAutoEntry(posted, [], now);
+    expect(entry?['amount'], 250.0);
+    expect(entry?['note'], 'Пятёрочка');
+    expect(confidentKopilkaAutoEntry(posted, [entry!], now), isNull);
+
+    final mismatch = Map<String, dynamic>.from(posted)
+      ..['body'] = 'Оплата 300 ₽\\nМагазин: Пятёрочка';
+    expect(confidentKopilkaAutoEntry(mismatch, [], now), isNull);
+    final twoInBody = Map<String, dynamic>.from(posted)
+      ..['body'] = 'Оплата 250 ₽, комиссия 250 ₽\\nМагазин: Пятёрочка';
+    expect(confidentKopilkaAutoEntry(twoInBody, [], now), isNull);
+    final balance = Map<String, dynamic>.from(posted)
+      ..['title'] = 'Баланс 250 ₽';
+    expect(confidentKopilkaAutoEntry(balance, [], now), isNull);
+  });
+
   test('accepts explicit salary and completed purchase refund as income', () {
     final salary = confidentKopilkaAutoEntry(
         alert('g-1', 'Газпромбанк', 'Зарплата поступила 20 000 ₽'), [], now);

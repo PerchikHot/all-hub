@@ -48,6 +48,11 @@ class MediaFeedMemoryCache {
 
   int get length => _pages.length;
 
+  /// Number of records returned by the API before deduplication. A page
+  /// with 40 mirrored GIFs is still a full page, not end-of-pagination.
+  /// This metadata is kept with stale pages for offline fallback too.
+  int? sourcePageLength(Uri request) => _pages[request.toString()]?.sourceCount;
+
   List<Map<String, dynamic>>? read(Uri request) {
     final key = request.toString();
     final entry = _pages[key];
@@ -84,9 +89,11 @@ class MediaFeedMemoryCache {
     // 40-card limit so repeated GIFs do not crowd out unique artwork.
     // Bound traversal as well as storage to keep a hostile feed finite.
     final snapshot = <Map<String, dynamic>>[];
+    var sourceCount = 0;
     final seenIds = <String>{};
     final seenMediaUrls = <String>{};
     for (final post in posts.take(200)) {
+      sourceCount++;
       final id = post['id'];
       final idKey = id is int || id is String ? id.toString() : null;
       // A mirrored upload may have a new post ID but the exact same image
@@ -112,7 +119,7 @@ class MediaFeedMemoryCache {
       if (snapshot.length == 40) break;
     }
     _pages.remove(key);
-    _pages[key] = _MediaFeedPage(_clock(), snapshot);
+    _pages[key] = _MediaFeedPage(_clock(), snapshot, sourceCount);
     while (_pages.length > maxEntries) {
       _pages.remove(_pages.keys.first);
     }
@@ -125,7 +132,8 @@ Map<String, dynamic> _copyJsonPost(Map<String, dynamic> post) =>
     Map<String, dynamic>.from(jsonDecode(jsonEncode(post)) as Map);
 
 class _MediaFeedPage {
-  const _MediaFeedPage(this.createdAt, this.posts);
+  const _MediaFeedPage(this.createdAt, this.posts, this.sourceCount);
   final DateTime createdAt;
   final List<Map<String, dynamic>> posts;
+  final int sourceCount;
 }

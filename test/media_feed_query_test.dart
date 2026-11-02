@@ -266,6 +266,27 @@ void main() {
     expect(posts.map((p) => p['id']).toList(), [90, 92]);
   });
 
+  test('mirrored originals and previews deduplicate across feed pages', () {
+    final original = <String, dynamic>{
+      'id': 201, 'tag_string': 'transgender solo', 'file_ext': 'gif',
+      'file_size': 2 * 1024 * 1024,
+      'file_url': 'https://cdn.example/animated.gif',
+      'preview_file_url': 'https://cdn.example/preview-a.jpg',
+    };
+    final first = filterNewMediaFeedPosts([original],
+        selectedTag: 'transgender', kind: 'gif', seenIds: <String>{});
+    expect(first, hasLength(1));
+    final seen = mediaFeedImageCandidates(first.single, highQuality: false).toSet();
+    final mirrored = {...original, 'id': 202,
+        'preview_file_url': 'https://cdn.example/preview-b.jpg'};
+    final second = filterNewMediaFeedPosts([mirrored],
+        selectedTag: 'transgender', kind: 'gif',
+        seenIds: <String>{'201'}, seenUrls: seen);
+    expect(second, isEmpty);
+    expect(seen, contains('https://cdn.example/animated.gif'));
+    expect(seen, contains('https://cdn.example/preview-a.jpg'));
+  });
+
   test('different post IDs sharing a thumbnail across pages are not repeated', () {
     final first = <String, dynamic>{
       'id': 100, 'tag_string': 'transgender solo',

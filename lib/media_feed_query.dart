@@ -195,6 +195,8 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
   final pageSeen = <String>{...seenIds};
   // The API can return the same image under different post IDs. Avoid
   // showing identical thumbnail URLs twice on a single loaded page.
+  // Track every usable CDN variant, not only the first thumbnail. A GIF
+  // mirrored on the next page may use a new preview URL but the same original.
   final pageUrls = <String>{...seenUrls};
   final result = <Map<String, dynamic>>[];
   for (final post in candidates) {
@@ -202,8 +204,9 @@ List<Map<String, dynamic>> filterNewMediaFeedPosts(
         kind: kind, seenIds: pageSeen, query: query)) {
       continue;
     }
-    final url = mediaFeedImageUrl(post, highQuality: false);
-    if (url == null || !pageUrls.add(url)) continue;
+    final urls = mediaFeedImageCandidates(post, highQuality: false);
+    if (urls.isEmpty || urls.any(pageUrls.contains)) continue;
+    pageUrls.addAll(urls);
     pageSeen.add((post['id'] ?? '').toString());
     result.add(post);
   }

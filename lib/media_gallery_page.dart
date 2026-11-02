@@ -369,8 +369,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         filteredPosts += data.length - newPosts.length;
         for (final post in newPosts) {
           seenPostIds.add((post['id'] ?? '').toString());
-          final thumbnail = mediaFeedImageUrl(post, highQuality: false);
-          if (thumbnail != null) seenPostUrls.add(thumbnail);
+          // Remember all original/sample/preview URLs across page loads.
+          // Otherwise a mirror with a new preview reappears as another card.
+          seenPostUrls.addAll(
+              mediaFeedImageCandidates(post, highQuality: false));
         }
         posts.addAll(newPosts);
         emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;

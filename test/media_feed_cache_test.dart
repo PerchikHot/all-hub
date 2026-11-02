@@ -134,6 +134,19 @@ void main() {
         [31, 34]);
   });
 
+  test('sample URL shared by different posts is cached only once', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/sample-mirrors');
+    cache.store(request, [
+      {'id': 81, 'sample_url': 'https://cdn.example/sample.jpg',
+          'preview_file_url': 'https://cdn.example/a.jpg'},
+      {'id': 82, 'sample_url': 'https://cdn.example/sample.jpg',
+          'preview_file_url': 'https://cdn.example/b.jpg'},
+      {'id': 83, 'sample_url': 'https://cdn.example/unique.jpg'},
+    ]);
+    expect(cache.read(request)!.map((p) => p['id']).toList(), [81, 83]);
+  });
+
   test('failed refresh restores exact page cursor and deduplication', () {
     final posts = <Map<String, dynamic>>[
       {'id': 11, 'media_asset': {'variants': ['original.gif']}},

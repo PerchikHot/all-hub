@@ -38,6 +38,7 @@ class MediaFeedClient {
   final int maxAttempts;
   final int maxConcurrentRequests;
   final int maxQueuedRequests;
+  bool _closed = false;
   int _activeRequests = 0;
   final Queue<Completer<void>> _waiting = Queue<Completer<void>>();
   final Future<void> Function(Duration) _wait;
@@ -49,6 +50,7 @@ class MediaFeedClient {
   final Map<Uri, Future<List<Map<String, dynamic>>>> _inFlight = {};
 
   Future<List<Map<String, dynamic>>> fetch(Uri uri) {
+    if (_closed) return Future.error(StateError('Media feed client is closed'));
     final pending = _inFlight[uri];
     if (pending != null) return pending;
     final request = _fetchUnshared(uri);
@@ -77,6 +79,7 @@ class MediaFeedClient {
   }
 
   Future<void> _acquireRequestSlot() async {
+    if (_closed) throw StateError('Media feed client is closed');
     if (_activeRequests < maxConcurrentRequests && _waiting.isEmpty) {
       _activeRequests++;
       return;
@@ -87,6 +90,7 @@ class MediaFeedClient {
     final waiter = Completer<void>();
     _waiting.addLast(waiter);
     await waiter.future;
+    if (_closed) throw StateError('Media feed client is closed');
   }
 
   void _releaseRequestSlot() {
@@ -201,5 +205,17 @@ class MediaFeedClient {
     throw StateError('Feed retries exhausted');
   }
 
-  void close() => _client.close();
+  /// Closing a screen must not leave queued pages waiting forever behind a
+  /// slow request. Reject pending work without starting another HTTP call.
+  /// The active request is cancelled by the underlying HTTP client's close.
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    while (_waiting.isNotEmpty) {
+      _waiting.removeFirst().completeError(
+        StateError('Media feed client is closed'),
+      );
+    }
+    _client.close();
+  }
 }

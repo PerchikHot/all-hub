@@ -95,6 +95,13 @@ class MediaFeedMemoryCache {
       // Comparing only the first URL missed duplicates when mirrored posts
       // provided those fields in a different order or omitted one variant.
       final mediaUrls = mediaFeedIdentityKeys(post);
+      // The live API sometimes returns video-only or broken CDN entries.
+      // Do not cache cards whose advertised media fields cannot produce a
+      // usable image; they would otherwise occupy masonry slots as blanks.
+      final hasMediaFields = const ['file_url', 'large_file_url',
+          'sample_url', 'preview_file_url'].any(post.containsKey);
+      if (hasMediaFields && (mediaUrls.isEmpty ||
+          mediaFeedImageUrl(post, highQuality: false) == null)) continue;
       if (idKey != null && seenIds.contains(idKey)) continue;
       if (mediaUrls.any(seenMediaUrls.contains)) continue;
       if (idKey != null) seenIds.add(idKey);

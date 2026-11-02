@@ -150,6 +150,20 @@ class HubService {
     return null;
   }
 
+  /// Debug APKs are useful for manual testing but cannot safely update an
+  /// installed release signed with a different certificate. Never offer
+  /// them through the one-tap production update path, even when somebody
+  /// accidentally uploads a debug artifact to GitHub Releases.
+  static bool isProductionInstallAsset(String name) {
+    final platform = assetPlatform(name);
+    if (platform == null) return false;
+    if (platform != 'android') return true;
+    return !RegExp(
+      r'(^|[-_.])(debug|dev|development|snapshot|test|testonly)([-_.]|$)',
+      caseSensitive: false,
+    ).hasMatch(name);
+  }
+
   /// GitHub release assets can be in an incomplete upload state. Never
   /// advertise a zero-byte or unfinished package as an installable update.
   static bool isPublishedReleaseAsset(Map<String, dynamic> file) {
@@ -241,7 +255,8 @@ class HubService {
         final name = (rawAsset['name'] ?? '').toString();
         final platform = assetPlatform(name);
         final url = (rawAsset['browser_download_url'] ?? '').toString();
-        if (platform == null || coveredPlatforms.contains(platform) ||
+        if (platform == null || !isProductionInstallAsset(name) ||
+            coveredPlatforms.contains(platform) ||
             !isTrustedReleaseAssetUrl(repo, url,
                 expectedName: name, expectedTag: tag)) {
           continue;

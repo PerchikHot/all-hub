@@ -116,13 +116,20 @@ internal object BankAutoClassifier {
         // Banks may place the labelled merchant after a full stop or semicolon
         // on the same line as the amount. Require a real separator and a
         // labelled field: free-form text is never sufficient for auto-import.
+        // Android may put the entire completed purchase in EXTRA_TITLE
+        // with an empty EXTRA_TEXT. The listener still scans every visible
+        // field for OTPs, rejected payments and conflicting amounts.
         val labelledMerchant = Regex("""(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\r\n,;]{2,80})""",
-            RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
+            RegexOption.IGNORE_CASE).let { pattern ->
+            (pattern.find(body) ?: pattern.find(title))?.groupValues?.get(1)?.trim()
+        }
         // Some bank notifications use an explicit location phrase rather than
         // "Магазин:". Only "в магазине/торговой точке" is unambiguous enough
         // for background import; a free-form "в <name>" stays in review.
         val locationMerchant = Regex("""(?:^|[\s.;])в\s+(?:магазине|торговой\s+точке)\s+([^\r\n,;.!?]{2,80})""",
-            RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
+            RegexOption.IGNORE_CASE).let { pattern ->
+            (pattern.find(body) ?: pattern.find(title))?.groupValues?.get(1)?.trim()
+        }
         val merchant = labelledMerchant ?: locationMerchant
         // A merchant containing digits could include a card suffix or code.
         // Never copy it into the minimal SQLite financial journal.

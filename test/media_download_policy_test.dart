@@ -40,4 +40,24 @@ void main() {
     expect(name, isNotNull);
     expect(name!.length, lessThanOrEqualTo(84));
   });
+  test('downloaded media must match its actual binary format', () {
+    expect(hasMediaFileSignature('loop.gif', [71, 73, 70, 56, 57, 97]), isTrue);
+    expect(hasMediaFileSignature('loop.gif', [71, 73, 70, 56, 55, 97]), isTrue);
+    expect(hasMediaFileSignature('photo.jpg', [0xff, 0xd8, 0xff]), isTrue);
+    expect(hasMediaFileSignature('photo.png',
+        [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), isTrue);
+    expect(hasMediaFileSignature('photo.webp',
+        [82, 73, 70, 70, 0, 0, 0, 0, 87, 69, 66, 80]), isTrue);
+    expect(hasMediaFileSignature('clip.mp4',
+        [0, 0, 0, 24, 102, 116, 121, 112]), isTrue);
+    expect(hasMediaFileSignature('clip.webm', [0x1a, 0x45, 0xdf, 0xa3]), isTrue);
+    expect(hasMediaFileSignature('clip.mov',
+        [0, 0, 0, 24, 109, 111, 111, 118]), isTrue);
+    for (final name in ['photo.jpg', 'loop.gif', 'clip.mp4', 'clip.webm']) {
+      expect(hasMediaFileSignature(name, '<html>blocked</html>'.codeUnits), isFalse);
+      expect(hasMediaFileSignature(name, []), isFalse);
+    }
+    expect(hasMediaFileSignature('photo.gif', [0xff, 0xd8, 0xff]), isFalse);
+  });
+
 }

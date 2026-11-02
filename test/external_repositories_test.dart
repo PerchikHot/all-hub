@@ -77,6 +77,21 @@ void main() {
     }
   });
 
+  test('backup export rejects duplicates and invalid constructed repositories', () {
+    final valid = ExternalRepository.parse('Example/One')!;
+    expect(() => ExternalRepositoryStore.exportBackup([valid, valid]),
+        throwsFormatException);
+    expect(() => ExternalRepositoryStore.exportBackup([
+      valid, ExternalRepository.parse('example/ONE')!,
+    ]), throwsFormatException);
+    expect(() => ExternalRepositoryStore.exportBackup([
+      const ExternalRepository('Example', 'One/releases'),
+    ]), throwsFormatException);
+    expect(() => ExternalRepositoryStore.exportBackup([
+      const ExternalRepository('bad owner', 'Repo'),
+    ]), throwsFormatException);
+  });
+
   test('backup import verifies all repositories before atomic replacement', () async {
     SharedPreferences.setMockInitialValues({
       ExternalRepositoryStore.storageKey: ['Original/Keep'],

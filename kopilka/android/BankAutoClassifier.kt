@@ -13,7 +13,7 @@ internal object BankAutoClassifier {
             postedAt < now - 24L * 60L * 60L * 1000L) return null
         val text = "$title\n$body"
         val reject = Regex(
-            """перевод|transfer|пополнени[ея]|снятие|withdraw|остаток|баланс|доступно|available|balance|код|password|парол|pin|cvv|cvc|отклон|не прош|не выполн|не провед|не подтвержд|отмен|неуспеш|недостаточн|pending|failed|cancelled|canceled|scheduled|upcoming|запланирован|будет списан|подтвердите""",
+            """перевод|transfer|пополнени[ея]|снятие|withdraw|остаток|баланс|доступно|available|balance|код|password|парол|pin|cvv|cvc|отклон|не прош|не выполн|не провед|не подтвержд|отмен|неуспеш|недостаточн|ожида[её]т|ожидается|в\\s+обработк|требует\\s+подтверждени|подтвердите|заблокирован|будет\\s+списан|выполнится|pending|processing|declined|rejected|failed|cancelled|canceled|scheduled|upcoming|запланирован|requires\\s+confirmation|authorization|will\\s+be\\s+charged""",
             RegexOption.IGNORE_CASE)
         if (reject.containsMatchIn(text)) return null
         val amountPattern = Regex(

@@ -118,6 +118,16 @@ class ExternalRepositoryStore {
     if (repositories.length > maxRepositories) {
       throw StateError('Слишком много репозиториев для резервной копии');
     }
+    // Export must be importable even when callers constructed a malformed
+    // repository directly or preferences contain case-insensitive duplicates.
+    final seen = <String>{};
+    for (final repo in repositories) {
+      final parsed = ExternalRepository.parse(repo.fullName);
+      if (parsed == null || parsed.fullName != repo.fullName ||
+          !seen.add(repo.fullName.toLowerCase())) {
+        throw const FormatException('Каталог содержит неверный или повторный репозиторий');
+      }
+    }
     return jsonEncode({
       'format': 'veyrion-public-repositories',
       'version': 1,

@@ -48,6 +48,13 @@ class BankAutoClassifierTest {
             "Оплата 250 ₽ не прошла\nМагазин: Пятёрочка",
             "Код подтверждения оплаты 250 ₽: 1234",
             "Покупка 250 ₽",
+            "Оплата 250 ₽ в обработке. Магазин: Пятёрочка",
+            "Покупка 250 ₽ ожидает подтверждения. Магазин: Пятёрочка",
+            "Покупка 250 ₽ ожидается завтра. Магазин: Пятёрочка",
+            "Оплата 250 ₽ требует подтверждения. Магазин: Пятёрочка",
+            "Payment 250 RUB pending. Merchant: Grocery",
+            "Payment 250 RUB declined. Merchant: Grocery",
+            "Payment 250 RUB requires confirmation. Merchant: Grocery",
             "Покупка 250 ₽\nМагазин: A",
         )) assertNull(body, parse(body))
         assertNull(parse("Покупка 250 ₽\nМагазин: Пятёрочка", "Другой банк"))

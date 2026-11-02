@@ -148,8 +148,12 @@ class BankNotificationService : NotificationListenerService() {
         val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
             ?.take(9)?.map { it.toString().take(2049) }.orEmpty()
         val body = BankNotificationBody.select(normalText, expandedText, lines)
+        // Some bank apps send a complete transaction only in EXTRA_TITLE.
+        // Do not drop it when EXTRA_TEXT is empty: the conservative native
+        // classifier can still require an explicit merchant and amount.
         // Never persist oversized or malformed notification payloads.
-        if (body.isBlank() || body.length > 2048 || title.length > 200) {
+        if ((body.isBlank() && title.isBlank()) ||
+            body.length > 2048 || title.length > 200) {
             markFiltered(bankId, "invalid_payload")
             return
         }

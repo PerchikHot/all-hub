@@ -305,8 +305,26 @@ Map<String, dynamic>? confidentKopilkaAutoEntry(
     r'(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)',
     caseSensitive: false,
   ).allMatches(text).toList();
-  if (sums.length != 1) return null;
-  final amount = parseKopilkaAmount(suggestNotificationAmount(text));
+  // Android often repeats the same posted purchase in EXTRA_TITLE and
+  // EXTRA_TEXT. Count it once only when each field contains exactly one
+  // identical amount and both explicitly describe a transaction. Two sums
+  // within one field (or a balance in either field) still require review.
+  final titleSums = sums.where((match) => match.start < title.length).toList();
+  final bodySums = sums.where((match) => match.start > title.length).toList();
+  final transactionMarker = RegExp(
+    r'покупк|оплат|оплач|списан|зарплат|кэшбэк|кешбэк|возврат|purchase|payment|salary|cashback|refund',
+    caseSensitive: false,
+  );
+  final repeatedPreview = sums.length == 2 && titleSums.length == 1 &&
+      bodySums.length == 1 && transactionMarker.hasMatch(title) &&
+      transactionMarker.hasMatch(body) &&
+      !RegExp(r'остаток|баланс|доступно|balance|available',
+          caseSensitive: false).hasMatch(text) &&
+      parseKopilkaAmount(titleSums.single.group(0)!) != null &&
+      parseKopilkaAmount(titleSums.single.group(0)!) ==
+          parseKopilkaAmount(bodySums.single.group(0)!);
+  if (sums.length != 1 && !repeatedPreview) return null;
+  final amount = parseKopilkaAmount(sums.first.group(0)!);
   if (amount == null) return null;
   final purchase = RegExp(r'покупк|оплат[ауы]|оплачено|purchase|payment',
       caseSensitive: false).hasMatch(text);

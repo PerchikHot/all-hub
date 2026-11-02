@@ -403,7 +403,7 @@ void main() {
     final animated = <String, dynamic>{
       'id': 17, 'tag_string': 'transgender erza_scarlet blue_hair',
       'file_ext': 'gif', 'rating': 's',
-      'file_url': 'https://example.org/17.gif', 'file_ext': 'gif', 'file_size': 1024,
+      'file_url': 'https://example.org/17.gif', 'file_size': 1024,
     };
     final wrongCategory = {...animated,
         'id': 18, 'tag_string': 'erza_scarlet blue_hair'};

@@ -40,9 +40,18 @@ internal object BankAutoClassifier {
         // Banks may place the labelled merchant after a full stop or semicolon
         // on the same line as the amount. Require a real separator and a
         // labelled field: free-form text is never sufficient for auto-import.
-        val merchant = Regex("""(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\r\n,;]{2,80})""",
+        val labelledMerchant = Regex("""(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*([^\r\n,;]{2,80})""",
             RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
-        if (purchase && !income && (merchant.isNullOrBlank() || merchant.length < 2)) return null
+        // Some bank notifications use an explicit location phrase rather than
+        // "Магазин:". Only "в магазине/торговой точке" is unambiguous enough
+        // for background import; a free-form "в <name>" stays in review.
+        val locationMerchant = Regex("""\bв\s+(?:магазине|торговой\s+точке)\s+([^\r\n,;.!?]{2,80})""",
+            RegexOption.IGNORE_CASE).find(body)?.groupValues?.get(1)?.trim()
+        val merchant = labelledMerchant ?: locationMerchant
+        // A merchant containing digits could include a card suffix or code.
+        // Never copy it into the minimal SQLite financial journal.
+        if (purchase && !income && (merchant.isNullOrBlank() ||
+                merchant.length < 2 || merchant.any { it.isDigit() })) return null
         val note = when {
             refund -> "Возврат покупки"
             salary -> "Зарплата"

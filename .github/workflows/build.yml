@@ -132,7 +132,7 @@ jobs:
           else:
               raise SystemExit('No complete Android NDK installed')
           text, ndk_count = re.subn(
-              r'ndkVersion\\s*=\\s*(?:flutter\\.ndkVersion|"[^"]+")',
+              r'ndkVersion\s*=\s*(?:flutter\.ndkVersion|"[^"]+")',
               f'ndkVersion = "{selected_ndk.name}"', text, count=1)
           if ndk_count != 1:
               raise SystemExit('Could not pin generated app NDK version')

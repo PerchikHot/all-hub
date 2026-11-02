@@ -42,6 +42,33 @@ void main() {
     expect(selected.single.version, contains('1045'));
   });
 
+  test('republished rolling release cannot downgrade a newer numeric build', () {
+    Map<String, dynamic> release(String tag, String date, String filename) => {
+      'tag_name': tag, 'published_at': date,
+      'assets': [{
+        'name': filename, 'size': 4096, 'state': 'uploaded',
+        'browser_download_url':
+            'https://github.com/PerchikHot/all-hub/releases/download/$tag/$filename',
+      }],
+    };
+    final selected = HubService.latestPublishedAssets(
+        'PerchikHot/all-hub', [
+      // The older Android build was republished later than +1100.
+      release('all-hub-v0.7.8+1000', '2026-11-02T15:00:00Z',
+          'AllHub-Android.apk'),
+      release('all-hub-v0.7.8+1100', '2026-11-02T14:00:00Z',
+          'AllHub-Android.apk'),
+      // Windows has a separate release cadence and must be independent.
+      release('all-hub-v0.7.8+1050', '2026-11-02T13:00:00Z',
+          'AllHub-Windows.zip'),
+    ], 'all-hub');
+    expect(selected.length, 2);
+    expect(selected.singleWhere((a) => a.platform == 'android').version,
+        '0.7.8+1100');
+    expect(selected.singleWhere((a) => a.platform == 'windows').version,
+        '0.7.8+1050');
+  });
+
   test('newest installable release wins separately for Android and Windows', () {
     Map<String, dynamic> asset(String tag, String name,
         {int size = 500, String state = 'uploaded'}) => {

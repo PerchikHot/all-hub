@@ -78,6 +78,29 @@ class BankAutoClassifierTest {
         // listener's allVisible privacy scan, not by selection alone.
     }
 
+    @Test fun titleOnlyCompletedPurchasesCanStageWithoutRelaxingPrivacy() {
+        val posted = BankAutoClassifier.classify(
+            "Т-Банк", "Покупка 250 ₽. Магазин: Пятёрочка", "",
+            "bank:title-only", now - 60000, now)
+        assertNotNull(posted)
+        assertEquals("expense", posted!!["kind"])
+        assertEquals("Пятёрочка", posted["note"])
+        val location = BankAutoClassifier.classify(
+            "Ozon Банк", "Оплата 90 ₽ в магазине Аптека", "",
+            "bank:title-location", now - 60000, now)
+        assertEquals("Аптека", location?.get("note"))
+        // A vague title or an unlabelled store never becomes a fake payment.
+        assertNull(BankAutoClassifier.classify(
+            "Т-Банк", "Покупка 250 ₽ в Пятёрочке", "",
+            "bank:ambiguous-title", now - 60000, now))
+        assertNull(BankAutoClassifier.classify(
+            "Т-Банк", "Код подтверждения оплаты 250 ₽. Магазин: Пятёрочка", "",
+            "bank:otp-title", now - 60000, now))
+        assertNull(BankAutoClassifier.classify(
+            "Т-Банк", "Оплата 250 ₽ не прошла. Магазин: Пятёрочка", "",
+            "bank:failed-title", now - 60000, now))
+    }
+
     @Test fun nativeGateDoesNotDropSalaryOrRefundBeforeClassification() {
         for (text in listOf("Зарплата 20 000 ₽", "Salary 20000 RUB",
                 "Возврат покупки 250 ₽", "Кэшбэк 10 ₽")) {

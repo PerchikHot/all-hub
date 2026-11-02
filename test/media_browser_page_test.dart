@@ -22,7 +22,7 @@ void main() {
       expect(await first.readAsString(), 'original GIF');
       final third = await reserveUniqueMediaFile(folder, 'animation.gif');
       expect(third.uri.pathSegments.last, 'animation (2).gif');
-      expect(() => reserveUniqueMediaFile(folder, '../escape.gif'),
+      await expectLater(reserveUniqueMediaFile(folder, '../escape.gif'),
           throwsA(isA<FormatException>()));
     } finally {
       await folder.delete(recursive: true);

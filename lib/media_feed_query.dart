@@ -167,7 +167,9 @@ List<String> mediaFeedImageCandidates(Map<String, dynamic> post, {
     // than filling the Pinterest grid with a permanently blank tile.
     final lowerPath = uri.path.toLowerCase();
     if (const ['.mp4', '.webm', '.mov', '.swf', '.zip']
-        .any(lowerPath.endsWith)) continue;
+        .any(lowerPath.endsWith)) {
+      continue;
+    }
     // Keep a large GIF as a fallback only; do not autoplay large assets.
     if (!autoplay && animated != null && value == animated) continue;
     if (seen.add(value)) {

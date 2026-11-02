@@ -2,6 +2,19 @@ import 'package:all_hub/media_feed_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('broken media URLs and video-only posts do not occupy cached tiles', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/broken-tiles');
+    cache.store(request, [
+      {'id': 1, 'file_url': 'http://cdn.example/broken.jpg'},
+      {'id': 2, 'file_url': 'https://cdn.example/clip.mp4'},
+      {'id': 3, 'file_url': 'https://cdn.example/valid.jpg'},
+      {'id': 4, 'file_url': 'https://cdn.example/clip.mp4',
+          'preview_file_url': 'https://cdn.example/clip-thumb.webp'},
+    ]);
+    expect(cache.read(request)!.map((post) => post['id']).toList(), [3, 4]);
+  });
+
   test('revisiting a filter reuses a page without mutating cached results', () {
     final cache = MediaFeedMemoryCache();
     final request = Uri.https('danbooru.donmai.us', '/posts.json', {

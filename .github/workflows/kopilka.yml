@@ -163,6 +163,15 @@ jobs:
           grep -F 'android.service.notification.NotificationListenerService' /tmp/kopilka-manifest.txt
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/Kopilka-Android.apk"
+      # Keep a diagnostic APK artifact even when the permanent certificate
+      # differs from the previous release. GitHub Releases publication remains
+      # blocked by the identity gate below; never offer it as an in-place update.
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kopilka-Android-APK
+          path: dist/Kopilka-Android.apk
+          if-no-files-found: error
       - name: Verify Kopilka Android in-place upgrade identity
         if: github.ref == 'refs/heads/main'
         env:
@@ -213,12 +222,6 @@ jobs:
           else
             echo "No previous Kopilka Android release to compare."
           fi
-      - name: Upload standalone APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kopilka-Android-APK
-          path: dist/Kopilka-Android.apk
-          if-no-files-found: error
       # A debug-signed test APK must never replace a permanently signed
       # release, because Android would refuse an in-place update.
       - name: Verify permanent signing for release

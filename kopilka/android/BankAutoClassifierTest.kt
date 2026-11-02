@@ -159,6 +159,10 @@ class BankAutoClassifierTest {
         assertNull(parse("Покупка 250 ₽ в Пятёрочке"))
         assertNull(parse("Покупка 250 ₽ в магазине Карта 1234"))
         assertNull(parse("Покупка 250 ₽. Магазин: A"))
+        // Punctuation and decorative placeholders are not merchants.
+        // Never turn these alerts into fabricated automatic expenses.
+        assertNull(parse("Покупка 250 ₽. Магазин: ---"))
+        assertNull(parse("Payment 250 RUB. Merchant: ???"))
         assertEquals("income", parse("Зарплата поступила 20 000 ₽",
             "Газпромбанк")?.get("kind"))
         assertEquals("income", parse("Возврат покупки 350 ₽",

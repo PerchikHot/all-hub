@@ -134,7 +134,8 @@ internal object BankAutoClassifier {
         // A merchant containing digits could include a card suffix or code.
         // Never copy it into the minimal SQLite financial journal.
         if (purchase && !income && (merchant.isNullOrBlank() ||
-                merchant.length < 2 || merchant.any { it.isDigit() })) return null
+                merchant.length < 2 || merchant.any { it.isDigit() } ||
+                merchant.none { it.isLetter() })) return null
         val note = when {
             refund -> "Возврат покупки"
             salary -> "Зарплата"

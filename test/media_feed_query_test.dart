@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/media_feed_query.dart';
 
 void main() {
+  test('video-only CDN assets never render as broken image tiles', () {
+    final video = <String, dynamic>{
+      'id': 101, 'file_url': 'https://cdn.example/clip.mp4',
+      'preview_file_url': 'https://cdn.example/clip-preview.jpg',
+    };
+    expect(mediaFeedImageUrl(video, highQuality: true),
+        'https://cdn.example/clip-preview.jpg');
+    expect(mediaFeedImageUrl({
+      'id': 102, 'file_url': 'https://cdn.example/clip.webm',
+    }, highQuality: false), isNull);
+  });
+
   test('interleaved feed continues after one category is exhausted', () {
     const tags = <String>['futanari', 'transgender'];
     expect(nextAvailableMediaFeedPage(1, tags, <String>{}), 1);

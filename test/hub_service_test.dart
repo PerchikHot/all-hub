@@ -21,7 +21,7 @@ void main() {
         Uri.parse('https://api.github.com.evil.test/repos/Example/App'),
         client: client), throwsFormatException);
     await expectLater(HubService.boundedGitHubGet(
-        Uri.parse('https://api.github.com:443/repos/Example/App'),
+        Uri.parse('https://api.github.com:8443/repos/Example/App'),
         client: client), throwsFormatException);
     expect(calls, 1);
 

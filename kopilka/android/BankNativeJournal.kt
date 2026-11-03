@@ -153,8 +153,17 @@ internal class BankNativeJournal(context: Context) :
                     put("ack_at", System.currentTimeMillis())
                 }
                 // Tombstone and removal must commit together, never separately.
-                db.insertWithOnConflict("native_acknowledged", null, values,
-                    SQLiteDatabase.CONFLICT_IGNORE)
+                // Never remove an unimported payment unless its durable
+                // replay tombstone is confirmed in the same transaction.
+                // CONFLICT_IGNORE returns -1 both for an existing key and
+                // for other ignored constraint failures; verify the row.
+                val inserted = db.insertWithOnConflict(
+                    "native_acknowledged", null, values, SQLiteDatabase.CONFLICT_IGNORE)
+                val durable = inserted != -1L || db.query(
+                    "native_acknowledged", arrayOf("notification_key"),
+                    "notification_key = ?", arrayOf(key), null, null, null, "1"
+                ).use { it.moveToFirst() }
+                if (!durable) return false
                 db.delete("native_entries", "notification_key = ?", arrayOf(key))
                 db.setTransactionSuccessful()
                 true

@@ -51,8 +51,20 @@ internal class BankNativeJournal(context: Context) :
     fun stage(candidate: Map<String, Any>): Boolean {
         val key = candidate["key"] as? String ?: return false
         val timestamp = candidate["dateMillis"] as? Long ?: return false
+        // Reject malformed financial values before opening SQLite.
+        // A corrupt native row would block Flutter reconciliation.
+        val amount = candidate["amount"] as? Number ?: return false
+        val bank = candidate["bank"] as? String ?: return false
+        val kind = candidate["kind"] as? String ?: return false
+        val note = candidate["note"] as? String ?: return false
+        val value = amount.toDouble()
         if (key.isBlank() || key.length > 256 ||
-            candidate["nativeClassifier"] != 1 || timestamp <= 0) return false
+            candidate["nativeClassifier"] != 1 || timestamp <= 0 ||
+            !value.isFinite() || value <= 0.0 || value > 1_000_000_000.0 ||
+            bank !in setOf("Т-Банк", "Газпромбанк", "Ozon Банк") ||
+            kind !in setOf("income", "expense") ||
+            note.isBlank() || note.length > 120 ||
+            note.any { it.isISOControl() }) return false
         return try {
             val values = ContentValues().apply {
                 put("notification_key", key)

@@ -27,6 +27,24 @@ class BankAutoClassifierTest {
             listOf("Код подтверждения оплаты 250 ₽", "Магазин: Пятёрочка"))))
     }
 
+    @Test fun inboxStyleDirectMerchantOverridesAmountOnlyPreview() {
+        val complete = "Покупка 250 ₽ в Пятёрочке"
+        val body = BankNotificationBody.select(
+            "Покупка 250 ₽", "", listOf(complete))
+        assertEquals(complete, body)
+        assertEquals("Пятёрочке", parse(body)?.get("note"))
+        // A generic destination in the short preview must not mask the
+        // actual merchant in the richer InboxStyle lines.
+        val richer = BankNotificationBody.select(
+            "Покупка 250 ₽ в приложении", "", listOf(complete))
+        assertEquals(complete, richer)
+        assertNull(parse(BankNotificationBody.select(
+            "Покупка 250 ₽", "", listOf("Покупка 250 ₽ в приложении"))))
+        // Conflicting amounts still force review in the listener.
+        assertTrue(BankNotificationBody.hasConflictingAmounts(
+            listOf("Покупка 250 ₽", "Покупка 350 ₽ в Пятёрочке")))
+    }
+
     @Test fun inboxStyleRichLinesAreUsedInsteadOfGenericPreview() {
         val body = BankNotificationBody.select(
             "Операция по карте", "", listOf("Покупка 250 ₽", "Магазин: Пятёрочка"))

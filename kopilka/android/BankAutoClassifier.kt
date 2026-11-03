@@ -28,8 +28,21 @@ internal object BankNotificationBody {
         val merchant = Regex(
             """(?:^|[\n.;])\s*(?:магазин|торговая точка|продавец|merchant)\s*[:：—-]\s*[^\r\n,;]{2,80}|(?:^|[\s.;])в\s+(?:магазине|торговой\s+точке)\s+[^\r\n,;.!?]{2,80}""",
             RegexOption.IGNORE_CASE)
-        return options.firstOrNull {
-            amount.containsMatchIn(it) && merchant.containsMatchIn(it)
+        // A complete purchase may appear only in InboxStyle lines while
+        // EXTRA_TEXT contains a shorter amount-only preview. Match the same
+        // single-line merchant syntax accepted by BankAutoClassifier, rather
+        // than selecting the incomplete preview and losing automatic import.
+        // Generic destinations are not merchants and remain review-only.
+        val directMerchant = Regex(
+            """(?:^|[\n])\s*(?:покупка|оплата)\s+(?:на\s+сумму\s+)?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+|\d+)(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|ль|ля|лей)?|\bRUB\b)\s+в\s+([^\r\n,;.!?]{2,60})\s*$""",
+            RegexOption.IGNORE_CASE)
+        val genericDestinations = setOf("приложении", "интернете",
+            "онлайне", "банке", "рассрочку", "обработке", "ожидании")
+        return options.firstOrNull { option ->
+            amount.containsMatchIn(option) &&
+                (merchant.containsMatchIn(option) ||
+                    directMerchant.find(option)?.groupValues?.get(1)
+                        ?.trim()?.lowercase()?.let { it !in genericDestinations } == true)
         } ?: options.firstOrNull { amount.containsMatchIn(it) }
             ?: options.firstOrNull() ?: ""
     }

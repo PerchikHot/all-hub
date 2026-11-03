@@ -94,6 +94,7 @@ class MediaFeedMemoryCache {
     final seenMediaUrls = <String>{};
     for (final post in posts.take(200)) {
       sourceCount++;
+      if (snapshot.length >= 40) continue;
       final id = post['id'];
       final idKey = id is int || id is String ? id.toString() : null;
       // A mirrored upload may have a new post ID but the exact same image
@@ -116,7 +117,10 @@ class MediaFeedMemoryCache {
       if (idKey != null) seenIds.add(idKey);
       seenMediaUrls.addAll(mediaUrls);
       snapshot.add(_copyJsonPost(post));
-      if (snapshot.length == 40) break;
+      // Keep counting the provider's full page even after filling the
+      // 40-card UI budget. Otherwise a 100-post page is misreported as
+      // 40 posts, causing false end-of-feed decisions and repeated page 1.
+      // The traversal itself remains capped at 200 records above.
     }
     _pages.remove(key);
     _pages[key] = _MediaFeedPage(_clock(), snapshot, sourceCount);

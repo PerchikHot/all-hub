@@ -62,6 +62,25 @@ void main() {
     expect(MediaFeedMemoryCache().read(request), isNull);
   });
 
+  test('full 100-item API page retains pagination source count', () {
+    final cache = MediaFeedMemoryCache();
+    final request = Uri.parse('https://example.org/full-unique-page');
+    cache.store(request, List.generate(100, (i) => {
+      'id': i + 1,
+      'file_url': 'https://cdn.example/unique-$i.jpg',
+    }));
+    expect(cache.read(request), hasLength(40));
+    expect(cache.sourcePageLength(request), 100);
+    // Even a full page of duplicated IDs still means the API has more pages.
+    final mirrored = Uri.parse('https://example.org/mirrored-full-page');
+    cache.store(mirrored, List.generate(100, (i) => {
+      'id': i % 10,
+      'file_url': 'https://cdn.example/mirror-$i.jpg',
+    }));
+    expect(cache.read(mirrored), hasLength(10));
+    expect(cache.sourcePageLength(mirrored), 100);
+  });
+
   test('least recently used pages are evicted, bounded to 40 posts', () {
     final cache = MediaFeedMemoryCache(maxEntries: 2);
     final a = Uri.parse('https://example.org/a');

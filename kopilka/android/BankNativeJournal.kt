@@ -130,13 +130,33 @@ internal class BankNativeJournal(context: Context) :
     fun acknowledgeReview(key: String): Boolean {
         if (key.isBlank() || key.length > 256) return false
         return try {
-            val values = ContentValues().apply {
-                put("notification_key", key)
-                put("ack_at", System.currentTimeMillis())
+            val db = writableDatabase
+            db.beginTransaction()
+            try {
+                // A review dismissal must not suppress a high-confidence
+                // payment staged under the same Android notification key.
+                // Otherwise a listener reconnect could silently hide it.
+                val staged = db.query(
+                    "native_entries", arrayOf("notification_key"),
+                    "notification_key = ?", arrayOf(key), null, null, null, "1"
+                ).use { it.moveToFirst() }
+                if (staged) return false
+                val values = ContentValues().apply {
+                    put("notification_key", key)
+                    put("ack_at", System.currentTimeMillis())
+                }
+                val inserted = db.insertWithOnConflict(
+                    "native_acknowledged", null, values, SQLiteDatabase.CONFLICT_IGNORE
+                )
+                val durable = inserted != -1L || db.query(
+                    "native_acknowledged", arrayOf("notification_key"),
+                    "notification_key = ?", arrayOf(key), null, null, null, "1"
+                ).use { it.moveToFirst() }
+                if (durable) db.setTransactionSuccessful()
+                durable
+            } finally {
+                db.endTransaction()
             }
-            writableDatabase.insertWithOnConflict(
-                "native_acknowledged", null, values, SQLiteDatabase.CONFLICT_IGNORE
-            ) != -1L || wasAcknowledged(key)
         } catch (_: Exception) {
             false
         }

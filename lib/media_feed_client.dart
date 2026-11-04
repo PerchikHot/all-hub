@@ -159,8 +159,14 @@ class MediaFeedClient {
             final delay = response.statusCode == 403 ? 60 :
                 (seconds == null ? (response.statusCode == 503 ? 15 : 30)
                     : seconds.clamp(1, 120).toInt());
-            _rateLimitUntil = _clock().add(Duration(seconds: delay));
-            _rateLimitStatus = response.statusCode;
+            // Concurrent pages can report different Retry-After values.
+            // Never shorten a longer cooldown already imposed by the API.
+            final proposedUntil = _clock().add(Duration(seconds: delay));
+            if (_rateLimitUntil == null ||
+                proposedUntil.isAfter(_rateLimitUntil!)) {
+              _rateLimitUntil = proposedUntil;
+              _rateLimitStatus = response.statusCode;
+            }
           }
           throw MediaFeedRequestException(response.statusCode);
         }

@@ -678,6 +678,18 @@ class ProjectLauncher {
     }
   }
 
+  /// Different builds must never overwrite a running Windows executable.
+  /// A unique generation suffix also makes reinstallation of the same
+  /// release safe while an older instance remains open.
+  @visibleForTesting
+  static String windowsReleaseFolder(String id, String url, int generation) {
+    if (!isValidProjectId(id) || generation < 0) {
+      throw ArgumentError('Некорректный проект или поколение установки');
+    }
+    final digest = sha256.convert(url.codeUnits).toString().substring(0, 16);
+    return '$id-$digest-$generation';
+  }
+
   /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
   /// Files are extracted to a staging directory and activated only after validation.
   static Future<void> installWindowsZip(String id, String url, {String? externalRepo, String? sha256Digest}) async {
@@ -700,8 +712,8 @@ class ProjectLauncher {
     // launcher path only after validation. The running old version remains
     // usable until the user launches the new one; never delete its files.
     // Keep old releases for rollback and for apps that store data beside EXE.
-    final releaseId = sha256.convert(url.codeUnits).toString().substring(0, 16);
-    final releaseFolder = '$id-$releaseId-${DateTime.now().microsecondsSinceEpoch}';
+    final releaseFolder = windowsReleaseFolder(
+        id, url, DateTime.now().microsecondsSinceEpoch);
     final target = Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
     final staging = Directory('${target.path}.staging');
     final zipFile = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download.zip');

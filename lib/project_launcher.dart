@@ -505,6 +505,59 @@ class ProjectLauncher {
     return false;
   }
 
+  /// Install and launch a Windows release as one transaction. If Windows
+  /// rejects the new executable, restore the previous launch target and
+  /// version receipt so the user can still open the working installation.
+  /// Old release files are intentionally retained for rollback.
+  static Future<void> updateAndLaunchWindows(
+    String id, String url, {
+    String? version,
+    String? externalRepo,
+    String? sha256Digest,
+  }) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id) || id == 'all-hub') {
+      throw ArgumentError('Самообновление All Hub требует отдельного установщика');
+    }
+    await runInstallExclusive(id, () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_$id');
+      final previousVersion = prefs.getString('installed_version_$id');
+      var installed = false;
+      try {
+        final path = Uri.parse(url).path.toLowerCase();
+        if (path.endsWith('.zip')) {
+          await installWindowsZip(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else if (path.endsWith('.exe')) {
+          await installWindowsExe(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else {
+          throw StateError('Формат обновления Windows не поддерживается');
+        }
+        installed = true;
+        if (!await launch(id)) {
+          throw StateError('Windows не удалось запустить обновлённое приложение');
+        }
+        await recordInstalledVersion(id, version);
+      } catch (_) {
+        if (installed) {
+          if (previousExe == null) {
+            await prefs.remove('exe_$id');
+          } else {
+            await prefs.setString('exe_$id', previousExe);
+          }
+          if (previousVersion == null) {
+            await prefs.remove('installed_version_$id');
+          } else {
+            await prefs.setString('installed_version_$id', previousVersion);
+          }
+        }
+        rethrow;
+      }
+    });
+  }
+
   /// Check GitHub's published SHA-256 digest before activating an installer.
   /// Older releases without a digest retain existing container checks.
   static Future<void> verifyDownloadedDigest(File file, String? expected) async {

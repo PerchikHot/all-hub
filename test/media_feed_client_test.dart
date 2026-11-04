@@ -357,7 +357,9 @@ void main() {
     })), throwsA(isA<MediaFeedRequestException>()));
     expect(calls, 2, reason: 'Late HTTP 200 must not cancel 429 cooldown');
     now = now.add(const Duration(seconds: 91));
-    expect((await client.fetch(url)).single['id'], 31);
+    expect((await client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '3',
+    }))).single['id'], 31);
     client.close();
   });
 
@@ -396,7 +398,9 @@ void main() {
     })), throwsA(isA<MediaFeedRequestException>()));
     expect(calls, 2, reason: 'Shorter Retry-After must not lift the ban');
     now = now.add(const Duration(seconds: 111));
-    expect((await client.fetch(url)).single['id'], 55);
+    expect((await client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '4',
+    }))).single['id'], 55);
     expect(calls, 3);
     client.close();
   });

@@ -609,9 +609,42 @@ class ProjectLauncher {
         // The helper waits for the current process to finish, then starts the
         // staged launcher in its own working directory.
         final script = r'''
-param([int]$OldPid, [string]$NextExe)
+param([int]$OldPid, [string]$NextExe, [string]$PreviousExe)
+$ErrorActionPreference = 'Stop'
 try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
-Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe)
+if (-not (Test-Path -LiteralPath $NextExe -PathType Leaf)) { exit 2 }
+try {
+  $newProcess = Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe) -PassThru
+  Start-Sleep -Seconds 5
+  $newProcess.Refresh()
+  if ($newProcess.HasExited) { throw 'New launcher exited during startup' }
+} catch {
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}
+  }
+  exit 3
+}
+# Migrate only shortcuts that explicitly target the previous launcher.
+# Do not alter unrelated shortcuts or system-wide shortcuts.
+if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $roots = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('StartMenu'))
+    foreach ($root in $roots) {
+      if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+      Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          $shortcut = $shell.CreateShortcut($_.FullName)
+          if ([string]::Equals($shortcut.TargetPath, $PreviousExe, [StringComparison]::OrdinalIgnoreCase)) {
+            $shortcut.TargetPath = $NextExe
+            $shortcut.WorkingDirectory = Split-Path -Parent $NextExe
+            $shortcut.Save()
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
 ''';
         final helper = File('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}allhub-handoff-${DateTime.now().microsecondsSinceEpoch}.ps1');
         await helper.writeAsString(script, flush: true);
@@ -619,6 +652,7 @@ Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe)
           '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
           '-File', helper.path, '-OldPid', pid.toString(),
           '-NextExe', nextExe,
+          '-PreviousExe', previousExe ?? Platform.resolvedExecutable,
         ], mode: ProcessStartMode.detached);
         await recordInstalledVersion('all-hub', version);
         // The caller must close the current Flutter process after success.

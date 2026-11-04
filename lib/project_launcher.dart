@@ -694,11 +694,17 @@ class ProjectLauncher {
     final root = await getApplicationSupportDirectory();
     final projects = Directory('${root.path}${Platform.pathSeparator}projects');
     await projects.create(recursive: true);
-    final target = Directory('${projects.path}${Platform.pathSeparator}$id');
-    final staging = Directory('${projects.path}${Platform.pathSeparator}$id.staging');
-    final backup = Directory('${projects.path}${Platform.pathSeparator}$id.backup');
-    await recoverInterruptedWindowsZip(target);
-    final zipFile = File('${projects.path}${Platform.pathSeparator}$id.download.zip');
+    // A running Windows process locks its EXE and Flutter DLLs. Renaming the
+    // currently installed directory therefore fails with ACCESS_DENIED.
+    // Install each release side-by-side and atomically switch the registered
+    // launcher path only after validation. The running old version remains
+    // usable until the user launches the new one; never delete its files.
+    // Keep old releases for rollback and for apps that store data beside EXE.
+    final releaseId = sha256.convert(url.codeUnits).toString().substring(0, 16);
+    final releaseFolder = '$id-$releaseId-${DateTime.now().microsecondsSinceEpoch}';
+    final target = Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+    final staging = Directory('${target.path}.staging');
+    final zipFile = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download.zip');
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);
     activeDownloadProject.value = id;
@@ -770,17 +776,16 @@ class ProjectLauncher {
         throw const FormatException(
             'В Windows ZIP несколько EXE без однозначного приложения');
       }
-      if (await backup.exists()) await backup.delete(recursive: true);
-      if (await target.exists()) await target.rename(backup.path);
+      // Publish only a fully unpacked and validated directory. No running
+      // EXE is overwritten, and the old registered path stays valid if this
+      // operation fails. This is also safe while the old game is still open.
       try {
         await staging.rename(target.path);
         final prefs = await SharedPreferences.getInstance();
         requireWindowsInstallRegistered(
             await prefs.setString('exe_$id', '${target.path}$relativeExe'));
-        if (await backup.exists()) await backup.delete(recursive: true);
       } catch (_) {
         if (await target.exists()) await target.delete(recursive: true);
-        if (await backup.exists()) await backup.rename(target.path);
         rethrow;
       }
     } finally {

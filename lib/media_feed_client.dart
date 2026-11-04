@@ -164,8 +164,13 @@ class MediaFeedClient {
           }
           throw MediaFeedRequestException(response.statusCode);
         }
-        _rateLimitUntil = null;
-        _rateLimitStatus = null;
+        // A concurrent page may have received 429/403 while this request
+        // was in flight. A successful older request must not erase that
+        // provider-wide cooldown and trigger a new request storm.
+        if (_rateLimitUntil != null && !_clock().isBefore(_rateLimitUntil!)) {
+          _rateLimitUntil = null;
+          _rateLimitStatus = null;
+        }
         // A CDN or captive portal can return HTTP 200 with an HTML login
         // page. Reject it before JSON decoding; never poison the media grid.
         // Missing Content-Type remains valid for older public API mirrors.

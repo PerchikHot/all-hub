@@ -569,6 +569,44 @@ class ProjectLauncher {
     });
   }
 
+  /// Reconcile a pending handoff on startup. The new launcher confirms the
+  /// receipt only after Flutter has initialized; a fallback to the previous
+  /// executable restores the old receipt instead of claiming an update.
+  static Future<void> reconcileAllHubWindowsHandoff() async {
+    if (!Platform.isWindows) return;
+    final prefs = await SharedPreferences.getInstance();
+    final next = prefs.getString('allhub_pending_exe');
+    if (next == null) return;
+    final current = File(Platform.resolvedExecutable).absolute.path.toLowerCase();
+    final expected = File(next).absolute.path.toLowerCase();
+    final previous = prefs.getString('allhub_previous_exe');
+    final previousVersion = prefs.getString('allhub_previous_version');
+    if (current == expected) {
+      await prefs.setString('exe_all-hub', next);
+      final version = prefs.getString('allhub_pending_version');
+      if (version != null && version.isNotEmpty) {
+        await prefs.setString('installed_version_all-hub', version);
+      }
+    } else if (previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+    } else {
+      // Do not clear a pending transaction for an unrelated executable.
+      return;
+    }
+    for (final key in [
+      'allhub_pending_exe', 'allhub_pending_version',
+      'allhub_previous_exe', 'allhub_previous_version',
+    ]) {
+      await prefs.remove(key);
+    }
+  }
+
   /// Stage the launcher side-by-side, then hand off activation to a separate
   /// Windows process. The old running EXE is never overwritten or deleted.
   /// This is intentionally not a shortcut migration: existing shortcuts may
@@ -648,13 +686,28 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
 ''';
         final helper = File('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}allhub-handoff-${DateTime.now().microsecondsSinceEpoch}.ps1');
         await helper.writeAsString(script, flush: true);
+        // Record a recoverable transaction, not a successful installation.
+        // The new process commits it during startup; the old process restores
+        // the receipt if the external updater has to fall back.
+        await prefs.setString('allhub_previous_exe', Platform.resolvedExecutable);
+        if (previousVersion == null) {
+          await prefs.remove('allhub_previous_version');
+        } else {
+          await prefs.setString('allhub_previous_version', previousVersion);
+        }
+        await prefs.setString('allhub_pending_exe', nextExe);
+        if (version == null) {
+          await prefs.remove('allhub_pending_version');
+        } else {
+          await prefs.setString('allhub_pending_version', version);
+        }
         await Process.start('powershell.exe', [
           '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
           '-File', helper.path, '-OldPid', pid.toString(),
           '-NextExe', nextExe,
           '-PreviousExe', Platform.resolvedExecutable,
         ], mode: ProcessStartMode.detached);
-        await recordInstalledVersion('all-hub', version);
+        // Do not claim the update succeeded before the new launcher starts.
         // The caller must close the current Flutter process after success.
       } catch (_) {
         if (previousExe == null) {

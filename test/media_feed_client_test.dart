@@ -326,6 +326,41 @@ void main() {
     client.close();
   });
 
+  test('late successful page cannot erase another page rate limit', () async {
+    var now = DateTime.utc(2026, 11, 3);
+    final olderPage = Completer<http.Response>();
+    var calls = 0;
+    final client = MediaFeedClient(
+      clock: () => now,
+      maxConcurrentRequests: 2,
+      client: MockClient((request) {
+        calls++;
+        if (request.url.queryParameters['page'] == '1') {
+          return olderPage.future;
+        }
+        if (calls == 2) {
+          return Future.value(http.Response('slow down', 429,
+              headers: {'retry-after': '90'}));
+        }
+        return Future.value(http.Response('[{"id":31}]', 200));
+      }),
+    );
+    final first = client.fetch(url);
+    final second = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '2',
+    }));
+    await expectLater(second, throwsA(isA<MediaFeedRequestException>()));
+    olderPage.complete(http.Response('[{"id":30}]', 200));
+    expect((await first).single['id'], 30);
+    await expectLater(client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '3',
+    })), throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 2, reason: 'Late HTTP 200 must not cancel 429 cooldown');
+    now = now.add(const Duration(seconds: 91));
+    expect((await client.fetch(url)).single['id'], 31);
+    client.close();
+  });
+
   test('rejects non-feed URLs and invalid budgets', () async {
     final client = MediaFeedClient(client: MockClient((_) async =>
         http.Response('[]', 200)));

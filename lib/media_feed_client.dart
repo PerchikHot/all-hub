@@ -179,14 +179,19 @@ class MediaFeedClient {
             response.contentLength! > maxResponseBytes) {
           throw const FormatException('Feed response exceeds size limit');
         }
+        // A per-chunk timeout alone is insufficient: a broken CDN can
+        // drip one byte every few seconds forever, keeping the masonry feed
+        // spinner alive indefinitely. Bound the entire body download too.
         final bytes = <int>[];
-        await for (final chunk in response.stream.timeout(
-            const Duration(seconds: 18))) {
-          if (chunk.length > maxResponseBytes - bytes.length) {
-            throw const FormatException('Feed response exceeds size limit');
+        await (() async {
+          await for (final chunk in response.stream.timeout(
+              const Duration(seconds: 18))) {
+            if (chunk.length > maxResponseBytes - bytes.length) {
+              throw const FormatException('Feed response exceeds size limit');
+            }
+            bytes.addAll(chunk);
           }
-          bytes.addAll(chunk);
-        }
+        })().timeout(const Duration(seconds: 25));
         final decoded = jsonDecode(utf8.decode(bytes));
         if (decoded is! List || decoded.length > 100 ||
             decoded.any((item) => item is! Map<String, dynamic>)) {

@@ -692,10 +692,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 }
                                 await ProjectLauncher.recordInstalledVersion(project.id, i.version);
                               });
+                              // The new version is installed side-by-side, so a
+                              // running old EXE can remain open while Windows
+                              // starts the freshly registered release directly.
+                              // No manual EXE selection or second button press.
+                              final launched = await ProjectLauncher.launch(project.id);
+                              if (!launched) {
+                                throw StateError('Новая версия установлена, но запуск EXE не удался');
+                              }
                               if (context.mounted) setState(() {});
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Обновление установлено. Можно запускать приложение.')));
+                                  const SnackBar(content: Text('Обновление установлено. Новая версия запущена.')));
                               }
                             } catch (e) {
                               if (context.mounted) {

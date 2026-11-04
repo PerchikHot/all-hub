@@ -628,48 +628,50 @@ class ProjectLauncher {
         throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
       }
       final root = await getApplicationSupportDirectory();
-      final directory = Directory('${root.path}${Platform.pathSeparator}projects${Platform.pathSeparator}$id');
-      await directory.create(recursive: true);
-      final target = File('${directory.path}${Platform.pathSeparator}$id.exe');
-      final temporary = File('${target.path}.download');
+      final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+      await projects.create(recursive: true);
+      // A running Windows EXE cannot be renamed or overwritten. Install each
+      // published standalone build into its own immutable version directory,
+      // just as we do for portable ZIP releases. The registered launcher path
+      // is switched only after the download and PE/digest checks succeed.
+      final releaseFolder = windowsReleaseFolder(
+          id, url, DateTime.now().microsecondsSinceEpoch);
+      final targetDirectory =
+          Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+      final staging = Directory('${targetDirectory.path}.staging');
+      final temporary = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download');
       try {
-        // Apply the same streaming size limit to standalone EXEs as to ZIPs.
-        // A server with a missing Content-Length must not fill the disk.
         await _download(response, temporary, maxBytes: 256 * 1024 * 1024);
         if (await temporary.length() < 1024) {
           throw const FormatException('Загруженный EXE слишком мал');
         }
         final file = await temporary.open();
         try {
-          final header = await file.read(8192);
-          if (!hasWindowsExecutableHeader(header)) {
+          if (!hasWindowsExecutableHeader(await file.read(8192))) {
             throw const FormatException('Файл не является корректным Windows PE (MZ/PE)');
           }
         } finally {
           await file.close();
         }
         await verifyDownloadedDigest(temporary, sha256Digest);
-        // Preserve the previous executable until both the file activation
-        // AND the launch registration have succeeded. A failed preferences
-        // write must not leave a new unlaunchable app marked as installed.
-        // Restore a previous install interrupted before activation.
-        await recoverInterruptedWindowsExe(target);
-        final backup = File('${target.path}.backup');
-        if (await backup.exists()) await backup.delete();
-        if (await target.exists()) await target.rename(backup.path);
+        await staging.create(recursive: true);
+        final stagedExe = File('${staging.path}${Platform.pathSeparator}$id.exe');
+        await temporary.rename(stagedExe.path);
+        await staging.rename(targetDirectory.path);
         try {
-          await temporary.rename(target.path);
           final prefs = await SharedPreferences.getInstance();
-          requireWindowsInstallRegistered(
-              await prefs.setString('exe_$id', target.path));
-          if (await backup.exists()) await backup.delete();
+          requireWindowsInstallRegistered(await prefs.setString(
+              'exe_$id', '${targetDirectory.path}${Platform.pathSeparator}$id.exe'));
         } catch (_) {
-          if (await target.exists()) await target.delete();
-          if (await backup.exists()) await backup.rename(target.path);
+          // Keep the previous registered EXE untouched on preferences failure.
+          if (await targetDirectory.exists()) {
+            await targetDirectory.delete(recursive: true);
+          }
           rethrow;
         }
       } finally {
         if (await temporary.exists()) await temporary.delete();
+        if (await staging.exists()) await staging.delete(recursive: true);
       }
     } finally {
       client.close();

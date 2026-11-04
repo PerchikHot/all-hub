@@ -632,6 +632,15 @@ class ProjectLauncher {
         if (nextExe == null || !await File(nextExe).exists()) {
           throw StateError('Новая версия лаунчера не найдена');
         }
+        // The installer stages a release by writing exe_all-hub. That is not
+        // activation: keep the current launcher registered until the new
+        // process confirms startup in reconcileAllHubWindowsHandoff().
+        // A failed or never-started helper must not leave a phantom install.
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
         // Process.start is independent of the running Flutter application.
         // Validate the executable before requesting the current process exit.
         final handle = await File(nextExe).open();
@@ -689,6 +698,8 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
         // Record a recoverable transaction, not a successful installation.
         // The new process commits it during startup; the old process restores
         // the receipt if the external updater has to fall back.
+        // Rollback must point to the executable actually running, even if a
+        // stale preference points to a different historical installation.
         await prefs.setString('allhub_previous_exe', Platform.resolvedExecutable);
         if (previousVersion == null) {
           await prefs.remove('allhub_previous_version');

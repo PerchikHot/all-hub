@@ -657,9 +657,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                  if (tab == 0 && Platform.isWindows && project.id == 'all-hub')
-                    const Chip(avatar: Icon(Icons.info_outline, size: 18),
-                      label: Text('Лаунчер запущен; обновление самого EXE требует отдельного перезапуска')),
+                  if (tab == 0 && Platform.isWindows && project.id == 'all-hub' && i.downloadUrl != null)
+                    FutureBuilder<String?>(
+                      future: ProjectLauncher.installedVersion('all-hub'),
+                      builder: (context, installed) => FilledButton.icon(
+                        icon: const Icon(Icons.system_update_alt_rounded),
+                        label: Text(windowsUpdateActionLabel(installed.data, i.version)),
+                        onPressed: () async {
+                          try {
+                            await ProjectLauncher.updateAllHubWindows(
+                              i.downloadUrl!, version: i.version,
+                              sha256Digest: i.sha256Digest,
+                            );
+                            // The detached updater waits for this process to
+                            // exit before launching the staged replacement.
+                            exit(0);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Ошибка обновления All Hub: $e')));
+                            }
+                          }
+                        },
+                      ),
+                    ),
                   if (tab == 0 && Platform.isWindows && project.id != 'all-hub' && i.downloadUrl != null)
                     FutureBuilder<String?>(
                       future: ProjectLauncher.installedVersion(project.id),

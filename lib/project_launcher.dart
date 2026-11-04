@@ -605,6 +605,11 @@ class ProjectLauncher {
     ]) {
       await prefs.remove(key);
     }
+    if (current == expected) {
+      // The external updater waits for an explicit startup acknowledgement.
+      // A running process alone is not proof that preferences were committed.
+      await File('$next.confirmed').writeAsString('ready', flush: true);
+    }
   }
 
   /// Stage the launcher side-by-side, then hand off activation to a separate
@@ -651,6 +656,10 @@ class ProjectLauncher {
         } finally {
           await handle.close();
         }
+        // Remove any stale receipt from a previous attempted launch before
+        // starting the helper; otherwise it could accept a false success.
+        final confirmation = File('$nextExe.confirmed');
+        if (await confirmation.exists()) await confirmation.delete();
         // PowerShell's argument list is passed as individual arguments, never
         // through a shell command assembled from an untrusted release URL.
         // The helper waits for the current process to finish, then starts the
@@ -662,9 +671,16 @@ try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
 if (-not (Test-Path -LiteralPath $NextExe -PathType Leaf)) { exit 2 }
 try {
   $newProcess = Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe) -PassThru
-  Start-Sleep -Seconds 5
-  $newProcess.Refresh()
-  if ($newProcess.HasExited) { throw 'New launcher exited during startup' }
+  # Do not migrate shortcuts until Flutter confirms its installed-version
+  # receipt has been persisted. Timeout or early exit triggers rollback.
+  $confirmed = "$NextExe.confirmed"
+  $deadline = (Get-Date).AddSeconds(60)
+  while (-not (Test-Path -LiteralPath $confirmed -PathType Leaf)) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited before confirming startup' }
+    if ((Get-Date) -ge $deadline) { throw 'New launcher did not confirm startup' }
+    Start-Sleep -Milliseconds 500
+  }
 } catch {
   if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
     try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}

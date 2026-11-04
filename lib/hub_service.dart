@@ -35,6 +35,28 @@ class ProjectStatus {
 }
 
 class HubService {
+  /// Prefer the complete portable Windows distribution over a bare EXE.
+  /// Flutter desktop builds need adjacent DLLs and data files; installing
+  /// only the executable may start and immediately crash on a clean machine.
+  /// Keep the newest published release chosen by latestPublishedAssets:
+  /// this only ranks formats within that same release.
+  static List<HubAsset> preferredInstallAssets(
+      Iterable<HubAsset> assets, String platform) {
+    final matching = assets.where((asset) => asset.platform == platform).toList();
+    if (platform == 'windows') {
+      matching.sort((a, b) {
+        int rank(HubAsset asset) {
+          final name = asset.name.toLowerCase();
+          if (name.endsWith('.zip')) return 0;
+          if (name.endsWith('.exe')) return 1;
+          return 2;
+        }
+        return rank(a).compareTo(rank(b));
+      });
+    }
+    return matching;
+  }
+
   /// Read GitHub API JSON with a strict memory budget. Large release lists
   /// must not freeze the Pinterest feed or exhaust memory on Android.
   /// API redirects are never followed, and only the canonical API host is used.

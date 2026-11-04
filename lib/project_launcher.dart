@@ -569,6 +569,75 @@ class ProjectLauncher {
     });
   }
 
+  /// Stage the launcher side-by-side, then hand off activation to a separate
+  /// Windows process. The old running EXE is never overwritten or deleted.
+  /// This is intentionally not a shortcut migration: existing shortcuts may
+  /// still point at the previous launcher until a stable bootstrapper is added.
+  static Future<void> updateAllHubWindows(
+    String url, {String? version, String? sha256Digest}
+  ) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    await runInstallExclusive('all-hub', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_all-hub');
+      final previousVersion = prefs.getString('installed_version_all-hub');
+      try {
+        final extension = Uri.parse(url).path.toLowerCase();
+        if (extension.endsWith('.zip')) {
+          await installWindowsZip('all-hub', url, sha256Digest: sha256Digest);
+        } else if (extension.endsWith('.exe')) {
+          await installWindowsExe('all-hub', url, sha256Digest: sha256Digest);
+        } else {
+          throw StateError('Нужен Windows ZIP или EXE из GitHub Releases');
+        }
+        final nextExe = prefs.getString('exe_all-hub');
+        if (nextExe == null || !await File(nextExe).exists()) {
+          throw StateError('Новая версия лаунчера не найдена');
+        }
+        // Process.start is independent of the running Flutter application.
+        // Validate the executable before requesting the current process exit.
+        final handle = await File(nextExe).open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
+            throw const FormatException('Новая версия All Hub не является Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+        // PowerShell's argument list is passed as individual arguments, never
+        // through a shell command assembled from an untrusted release URL.
+        // The helper waits for the current process to finish, then starts the
+        // staged launcher in its own working directory.
+        final script = r'''
+param([int]$OldPid, [string]$NextExe)
+try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
+Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe)
+''';
+        final helper = File('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}allhub-handoff-${DateTime.now().microsecondsSinceEpoch}.ps1');
+        await helper.writeAsString(script, flush: true);
+        await Process.start('powershell.exe', [
+          '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', helper.path, '-OldPid', pid.toString(),
+          '-NextExe', nextExe,
+        ], mode: ProcessStartMode.detached);
+        await recordInstalledVersion('all-hub', version);
+        // The caller must close the current Flutter process after success.
+      } catch (_) {
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
+        if (previousVersion == null) {
+          await prefs.remove('installed_version_all-hub');
+        } else {
+          await prefs.setString('installed_version_all-hub', previousVersion);
+        }
+        rethrow;
+      }
+    });
+  }
+
   /// Check GitHub's published SHA-256 digest before activating an installer.
   /// Older releases without a digest retain existing container checks.
   static Future<void> verifyDownloadedDigest(File file, String? expected) async {

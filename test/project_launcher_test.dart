@@ -8,6 +8,20 @@ import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('Windows updates use distinct folders without touching running EXE', () {
+    const release = 'https://github.com/PerchikHot/Shadow-rp/releases/download/v1/app.zip';
+    final old = ProjectLauncher.windowsReleaseFolder('shadow-rp', release, 100);
+    final next = ProjectLauncher.windowsReleaseFolder('shadow-rp', release, 101);
+    expect(old, startsWith('shadow-rp-'));
+    expect(next, isNot(old));
+    expect(old, isNot(contains('/')));
+    expect(old, isNot(contains('\\\\')));
+    expect(ProjectLauncher.windowsReleaseFolder('shadow-rp', release, 100), old);
+    expect(ProjectLauncher.windowsReleaseFolder('shadow-rp', '$release?other', 100), isNot(old));
+    expect(() => ProjectLauncher.windowsReleaseFolder('../escape', release, 1), throwsArgumentError);
+    expect(() => ProjectLauncher.windowsReleaseFolder('shadow-rp', release, -1), throwsArgumentError);
+  });
+
   test('update manager serializes installs and releases lock on failure', () async {
     final gate = Completer<void>();
     final first = ProjectLauncher.runInstallExclusive('shadow-rp', () async {

@@ -652,7 +652,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
           '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
           '-File', helper.path, '-OldPid', pid.toString(),
           '-NextExe', nextExe,
-          '-PreviousExe', previousExe ?? Platform.resolvedExecutable,
+          '-PreviousExe', Platform.resolvedExecutable,
         ], mode: ProcessStartMode.detached);
         await recordInstalledVersion('all-hub', version);
         // The caller must close the current Flutter process after success.

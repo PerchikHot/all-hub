@@ -361,6 +361,46 @@ void main() {
     client.close();
   });
 
+
+  test('concurrent rate limits retain the longest Retry-After', () async {
+    var now = DateTime.utc(2026, 11, 3);
+    final firstGate = Completer<http.Response>();
+    final secondGate = Completer<http.Response>();
+    var calls = 0;
+    final client = MediaFeedClient(
+      clock: () => now,
+      maxConcurrentRequests: 2,
+      client: MockClient((request) {
+        calls++;
+        final page = request.url.queryParameters['page'];
+        if (page == '1') return firstGate.future;
+        if (page == '2') return secondGate.future;
+        return Future.value(http.Response('[{"id":55}]', 200));
+      }),
+    );
+    final first = client.fetch(url);
+    final second = client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '2',
+    }));
+    // The newer, shorter restriction must not overwrite the earlier
+    // 120-second restriction, regardless of completion order.
+    firstGate.complete(http.Response('limited', 429,
+        headers: {'retry-after': '120'}));
+    await expectLater(first, throwsA(isA<MediaFeedRequestException>()));
+    secondGate.complete(http.Response('limited', 429,
+        headers: {'retry-after': '5'}));
+    await expectLater(second, throwsA(isA<MediaFeedRequestException>()));
+    now = now.add(const Duration(seconds: 10));
+    await expectLater(client.fetch(url.replace(queryParameters: {
+      ...url.queryParameters, 'page': '3',
+    })), throwsA(isA<MediaFeedRequestException>()));
+    expect(calls, 2, reason: 'Shorter Retry-After must not lift the ban');
+    now = now.add(const Duration(seconds: 111));
+    expect((await client.fetch(url)).single['id'], 55);
+    expect(calls, 3);
+    client.close();
+  });
+
   test('rejects non-feed URLs and invalid budgets', () async {
     final client = MediaFeedClient(client: MockClient((_) async =>
         http.Response('[]', 200)));

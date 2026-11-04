@@ -679,29 +679,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           onPressed: isNewerLocal ? null : () async {
                             try {
                               if (!await confirmExternalInstall(project)) return;
-                              await ProjectLauncher.runInstallExclusive(project.id, () async {
-                                final uri = Uri.parse(i.downloadUrl!);
-                                if (uri.path.toLowerCase().endsWith('.zip')) {
-                                  await ProjectLauncher.installWindowsZip(project.id, i.downloadUrl!,
-                                    externalRepo: project.id.startsWith('external-') ? project.repo : null,
-                                    sha256Digest: i.sha256Digest);
-                                } else if (uri.path.toLowerCase().endsWith('.exe')) {
-                                  await ProjectLauncher.installWindowsExe(project.id, i.downloadUrl!,
-                                    externalRepo: project.id.startsWith('external-') ? project.repo : null,
-                                    sha256Digest: i.sha256Digest);
-                                } else {
-                                  throw StateError('Формат обновления Windows не поддерживается');
-                                }
-                                await ProjectLauncher.recordInstalledVersion(project.id, i.version);
-                              });
-                              // The new version is installed side-by-side, so a
-                              // running old EXE can remain open while Windows
-                              // starts the freshly registered release directly.
-                              // No manual EXE selection or second button press.
-                              final launched = await ProjectLauncher.launch(project.id);
-                              if (!launched) {
-                                throw StateError('Новая версия установлена, но запуск EXE не удался');
-                              }
+                              await ProjectLauncher.updateAndLaunchWindows(
+                                project.id, i.downloadUrl!,
+                                version: i.version,
+                                externalRepo: project.id.startsWith('external-') ? project.repo : null,
+                                sha256Digest: i.sha256Digest,
+                              );
                               if (context.mounted) setState(() {});
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(

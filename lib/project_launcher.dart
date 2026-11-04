@@ -498,8 +498,19 @@ class ProjectLauncher {
       final prefs = await SharedPreferences.getInstance();
       final executable = prefs.getString('exe_$id');
       if (executable == null || !await File(executable).exists()) return false;
-      await Process.start(executable, [], mode: ProcessStartMode.detached,
+      // A successful CreateProcess call is not proof that the new release
+      // actually starts. Detect immediate crashes (missing DLLs, invalid
+      // bundled assets, etc.) before committing the version receipt.
+      final process = await Process.start(executable, [],
+          mode: ProcessStartMode.normal,
           workingDirectory: File(executable).parent.path);
+      final earlyExit = await Future.any<bool>([
+        process.exitCode.then((code) => true),
+        Future<bool>.delayed(const Duration(seconds: 3), () => false),
+      ]);
+      if (earlyExit) {
+        throw StateError('Windows-приложение завершилось сразу после запуска; обновление отменено');
+      }
       return true;
     }
     return false;

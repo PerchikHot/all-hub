@@ -5,6 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/hub_service.dart';
 
 void main() {
+  test('one-click Windows update selects complete ZIP before standalone EXE', () {
+    const exe = HubAsset('Nova-Windows.exe', 'https://example.test/exe',
+        'windows', '1.2.0');
+    const zip = HubAsset('Nova-Windows.zip', 'https://example.test/zip',
+        'windows', '1.2.0');
+    const apk = HubAsset('Nova-Android.apk', 'https://example.test/apk',
+        'android', '1.2.0');
+    final preferred = HubService.preferredInstallAssets(
+        [exe, apk, zip], 'windows');
+    expect(preferred.map((asset) => asset.name),
+        ['Nova-Windows.zip', 'Nova-Windows.exe']);
+    expect(HubService.preferredInstallAssets([exe, apk], 'windows').single,
+        same(exe));
+    expect(HubService.preferredInstallAssets([exe, apk, zip], 'android')
+        .single, same(apk));
+  });
+
   test('bounded release API never follows redirects or loads oversized JSON', () async {
     const api = 'https://api.github.com/repos/Example/App/releases?per_page=100';
     var calls = 0;

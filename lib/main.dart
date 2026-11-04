@@ -17,7 +17,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-void main() => runApp(const AllHub());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await ProjectLauncher.reconcileAllHubWindowsHandoff();
+  } catch (error) {
+    // Keep the launcher usable even if preferences are temporarily unavailable.
+    debugPrint('Windows update receipt reconciliation failed: $error');
+  }
+  runApp(const AllHub());
+}
 
 class Project {
   final String id, name, type, description;

@@ -681,6 +681,14 @@ try {
     if ((Get-Date) -ge $deadline) { throw 'New launcher did not confirm startup' }
     Start-Sleep -Milliseconds 500
   }
+  # A receipt written during startup is not enough if the UI immediately
+  # crashes. Observe a short post-confirmation window before moving shortcuts.
+  $stableUntil = (Get-Date).AddSeconds(8)
+  while ((Get-Date) -lt $stableUntil) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited after startup confirmation' }
+    Start-Sleep -Milliseconds 500
+  }
 } catch {
   if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
     try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}

@@ -101,6 +101,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String category = 'All';
   String search = '';
   bool showOnlyAvailable = false;
+  bool allHubUpdateInProgress = false;
   late Future<List<Project>> projects = _loadProjects();
   @override
   void initState() {
@@ -666,29 +667,57 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         );
                       },
                     ),
-                  if (tab == 0 && Platform.isWindows && project.id == 'all-hub' && i.downloadUrl != null)
+                  if (tab == 0 && Platform.isWindows && project.id == 'all-hub')
                     FutureBuilder<String?>(
                       future: ProjectLauncher.installedVersion('all-hub'),
-                      builder: (context, installed) => FilledButton.icon(
-                        icon: const Icon(Icons.system_update_alt_rounded),
-                        label: Text(windowsUpdateActionLabel(installed.data, i.version)),
-                        onPressed: () async {
-                          try {
-                            await ProjectLauncher.updateAllHubWindows(
-                              i.downloadUrl!, version: i.version,
-                              sha256Digest: i.sha256Digest,
-                            );
-                            // The detached updater waits for this process to
-                            // exit before launching the staged replacement.
-                            exit(0);
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Ошибка обновления All Hub: $e')));
+                      builder: (context, installed) {
+                        if (installed.connectionState != ConnectionState.done) {
+                          return const Chip(label: Text('Проверяем установленную версию…'));
+                        }
+                        final current = installed.data;
+                        final published = i.version;
+                        final comparison = current == null || published == null
+                            ? null : comparePublishedVersions(current, published);
+                        if (comparison == 0) {
+                          return const Chip(avatar: Icon(Icons.check_circle_outline, size: 18),
+                            label: Text('All Hub обновлён до актуальной версии'));
+                        }
+                        if (comparison == 1) {
+                          return const Chip(label: Text('Установленная версия новее опубликованной'));
+                        }
+                        if (i.downloadUrl == null) {
+                          return const Chip(label: Text('Windows EXE пока не опубликован'));
+                        }
+                        return FilledButton.icon(
+                          icon: allHubUpdateInProgress
+                              ? const SizedBox(width: 18, height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.system_update_alt_rounded),
+                          label: Text(allHubUpdateInProgress ? 'Подготовка обновления…' : 'Обновить'),
+                          onPressed: allHubUpdateInProgress ? null : () async {
+                            setState(() => allHubUpdateInProgress = true);
+                            try {
+                              if (i.version == null) {
+                                throw StateError('Не удалось определить версию релиза');
+                              }
+                              // The updater stages the executable and starts an external
+                              // helper; exit only after that handoff succeeds.
+                              await ProjectLauncher.updateAllHubWindows(
+                                i.downloadUrl!, version: i.version,
+                                sha256Digest: i.sha256Digest,
+                              );
+                              exit(0);
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Ошибка обновления All Hub: $e')));
+                              }
+                            } finally {
+                              if (mounted) setState(() => allHubUpdateInProgress = false);
                             }
-                          }
-                        },
-                      ),
+                          },
+                        );
+                      },
                     ),
                   if (tab == 0 && Platform.isWindows && project.id != 'all-hub' && i.downloadUrl != null)
                     FutureBuilder<String?>(

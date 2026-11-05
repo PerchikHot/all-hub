@@ -19,13 +19,17 @@ import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await ProjectLauncher.reconcileAllHubWindowsHandoff();
-  } catch (error) {
-    // Keep the launcher usable even if preferences are temporarily unavailable.
-    debugPrint('Windows update receipt reconciliation failed: $error');
-  }
   runApp(const AllHub());
+  // A successful process spawn is not a successful app startup. Only confirm
+  // the Windows handoff after Flutter has rendered its first application frame.
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    try {
+      await ProjectLauncher.reconcileAllHubWindowsHandoff();
+    } catch (error) {
+      // Leave the receipt unconfirmed: the external updater will roll back.
+      debugPrint('Windows update receipt reconciliation failed: $error');
+    }
+  });
 }
 
 class Project {

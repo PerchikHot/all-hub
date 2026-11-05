@@ -725,10 +725,44 @@ try {
   # Mark activation only after the new process survives the observation
   # window. The next launcher start can then discard the rollback receipt.
   Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
+  # Stable entry point: shortcuts must never point at an immutable release EXE.
+  # Store the pointer outside version folders so future updates only change
+  # this pointer. A failed handoff leaves the previous pointer untouched.
+  $projectsRoot = Split-Path -Parent (Split-Path -Parent $NextExe)
+  $supportRoot = Split-Path -Parent $projectsRoot
+  $entry = Join-Path $supportRoot 'AllHub-Launch.cmd'
+  $pointer = Join-Path $supportRoot 'AllHub-Current.txt'
+  $entryContent = @'
+@echo off
+setlocal DisableDelayedExpansion
+set "ALLHUB_TARGET="
+if not exist "%~dp0AllHub-Current.txt" exit /b 2
+set /p "ALLHUB_TARGET=" < "%~dp0AllHub-Current.txt"
+if not defined ALLHUB_TARGET exit /b 3
+if not exist "%ALLHUB_TARGET%" exit /b 4
+start "" "%ALLHUB_TARGET%"
+'@
+  # Install the stable entry before updating the pointer. No executable is
+  # ever modified while running; the .cmd lives in application support.
+  Set-Content -LiteralPath $entry -Value $entryContent -Encoding ASCII
+  $pendingPointer = "$pointer.new"
+  Set-Content -LiteralPath $pendingPointer -Value $NextExe -Encoding UTF8
+  Move-Item -LiteralPath $pendingPointer -Destination $pointer -Force
+  # A user launching via the stable entry always gets the confirmed build.
+  # Existing shortcuts pointing to a previous EXE are migrated below.
 } catch {
   # Persist the failure independently of the new process. The old launcher
   # reconciles this marker on startup and restores its version receipt.
   try { Set-Content -LiteralPath "$NextExe.failed" -Value $_.Exception.Message } catch {}
+  # If the stable pointer was changed before a later failure, restore it.
+  try {
+    if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+      $projectsRoot = Split-Path -Parent (Split-Path -Parent $NextExe)
+      $pointer = Join-Path (Split-Path -Parent $projectsRoot) 'AllHub-Current.txt'
+      Set-Content -LiteralPath "$pointer.rollback" -Value $PreviousExe -Encoding UTF8
+      Move-Item -LiteralPath "$pointer.rollback" -Destination $pointer -Force
+    }
+  } catch {}
   if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
     try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}
   }
@@ -745,9 +779,10 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
       Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
         try {
           $shortcut = $shell.CreateShortcut($_.FullName)
-          if ([string]::Equals($shortcut.TargetPath, $PreviousExe, [StringComparison]::OrdinalIgnoreCase)) {
-            $shortcut.TargetPath = $NextExe
-            $shortcut.WorkingDirectory = Split-Path -Parent $NextExe
+          if ([string]::Equals($shortcut.TargetPath, $PreviousExe, [StringComparison]::OrdinalIgnoreCase) -or
+              [string]::Equals($shortcut.TargetPath, $NextExe, [StringComparison]::OrdinalIgnoreCase)) {
+            $shortcut.TargetPath = $entry
+            $shortcut.WorkingDirectory = $supportRoot
             $shortcut.Save()
           }
         } catch {}

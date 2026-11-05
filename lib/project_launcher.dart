@@ -698,7 +698,7 @@ class ProjectLauncher {
         // The helper waits for the current process to finish, then starts the
         // staged launcher in its own working directory.
         final script = r'''
-param([int]$OldPid, [string]$NextExe, [string]$PreviousExe)
+param([int]$OldPid, [string]$NextExe, [string]$PreviousExe, [string]$SupportRoot)
 $ErrorActionPreference = 'Stop'
 try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
 if (-not (Test-Path -LiteralPath $NextExe -PathType Leaf)) { exit 2 }
@@ -728,20 +728,21 @@ try {
   # Stable entry point: shortcuts must never point at an immutable release EXE.
   # Store the pointer outside version folders so future updates only change
   # this pointer. A failed handoff leaves the previous pointer untouched.
-  $projectsRoot = Split-Path -Parent (Split-Path -Parent $NextExe)
-  $supportRoot = Split-Path -Parent $projectsRoot
+  $supportRoot = $SupportRoot
   $entry = Join-Path $supportRoot 'AllHub-Launch.cmd'
   $pointer = Join-Path $supportRoot 'AllHub-Current.txt'
   $entryContent = @'
 @echo off
-setlocal DisableDelayedExpansion
-set "ALLHUB_TARGET="
-if not exist "%~dp0AllHub-Current.txt" exit /b 2
-set /p "ALLHUB_TARGET=" < "%~dp0AllHub-Current.txt"
-if not defined ALLHUB_TARGET exit /b 3
-if not exist "%ALLHUB_TARGET%" exit /b 4
-start "" "%ALLHUB_TARGET%"
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0AllHub-Launch.ps1"
 '@
+  $launchScript = @'
+$ErrorActionPreference = 'Stop'
+$pointer = Join-Path $PSScriptRoot 'AllHub-Current.txt'
+$target = (Get-Content -LiteralPath $pointer -Encoding UTF8 -TotalCount 1).Trim()
+if (-not $target -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { exit 4 }
+Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target)
+'@
+  Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Launch.ps1') -Value $launchScript -Encoding UTF8
   # Install the stable entry before updating the pointer. No executable is
   # ever modified while running; the .cmd lives in application support.
   Set-Content -LiteralPath $entry -Value $entryContent -Encoding ASCII
@@ -757,8 +758,7 @@ start "" "%ALLHUB_TARGET%"
   # If the stable pointer was changed before a later failure, restore it.
   try {
     if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
-      $projectsRoot = Split-Path -Parent (Split-Path -Parent $NextExe)
-      $pointer = Join-Path (Split-Path -Parent $projectsRoot) 'AllHub-Current.txt'
+      $pointer = Join-Path $SupportRoot 'AllHub-Current.txt'
       Set-Content -LiteralPath "$pointer.rollback" -Value $PreviousExe -Encoding UTF8
       Move-Item -LiteralPath "$pointer.rollback" -Destination $pointer -Force
     }
@@ -815,6 +815,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
           '-File', helper.path, '-OldPid', pid.toString(),
           '-NextExe', nextExe,
           '-PreviousExe', Platform.resolvedExecutable,
+          '-SupportRoot', (await getApplicationSupportDirectory()).path,
         ], mode: ProcessStartMode.detached);
         // Do not claim the update succeeded before the new launcher starts.
         // The caller must close the current Flutter process after success.

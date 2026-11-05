@@ -599,16 +599,22 @@ class ProjectLauncher {
       // Do not clear a pending transaction for an unrelated executable.
       return;
     }
+    // Keep the rollback receipt until the external updater has observed a
+    // stable process. Otherwise an early crash leaves the old launcher unable
+    // to restore the previous registered version.
+    final committed = File('$next.committed');
+    if (current == expected && !await committed.exists()) {
+      await File('$next.confirmed').writeAsString('ready', flush: true);
+      return;
+    }
     for (final key in [
       'allhub_pending_exe', 'allhub_pending_version',
       'allhub_previous_exe', 'allhub_previous_version',
     ]) {
       await prefs.remove(key);
     }
-    if (current == expected) {
-      // The external updater waits for an explicit startup acknowledgement.
-      // A running process alone is not proof that preferences were committed.
-      await File('$next.confirmed').writeAsString('ready', flush: true);
+    if (current == expected && await committed.exists()) {
+      await committed.delete();
     }
   }
 
@@ -660,6 +666,8 @@ class ProjectLauncher {
         // starting the helper; otherwise it could accept a false success.
         final confirmation = File('$nextExe.confirmed');
         if (await confirmation.exists()) await confirmation.delete();
+        final committed = File('$nextExe.committed');
+        if (await committed.exists()) await committed.delete();
         // PowerShell's argument list is passed as individual arguments, never
         // through a shell command assembled from an untrusted release URL.
         // The helper waits for the current process to finish, then starts the
@@ -689,6 +697,9 @@ try {
     if ($newProcess.HasExited) { throw 'New launcher exited after startup confirmation' }
     Start-Sleep -Milliseconds 500
   }
+  # Mark activation only after the new process survives the observation
+  # window. The next launcher start can then discard the rollback receipt.
+  Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
 } catch {
   if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
     try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}

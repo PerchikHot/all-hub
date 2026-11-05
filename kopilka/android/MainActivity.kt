@@ -20,6 +20,36 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // Permission can remain enabled while Android has not bound the listener.
+    // Request an official rebind when the user returns from system settings;
+    // this does not grant access, start a foreground service or bypass Android.
+    private fun requestListenerReconnect(): Boolean {
+        if (!isListenerPermissionGranted() || BankNotificationService.connectedInProcess) return false
+        val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val last = prefs.getLong("last_rebind_request", 0L)
+        if (now < last || now - last < 60_000L) return false
+        // Persist before requesting to avoid repeated requests during resume.
+        if (!prefs.edit().putLong("last_rebind_request", now)
+                .putInt("rebind_requests",
+                    (prefs.getInt("rebind_requests", 0) + 1).coerceAtMost(100000000))
+                .commit()) return false
+        return try {
+            android.service.notification.NotificationListenerService.requestRebind(
+                ComponentName(this, BankNotificationService::class.java))
+            true
+        } catch (_: SecurityException) {
+            false
+        } catch (_: IllegalArgumentException) {
+            false
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requestListenerReconnect()
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kopilka/notifications")
@@ -30,6 +60,7 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "enabled" -> result.success(isListenerPermissionGranted())
+                    "reconnect" -> result.success(requestListenerReconnect())
                     "pending" -> {
                         val prefs = getSharedPreferences("kopilka_notifications", MODE_PRIVATE)
                         synchronized(BankNotificationService.queueLock) {

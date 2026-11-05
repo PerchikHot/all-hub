@@ -581,6 +581,28 @@ class ProjectLauncher {
     final expected = File(next).absolute.path.toLowerCase();
     final previous = prefs.getString('allhub_previous_exe');
     final previousVersion = prefs.getString('allhub_previous_version');
+    // The external updater writes a failure receipt before launching the old
+    // binary. A previous app must never leave the failed new version registered.
+    final failed = File('$next.failed');
+    if (await failed.exists() && previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+      await prefs.setString('allhub_last_update_error',
+          (await failed.readAsString()).trim());
+      await failed.delete();
+      for (final key in [
+        'allhub_pending_exe', 'allhub_pending_version',
+        'allhub_previous_exe', 'allhub_previous_version',
+      ]) {
+        await prefs.remove(key);
+      }
+      return;
+    }
     if (current == expected) {
       await prefs.setString('exe_all-hub', next);
       final version = prefs.getString('allhub_pending_version');
@@ -668,6 +690,9 @@ class ProjectLauncher {
         if (await confirmation.exists()) await confirmation.delete();
         final committed = File('$nextExe.committed');
         if (await committed.exists()) await committed.delete();
+        final failed = File('$nextExe.failed');
+        if (await failed.exists()) await failed.delete();
+        await prefs.remove('allhub_last_update_error');
         // PowerShell's argument list is passed as individual arguments, never
         // through a shell command assembled from an untrusted release URL.
         // The helper waits for the current process to finish, then starts the
@@ -701,6 +726,9 @@ try {
   # window. The next launcher start can then discard the rollback receipt.
   Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
 } catch {
+  # Persist the failure independently of the new process. The old launcher
+  # reconciles this marker on startup and restores its version receipt.
+  try { Set-Content -LiteralPath "$NextExe.failed" -Value $_.Exception.Message } catch {}
   if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
     try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}
   }

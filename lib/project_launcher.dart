@@ -738,6 +738,7 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0Al
   $launchScript = @'
 $ErrorActionPreference = 'Stop'
 $pointer = Join-Path $PSScriptRoot 'AllHub-Current.txt'
+if (-not (Test-Path -LiteralPath $pointer -PathType Leaf)) { exit 4 }
 $target = (Get-Content -LiteralPath $pointer -Encoding UTF8 -TotalCount 1).Trim()
 if (-not $target -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { exit 4 }
 Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target)
@@ -750,6 +751,27 @@ Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target)
   Set-Content -LiteralPath $pendingPointer -Value $NextExe -Encoding UTF8
   Move-Item -LiteralPath $pendingPointer -Destination $pointer -Force
   # A user launching via the stable entry always gets the confirmed build.
+  # Create a durable user shortcut even for portable installations that
+  # never had an existing shortcut to migrate. Do not overwrite user links.
+  $shell = New-Object -ComObject WScript.Shell
+  $userLinks = @(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'All Hub.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'All Hub.lnk')
+  )
+  foreach ($link in $userLinks) {
+    try {
+      $parent = Split-Path -Parent $link
+      if (-not $parent -or -not (Test-Path -LiteralPath $parent -PathType Container)) { continue }
+      if (Test-Path -LiteralPath $link) { continue }
+      $shortcut = $shell.CreateShortcut($link)
+      $shortcut.TargetPath = $entry
+      $shortcut.WorkingDirectory = $supportRoot
+      $shortcut.Description = 'All Hub — запуск актуальной версии'
+      $shortcut.Save()
+    } catch {
+      # Shortcuts are optional; failure must not roll back a healthy update.
+    }
+  }
   # Existing shortcuts pointing to a previous EXE are migrated below.
 } catch {
   # Persist the failure independently of the new process. The old launcher

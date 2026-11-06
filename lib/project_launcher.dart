@@ -722,9 +722,9 @@ try {
     if ($newProcess.HasExited) { throw 'New launcher exited after startup confirmation' }
     Start-Sleep -Milliseconds 500
   }
-  # Mark activation only after the new process survives the observation
-  # window. The next launcher start can then discard the rollback receipt.
-  Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
+  # The update is not committed until the stable launcher pointer has
+  # been installed. Otherwise a shortcut/pointer failure can roll back the
+  # old executable while the new process later accepts a false commit.
   # Stable entry point: shortcuts must never point at an immutable release EXE.
   # Store the pointer outside version folders so future updates only change
   # this pointer. A failed handoff leaves the previous pointer untouched.
@@ -772,8 +772,13 @@ Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target)
       # Shortcuts are optional; failure must not roll back a healthy update.
     }
   }
+  # Commit only after the durable entry point and pointer are installed.
+  # Shortcut migration is best-effort and must not block a healthy launch.
+  Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
   # Existing shortcuts pointing to a previous EXE are migrated below.
 } catch {
+  # Never let a stale success receipt win over a failed activation.
+  try { Remove-Item -LiteralPath "$NextExe.committed" -Force -ErrorAction SilentlyContinue } catch {}
   # Persist the failure independently of the new process. The old launcher
   # reconciles this marker on startup and restores its version receipt.
   try { Set-Content -LiteralPath "$NextExe.failed" -Value $_.Exception.Message } catch {}

@@ -75,10 +75,10 @@ jobs:
           service = '''<service android:name=".BankNotificationService"
                   android:label="Копилка — уведомления банков"
                   android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-                  android:exported="false">
+                  android:exported="true">
                   <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
               </service>'''
-          m = m.replace('</application>', service + '</application>')
+          # Android's notification manager runs in another UID. With exported=false\n          # it cannot bind even when the user has enabled notification access.\n          # The signature-level BIND_NOTIFICATION_LISTENER_SERVICE permission\n          # restricts binding to the Android system.\n          assert 'android:exported="true"' in service\n          assert 'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE' in service\n          m = m.replace('</application>', service + '</application>')
           manifest.write_text(m)
           folder = Path('android/app/src/main/kotlin/com/veyrion/kopilka_app')
           folder.mkdir(parents=True, exist_ok=True)

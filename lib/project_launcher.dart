@@ -654,16 +654,31 @@ class ProjectLauncher {
       final previousVersion = prefs.getString('installed_version_all-hub');
       try {
         final extension = Uri.parse(url).path.toLowerCase();
-        if (extension.endsWith('.zip')) {
-          await installWindowsZip('all-hub', url, sha256Digest: sha256Digest);
-        } else if (extension.endsWith('.exe')) {
-          await installWindowsExe('all-hub', url, sha256Digest: sha256Digest);
-        } else {
-          throw StateError('Нужен Windows ZIP или EXE из GitHub Releases');
+        // Flutter Windows applications are not standalone EXEs: they require
+        // flutter_windows.dll, data/flutter_assets and plugin DLLs. Never
+        // replace the running launcher with a bare EXE from a release.
+        if (!extension.endsWith('.zip')) {
+          throw StateError(
+              'Для самообновления All Hub нужен полный Windows ZIP с DLL и ресурсами');
         }
+        await installWindowsZip('all-hub', url, sha256Digest: sha256Digest);
         final nextExe = prefs.getString('exe_all-hub');
         if (nextExe == null || !await File(nextExe).exists()) {
           throw StateError('Новая версия лаунчера не найдена');
+        }
+        // Check the complete Flutter runtime before asking the old process
+        // to exit. A valid PE header alone cannot detect missing dependencies.
+        final bundle = File(nextExe).parent;
+        final runtime = File('${bundle.path}${Platform.pathSeparator}flutter_windows.dll');
+        final assets = Directory(
+            '${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}flutter_assets');
+        final icu = File('${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}icudtl.dat');
+        if (!await runtime.exists() || !await assets.exists() ||
+            !await icu.exists()) {
+          throw StateError(
+              'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
         }
         // The installer stages a release by writing exe_all-hub. That is not
         // activation: keep the current launcher registered until the new

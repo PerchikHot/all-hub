@@ -1162,10 +1162,9 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
         throw const FormatException(
             'В Windows ZIP несколько EXE без однозначного приложения');
       }
-      // Validate the complete Flutter bundle while it is still in staging.
-      // This applies to every portable Windows project, not only All Hub:
-      // a ZIP with a valid EXE but missing runtime files must never become
-      // the registered installation or replace a previously working app.
+      // Validate Flutter projects before registration; Godot and native
+      // Windows games use different layouts and must not be rejected.
+      if (id == 'all-hub' || id == 'kopilka') {
       final launchFile = File('${staging.path}$relativeExe');
       final bundleRoot = launchFile.parent;
       final runtimeDll = File('${bundleRoot.path}${Platform.pathSeparator}flutter_windows.dll');
@@ -1181,6 +1180,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
       // Empty asset directories are not usable Flutter installations.
       if (!await flutterAssets.list(followLinks: false).isNotEmpty) {
         throw const FormatException('Windows ZIP содержит пустой flutter_assets');
+      }
       }
       // Publish only a fully unpacked and validated directory. No running
       // EXE is overwritten, and the old registered path stays valid if this

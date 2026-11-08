@@ -34,7 +34,15 @@ launcher = launcher.replace("    override fun configureFlutterEngine(flutterEngi
     '    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {\n'
     '        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kopilka/notifications")'
     + channel + "\n", 1)
-launcher = launcher.replace("\nclass MainActivity", "\n" + imports + "\nclass MainActivity", 1)
+# Kotlin imports must precede annotations such as @Suppress.
+if imports:
+    lines = launcher.splitlines(keepends=True)
+    last_import = max((i for i, line in enumerate(lines)
+                       if line.startswith("import ")), default=-1)
+    assert last_import >= 0, "Launcher must have imports"
+    lines.insert(last_import + 1, imports + "\n")
+    launcher = "".join(lines)
+assert launcher.index("import ") < launcher.index("@Suppress")
 assert launcher.count('"allhub/launcher"') == 1
 assert launcher.count('"kopilka/notifications"') == 1
 target.write_text(launcher)

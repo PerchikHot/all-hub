@@ -692,12 +692,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (i.downloadUrl == null) {
                           return const Chip(label: Text('Windows EXE пока не опубликован'));
                         }
-                        return FilledButton.icon(
-                          icon: allHubUpdateInProgress
-                              ? const SizedBox(width: 18, height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.system_update_alt_rounded),
-                          label: Text(allHubUpdateInProgress ? 'Подготовка обновления…' : 'Обновить'),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Установлено: ${current ?? 'не определено'}  •  Доступно: ${published ?? 'не определено'}'),
+                            if (allHubUpdateInProgress)
+                              ValueListenableBuilder<double?>(
+                                valueListenable: ProjectLauncher.downloadProgress,
+                                builder: (context, progress, _) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: LinearProgressIndicator(value: progress),
+                                ),
+                              ),
+                            FilledButton.icon(
+                              icon: allHubUpdateInProgress
+                                  ? const SizedBox(width: 18, height: 18,
+                                      child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.system_update_alt_rounded),
+                              label: const Text('Обновить'),
                           onPressed: allHubUpdateInProgress ? null : () async {
                             setState(() => allHubUpdateInProgress = true);
                             try {
@@ -720,6 +733,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               if (mounted) setState(() => allHubUpdateInProgress = false);
                             }
                           },
+                            ),
+                          ],
                         );
                       },
                     ),

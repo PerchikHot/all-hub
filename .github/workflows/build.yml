@@ -65,6 +65,290 @@ jobs:
           (paths / 'allhub_file_paths.xml').write_text(
               '<paths xmlns:android="http://schemas.android.com/apk/res/android"><cache-path name="apk" path="."/></paths>')
           PY
+      - name: Integrate autonomous Kopilka bank listener into All Hub APK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          xml = manifest.read_text(encoding='utf-8')
+          service = '''<service android:name=".BankNotificationService"
+                  android:label="Копилка — уведомления банков"
+                  android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+                  android:exported="true">
+                  <intent-filter>
+                    <action android:name="android.service.notification.NotificationListenerService"/>
+                  </intent-filter>
+                </service>'''
+          assert '</application>' in xml and 'BankNotificationService' not in xml
+          manifest.write_text(xml.replace('</application>', service + '</application>', 1), encoding='utf-8')
+          destination = Path('android/app/src/main/kotlin/com/example/all_hub')
+          # Flutter's generated Kotlin package follows the project org and
+          # can vary with the template; discover its actual MainActivity.
+          activities = list(Path('android/app/src/main/kotlin').rglob('MainActivity.kt'))
+          assert len(activities) == 1, activities
+          destination = activities[0].parent
+          source = Path('kopilka/android')
+          for name in ('MainActivity.kt', 'BankNotificationService.kt',
+                       'BankAutoClassifier.kt', 'BankNativeJournal.kt'):
+              content = (source / name).read_text(encoding='utf-8')
+              content, count = re.subn(
+                  r'^package com\\.veyrion\\.kopilka_app
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v0.7.0 https://github.com/ggml-org/llama.cpp.git /tmp/allhub-llama
+          NDK_ROOT="${ANDROID_NDK_HOME:-}"
+          if [ ! -f "$NDK_ROOT/build/cmake/android.toolchain.cmake" ]; then
+            NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          fi
+          cmake -S /tmp/allhub-llama -B /tmp/allhub-llama-build \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+            -DLLAMA_BUILD_SERVER=OFF -DGGML_OPENMP=OFF \
+            -DGGML_NATIVE=OFF
+          cmake --build /tmp/allhub-llama-build --config Release --target llama -j 2
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          find /tmp/allhub-llama-build -type f -name '*.so' -exec cp -v {} android/app/src/main/jniLibs/arm64-v8a/ \;
+          test -s android/app/src/main/jniLibs/arm64-v8a/libllama.so
+      - name: Build native ARM64 bridge
+        run: |
+          set -euo pipefail
+          NDK_ROOT="${ANDROID_NDK_HOME:-}"
+          if [ ! -d "$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin" ]; then
+            NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          fi
+          CLANG="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          test -x "$CLANG"
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          "$CLANG" -shared -fPIC -O2 -Wall -Wextra \
+            -I/tmp/allhub-llama/include -I/tmp/allhub-llama/ggml/include native/allhub_llama_bridge.cpp \
+            -Landroid/app/src/main/jniLibs/arm64-v8a -lllama \
+            -o android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
+          test -s android/app/src/main/jniLibs/arm64-v8a/liballhub_llama.so
+          # The NDK clang++ bridge dynamically links Android's shared C++ runtime.
+          # Flutter does not automatically package this dependency for manually copied .so files.
+          CPP_SHARED="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          test -s "$CPP_SHARED"
+          cp -v "$CPP_SHARED" android/app/src/main/jniLibs/arm64-v8a/libc++_shared.so
+      - run: flutter pub get
+      - name: Align Android compile SDK with plugin requirements
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          app = Path('android/app/build.gradle.kts')
+          if not app.exists():
+              app = Path('android/app/build.gradle')
+          if not app.exists():
+              raise SystemExit('Android app Gradle configuration not found')
+          text = app.read_text()
+          # Flutter's generated template may request an NDK not present on
+          # the runner. Reuse the installed NDK already used for libllama.so
+          # instead of downloading a second toolchain (r28 hit Premature EOF).
+          ndk_root = Path(os.environ['ANDROID_HOME']) / 'ndk'
+          installed = [p for p in ndk_root.iterdir() if p.is_dir() and
+              (p / 'source.properties').is_file() and
+              (p / 'build/cmake/android.toolchain.cmake').is_file()]
+          ndk_home = Path(os.environ.get('ANDROID_NDK_HOME', '/missing'))
+          if ndk_home in installed:
+              selected_ndk = ndk_home
+          elif installed:
+              selected_ndk = sorted(installed,
+                  key=lambda p: [int(part) for part in p.name.split('.')])[-1]
+          else:
+              raise SystemExit('No complete Android NDK installed')
+          text, ndk_count = re.subn(
+              r'ndkVersion\s*=\s*(?:flutter\.ndkVersion|"[^"]+")',
+              f'ndkVersion = "{selected_ndk.name}"', text, count=1)
+          if ndk_count != 1:
+              raise SystemExit('Could not pin generated app NDK version')
+          print(f'Using installed Android NDK {selected_ndk.name}')
+          text, count = re.subn(r'compileSdk(?:Version)?\s*(?:=\s*)?(?:flutter\.compileSdkVersion|\d+)', 'compileSdk = 36' if app.suffix == '.kts' else 'compileSdkVersion 36', text, count=1)
+          if count != 1:
+              raise SystemExit('Could not update app compileSdk')
+          app.write_text(text)
+          cache = Path(os.environ['HOME']) / '.pub-cache' / 'hosted' / 'pub.dev'
+          plugin_dirs = sorted(cache.glob('file_picker-*/android/build.gradle'))
+          plugin_dirs += sorted(cache.glob('file_picker-*/android/build.gradle.kts'))
+          if not plugin_dirs:
+              print('No file_picker Gradle override needed')
+          for gradle in plugin_dirs:
+              text = gradle.read_text()
+              kotlin = gradle.suffix == '.kts'
+              pattern = r'compileSdk(?:Version)?\s*(?:=\s*)?(?:flutter\.compileSdkVersion|\d+)'
+              replacement = 'compileSdk = 36' if kotlin else 'compileSdkVersion 36'
+              updated, count = re.subn(pattern, replacement, text, count=1)
+              if count:
+                  gradle.write_text(updated)
+                  print(f'Updated {gradle} to compileSdk 36')
+              else:
+                  print(f'No numeric compileSdk override needed in {gradle}')
+          PY
+      - name: Configure persistent release signing
+        env:
+          ALLHUB_KEYSTORE_BASE64: ${{ secrets.ALLHUB_KEYSTORE_BASE64 }}
+          ALLHUB_STORE_PASSWORD: ${{ secrets.ALLHUB_STORE_PASSWORD }}
+          ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
+          ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import os, base64
+          from pathlib import Path
+          names = ['ALLHUB_KEYSTORE_BASE64','ALLHUB_STORE_PASSWORD','ALLHUB_KEY_PASSWORD','ALLHUB_KEY_ALIAS']
+          if not all(os.getenv(n) for n in names):
+              raise SystemExit('Missing release signing secrets: ' + ', '.join(n for n in names if not os.getenv(n)))
+          Path('android/app/allhub-release.jks').write_bytes(base64.b64decode(os.environ['ALLHUB_KEYSTORE_BASE64']))
+          gradle = Path('android/app/build.gradle.kts')
+          content = gradle.read_text()
+          content = 'import java.util.Properties\n' + content
+          marker = 'android {'
+          signing = """val signingProps = Properties()
+          signingProps["storePassword"] = System.getenv("ALLHUB_STORE_PASSWORD")
+          signingProps["keyPassword"] = System.getenv("ALLHUB_KEY_PASSWORD")
+          signingProps["keyAlias"] = System.getenv("ALLHUB_KEY_ALIAS")
+          android {
+              signingConfigs {
+                  create("allhubRelease") {
+                      storeFile = file("allhub-release.jks")
+                      storePassword = signingProps["storePassword"] as String
+                      keyPassword = signingProps["keyPassword"] as String
+                      keyAlias = signingProps["keyAlias"] as String
+                  }
+              }
+          """
+          content = content.replace(marker, signing, 1)
+          content = content.replace('signingConfig = signingConfigs.getByName("debug")','signingConfig = signingConfigs.getByName("allhubRelease")')
+          gradle.write_text(content)
+          PY
+      - run: flutter analyze
+      - run: flutter test
+      - name: Build signed Android release APK
+        env:
+          ALLHUB_STORE_PASSWORD: ${{ secrets.ALLHUB_STORE_PASSWORD }}
+          ALLHUB_KEY_PASSWORD: ${{ secrets.ALLHUB_KEY_PASSWORD }}
+          ALLHUB_KEY_ALIAS: ${{ secrets.ALLHUB_KEY_ALIAS }}
+        run: flutter build apk --release --build-number "$GITHUB_RUN_NUMBER"
+      - name: Verify Android package and native dependencies
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -s "$APK"
+          python3 tools/verify_packaged_icon.py --project all_hub --apk "$APK" \
+            --require-lib lib/arm64-v8a/liballhub_llama.so \
+            --require-lib lib/arm64-v8a/libc++_shared.so \
+            --require-lib lib/arm64-v8a/libllama.so
+      - name: Verify packaged Kopilka notification service in All Hub
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          AAPT="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$AAPT"
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > /tmp/allhub-manifest.txt
+          grep -F 'BankNotificationService' /tmp/allhub-manifest.txt
+          grep -F 'android.permission.BIND_NOTIFICATION_LISTENER_SERVICE' /tmp/allhub-manifest.txt
+          grep -F 'android.service.notification.NotificationListenerService' /tmp/allhub-manifest.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AllHub-Android-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate Windows platform scaffolding
+        run: flutter create --platforms=windows --project-name all_hub .
+      - name: Generate branded Windows desktop and taskbar icon
+        shell: pwsh
+        run: |
+          python -m pip install --quiet Pillow
+          python tools/generate_launcher_icon.py --project all_hub
+          python tools/generate_launcher_icon.py --project all_hub --verify
+          if (!(Test-Path 'windows/runner/resources/app_icon.ico')) { throw 'Windows icon generation failed' }
+      - name: Remove generated template test
+        run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      # Keep Windows executable metadata aligned with the immutable release tag.
+      # Without this, PackageInfo reports the pubspec build (e.g. +12) while
+      # GitHub publishes +933, so All Hub always claims its own update is pending.
+      - run: flutter build windows --release --build-number ${{ github.run_number }}
+      - name: Package portable Windows app
+        shell: pwsh
+        run: |
+          $release = 'build/windows/x64/runner/Release'
+          if (!(Test-Path "$release/all_hub.exe")) { throw 'Windows executable missing' }
+          python -m pip install --quiet pefile
+          python -c "import pefile; p=pefile.PE(r'$release/all_hub.exe'); assert any(e.id==14 for e in p.DIRECTORY_ENTRY_RESOURCE.entries), 'EXE icon missing'"
+          if (!(Test-Path "$release/flutter_windows.dll")) { throw 'Flutter runtime missing' }
+          if (!(Test-Path "$release/data")) { throw 'Windows data assets missing' }
+          Compress-Archive -Path "$release/*" -DestinationPath 'AllHub-Windows-portable.zip' -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AllHub-Windows
+          path: AllHub-Windows-portable.zip
+          if-no-files-found: error
+  # A release must never advertise a new version while one platform still
+  # points to an older build. Only publish after BOTH artifacts passed CI.
+  publish:
+    name: Publish verified Android and Windows pair
+    needs: [android, windows]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: AllHub-Android-release
+          path: dist/android
+      - uses: actions/download-artifact@v4
+        with:
+          name: AllHub-Windows
+          path: dist/windows
+      - name: Verify both packages before publishing
+        run: |
+          set -euo pipefail
+          test -s dist/android/app-release.apk
+          test -s dist/windows/AllHub-Windows-portable.zip
+          cp dist/android/app-release.apk AllHub-Android.apk
+          cp dist/windows/AllHub-Windows-portable.zip AllHub-Windows-portable.zip
+      - name: Publish immutable, complete platform pair
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+).*/\1/p' pubspec.yaml)"
+          test -n "$VERSION"
+          TAG="all-hub-v${VERSION}+${GITHUB_RUN_NUMBER}"
+          # A rolling release can temporarily mix old and new binaries if
+          # uploads fail halfway. Publish a NEW draft release instead; it
+          # remains invisible to All Hub until BOTH assets are uploaded.
+          gh release create "$TAG" AllHub-Android.apk AllHub-Windows-portable.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "All Hub ${VERSION} build ${GITHUB_RUN_NUMBER}" \
+            --notes "$(printf 'Verified Android and Windows build.\nVersion: %s+%s\n' "$VERSION" "$GITHUB_RUN_NUMBER")" \
+            --draft --latest=false
+          # GitHub API only lists non-draft releases to normal clients.
+          # If publishing fails, the previous working release stays intact.
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+,
+                  'package ' + '.'.join(destination.relative_to(
+                      Path('android/app/src/main/kotlin')).parts),
+                  content, count=1, flags=re.MULTILINE)
+              assert count == 1, name
+              (destination / name).write_text(content, encoding='utf-8')
+          assert 'kopilka/notifications' in (destination / 'MainActivity.kt').read_text()
+          assert 'NotificationListenerService' in (destination / 'BankNotificationService.kt').read_text()
+          PY
       - name: Build llama.cpp CPU runtime for Android ARM64
         run: |
           set -euo pipefail

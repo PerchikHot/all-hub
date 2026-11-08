@@ -1178,7 +1178,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
             'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
       }
       // Empty asset directories are not usable Flutter installations.
-      if (!await flutterAssets.list(followLinks: false).isNotEmpty) {
+      if (await flutterAssets.list(followLinks: false).isEmpty) {
         throw const FormatException('Windows ZIP содержит пустой flutter_assets');
       }
       }

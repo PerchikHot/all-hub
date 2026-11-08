@@ -16,7 +16,7 @@ assert "class MainActivity : FlutterActivity() {" in kopilka
 for path in source.glob("*.kt"):
     # Unit-test sources use JUnit and must never be compiled into the release APK.
     # The upstream Kopilka keeps some *Test.kt files alongside production sources.
-    if path.name == "MainActivity.kt" or path.name.endsWith("Test.kt"):
+    if path.name == "MainActivity.kt" or path.name.endswith("Test.kt"):
         continue
     data = path.read_text()
     assert data.startswith("package com.veyrion.kopilka_app"), path

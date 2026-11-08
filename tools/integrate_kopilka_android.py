@@ -14,7 +14,9 @@ assert "allhub/launcher" in launcher and "kopilka/notifications" in kopilka
 assert "class MainActivity : FlutterActivity() {" in launcher
 assert "class MainActivity : FlutterActivity() {" in kopilka
 for path in source.glob("*.kt"):
-    if path.name == "MainActivity.kt":
+    # Unit-test sources use JUnit and must never be compiled into the release APK.
+    # The upstream Kopilka keeps some *Test.kt files alongside production sources.
+    if path.name == "MainActivity.kt" or path.name.endsWith("Test.kt"):
         continue
     data = path.read_text()
     assert data.startswith("package com.veyrion.kopilka_app"), path

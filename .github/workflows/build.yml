@@ -67,30 +67,7 @@ jobs:
           PY
       - name: Integrate Kopilka native listener and journal into All Hub
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          manifest = Path('android/app/src/main/AndroidManifest.xml')
-          xml = manifest.read_text()
-          service = '''<service android:name=".BankNotificationService"
-              android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-              android:exported="true">
-              <intent-filter><action android:name="android.service.notification.NotificationListenerService"/></intent-filter>
-              </service>'''
-          assert '</application>' in xml
-          manifest.write_text(xml.replace('</application>', service + '</application>', 1))
-          activities = list(Path('android/app/src/main/kotlin').rglob('MainActivity.kt'))
-          assert len(activities) == 1
-          target = activities[0].parent
-          package = '.'.join(target.relative_to(Path('android/app/src/main/kotlin')).parts)
-          for name in ('MainActivity.kt', 'BankNotificationService.kt',
-                       'BankAutoClassifier.kt', 'BankNativeJournal.kt'):
-              source = Path('kopilka/android') / name
-              content = source.read_text()
-              assert content.startswith('package com.veyrion.kopilka_app')
-              content = content.replace('package com.veyrion.kopilka_app', 'package ' + package, 1)
-              (target / name).write_text(content)
-          assert 'kopilka/notifications' in (target / 'MainActivity.kt').read_text()
-          PY
+          python3 tools/integrate_kopilka_android.py
       - name: Build llama.cpp CPU runtime for Android ARM64
         run: |
           set -euo pipefail

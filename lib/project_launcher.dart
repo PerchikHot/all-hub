@@ -753,15 +753,32 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0Al
   $launchScript = @'
 $ErrorActionPreference = 'Stop'
 $pointer = Join-Path $PSScriptRoot 'AllHub-Current.txt'
-if (-not (Test-Path -LiteralPath $pointer -PathType Leaf)) { exit 4 }
-$target = (Get-Content -LiteralPath $pointer -Encoding UTF8 -TotalCount 1).Trim()
-if (-not $target -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { exit 4 }
-Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target)
+$backup = Join-Path $PSScriptRoot 'AllHub-Previous.txt'
+# A broken or deleted release must not strand the user behind a dead shortcut.
+# Never execute arbitrary command lines: both pointer files contain only paths
+# to previously installed EXEs, and Start-Process receives a literal path.
+foreach ($file in @($pointer, $backup)) {
+  if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+  $target = (Get-Content -LiteralPath $file -Encoding UTF8 -TotalCount 1).Trim()
+  if (-not $target -or -not [IO.Path]::IsPathRooted($target) -or
+      -not $target.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase) -or
+      -not (Test-Path -LiteralPath $target -PathType Leaf)) { continue }
+  try {
+    Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) -ErrorAction Stop
+    exit 0
+  } catch { continue }
+}
+exit 4
 '@
   Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Launch.ps1') -Value $launchScript -Encoding UTF8
   # Install the stable entry before updating the pointer. No executable is
   # ever modified while running; the .cmd lives in application support.
   Set-Content -LiteralPath $entry -Value $entryContent -Encoding ASCII
+  # Retain a known-good executable for the stable launcher if a release
+  # folder is removed after an otherwise successful update.
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Previous.txt') -Value $PreviousExe -Encoding UTF8
+  }
   $pendingPointer = "$pointer.new"
   Set-Content -LiteralPath $pendingPointer -Value $NextExe -Encoding UTF8
   Move-Item -LiteralPath $pendingPointer -Destination $pointer -Force

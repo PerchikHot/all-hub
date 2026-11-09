@@ -763,8 +763,19 @@ foreach ($file in @($pointer, $backup)) {
   if (-not $target -or -not [IO.Path]::IsPathRooted($target) -or
       -not $target.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase) -or
       -not (Test-Path -LiteralPath $target -PathType Leaf)) { continue }
+  # A Flutter Windows build needs its runtime beside the EXE. A valid
+  # executable alone is not enough: missing DLL/assets cause a dead shortcut.
+  $bundle = Split-Path -Parent $target
+  if (-not (Test-Path -LiteralPath (Join-Path $bundle 'flutter_windows.dll') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\icudtl.dat') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\flutter_assets') -PathType Container)) { continue }
   try {
-    Start-Process -FilePath $target -WorkingDirectory (Split-Path -Parent $target) -ErrorAction Stop
+    $process = Start-Process -FilePath $target -WorkingDirectory $bundle -PassThru -ErrorAction Stop
+    # Start-Process succeeding does not mean Flutter actually started. If it
+    # crashes immediately, try the last known-good build instead.
+    if ($process.WaitForExit(3000)) {
+      if ($process.ExitCode -ne 0) { continue }
+    }
     exit 0
   } catch { continue }
 }

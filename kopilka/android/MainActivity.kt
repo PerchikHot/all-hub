@@ -2,11 +2,25 @@ package com.veyrion.kopilka_app
 import android.content.ComponentName
 import android.content.Intent
 import android.provider.Settings
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    // Android can retain notification access without ever binding the service
+    // after an APK update. Keep recovery alive while the dashboard is visible,
+    // instead of making a single attempt when the settings screen closes.
+    private val recoveryHandler = Handler(Looper.getMainLooper())
+    private val recoveryTick = object : Runnable {
+        override fun run() {
+            if (!isFinishing && !isDestroyed) {
+                requestListenerReconnect()
+                recoveryHandler.postDelayed(this, 60_000L)
+            }
+        }
+    }
     // A user-controlled Android permission, not proof that the service is
     // currently connected or that any bank has posted a notification.
     private fun isListenerPermissionGranted(): Boolean {
@@ -47,7 +61,13 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        requestListenerReconnect()
+        recoveryHandler.removeCallbacks(recoveryTick)
+        recoveryHandler.post(recoveryTick)
+    }
+
+    override fun onPause() {
+        recoveryHandler.removeCallbacks(recoveryTick)
+        super.onPause()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

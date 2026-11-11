@@ -336,6 +336,18 @@ class HubService {
         if (rawAsset is! Map<String, dynamic>) continue;
         if (!isPublishedReleaseAsset(rawAsset)) continue;
         final name = (rawAsset['name'] ?? '').toString();
+        final lowerName = name.toLowerCase();
+        // Filter by app BEFORE choosing the newest usable release.
+        // Otherwise a newer Kopilka ZIP/APK can shadow the last valid
+        // All Hub bundle and make its one-click update disappear.
+        if (projectId == 'all-hub' &&
+            !(lowerName.startsWith('allhub-') ||
+              lowerName.startsWith('all-hub-'))) {
+          continue;
+        }
+        if (projectId == 'kopilka' && !lowerName.startsWith('kopilka-')) {
+          continue;
+        }
         final platform = assetPlatform(name);
         final url = (rawAsset['browser_download_url'] ?? '').toString();
         if (platform == null || !isProductionInstallAsset(name) ||

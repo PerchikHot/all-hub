@@ -1,0 +1,5 @@
+analyzer:
+  errors:
+    # Flutter 3.50 deprecates material.dart globally. Keep build verification
+    # working while the UI migrates to material_ui in a dedicated change.
+    deprecated_member_use: ignore

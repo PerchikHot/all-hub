@@ -351,8 +351,17 @@ class HubService {
             releaseNotes: notes, sha256Digest: digest));
       }
       for (final platform in const ['android', 'windows']) {
-        final candidates = thisRelease.where(
-          (asset) => asset.platform == platform).toList();
+        final candidates = thisRelease.where((asset) {
+          if (asset.platform != platform) return false;
+          // Self-updating Flutter Windows requires the complete runtime ZIP.
+          // A newer EXE-only release is not installable: continue looking for
+          // the latest complete Windows bundle instead of offering a button
+          // that inevitably fails after downloading the executable.
+          if (projectId == 'all-hub' && platform == 'windows') {
+            return asset.name.toLowerCase().endsWith('.zip');
+          }
+          return true;
+        }).toList();
         if (candidates.isEmpty) continue;
         final existing = selectedByPlatform[platform];
         if (existing == null ||

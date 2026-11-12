@@ -1,43 +1,30 @@
 {
-  "run_id": 43113984845,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/43113984845",
-  "conclusion": "success",
-  "head_sha": "5aa5a996d31b7608353badf88322bd8201773295",
+  "run_id": 43311703309,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/43311703309",
+  "conclusion": "failure",
+  "head_sha": "776835d6745ae2c7b23b55a17e0f5f677de90b7a",
   "jobs": [
     {
       "name": "android",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43113984845/job/130837076540",
-      "id": 130837076540
+      "conclusion": "failure",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43311703309/job/131509146984",
+      "id": 131509146984
     },
     {
       "name": "windows",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43113984845/job/130837077015",
-      "id": 130837077015
+      "conclusion": "failure",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43311703309/job/131509147428",
+      "id": 131509147428
     },
     {
       "name": "Publish verified Android and Windows pair",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43113984845/job/130841328105",
-      "id": 130841328105
+      "conclusion": "skipped",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/43311703309/job/131510933070",
+      "id": 131510933070
     }
   ],
-  "artifacts": [
-    {
-      "name": "AllHub-Android-release",
-      "size_in_bytes": 29701638,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/13898495761/zip"
-    },
-    {
-      "name": "AllHub-Windows",
-      "size_in_bytes": 13080321,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/13897393381/zip"
-    }
-  ]
+  "artifacts": []
 }

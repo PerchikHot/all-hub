@@ -817,7 +817,14 @@ exit 4
                 [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
           if ([string]::Equals($existingTarget, $entry,
                 [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
-          if ($existingTarget -match '(?i)[\\/]all[-_ ]?hub(?:\\.exe)?
+          # A matching name is not proof of ownership. Only migrate links
+          # targeting the known previous executable or stable launcher.
+        }
+        if (-not $owned) { continue }
+      }
+      $shortcut.TargetPath = $entry
+      $shortcut.WorkingDirectory = $supportRoot
+      $shortcut.Save()
     } catch {
       # Shortcuts are optional; failure must not roll back a healthy update.
     }

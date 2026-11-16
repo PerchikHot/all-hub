@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
+import 'package:image/image.dart' as img;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -32,10 +33,20 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     super.dispose();
   }
 
+  Uint8List? convertToPng(Uint8List bytes) {
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return null;
+      return Uint8List.fromList(img.encodePng(decoded));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> addPhotos() async {
     final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['png'],
+      allowedExtensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'],
       allowMultiple: true,
       withData: true,
     );
@@ -44,10 +55,10 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     try {
     for (final file in picked.files) {
       final bytes = file.bytes ?? (file.path == null ? null : await File(file.path!).readAsBytes());
-      if (bytes == null || bytes.length < 8 || bytes[0] != 137 || bytes[1] != 80 || bytes[2] != 78 || bytes[3] != 71) {
-        throw FormatException('Файл ${file.name} не является PNG');
-      }
-      added.add(bytes);
+      if (bytes == null) throw FormatException('Не удалось прочитать ${file.name}');
+      final png = convertToPng(bytes);
+      if (png == null) throw FormatException('Неподдерживаемое изображение: ${file.name}');
+      added.add(png);
     }
     if (mounted) setState(() => photos.addAll(added));
     } catch (e) {
@@ -70,14 +81,10 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       for (final entry in archive.files) {
         if (!entry.isFile) continue;
         final lower = entry.name.toLowerCase();
-        if (!lower.endsWith('.png') && !lower.endsWith('.dat')) continue;
+        if (!RegExp(r'\\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff|dat)$').hasMatch(lower)) continue;
         final data = Uint8List.fromList(entry.content as List<int>);
-        if (data.length >= 8 && data[0] == 137 && data[1] == 80 &&
-            data[2] == 78 && data[3] == 71 &&
-            data[4] == 13 && data[5] == 10 &&
-            data[6] == 26 && data[7] == 10) {
-          imported.add(data);
-        }
+        final png = convertToPng(data);
+        if (png != null) imported.add(png);
       }
       if (imported.isEmpty) {
         throw const FormatException('В ZIP нет PNG-изображений');
@@ -291,9 +298,9 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       TextField(controller: category, decoration: const InputDecoration(labelText: 'Категория')),
       const SizedBox(height: 16),
       OutlinedButton.icon(onPressed: busy ? null : addPhotos,
-        icon: const Icon(Icons.add_photo_alternate), label: const Text('Добавить PNG')),
+        icon: const Icon(Icons.add_photo_alternate), label: const Text('Добавить изображение')),
       OutlinedButton.icon(onPressed: busy ? null : addPhotosFromZip,
-        icon: const Icon(Icons.archive_outlined), label: const Text('Добавить фотографии из ZIP')),
+        icon: const Icon(Icons.archive_outlined), label: const Text('Импорт PNG/JPG/WebP/GIF из ZIP')),
       const SizedBox(height: 8),
       Text('Изображений: ${photos.length}'),
       const SizedBox(height: 12),

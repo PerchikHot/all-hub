@@ -123,9 +123,53 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
         templateRoot = root;
         templatePhotoNames = names;
         templateError = null;
+        editedEvents.clear();
       });
     } catch (e) {
       if (mounted) setState(() => templateError = '$e');
+    }
+  }
+
+  final Map<String, String> editedEvents = {};
+
+  Future<void> editEventJson() async {
+    if (templateBytes == null || templateRoot == null) return;
+    try {
+      final archive = ZipDecoder().decodeBytes(templateBytes!);
+      final files = archive.files.where((f) => f.isFile &&
+        f.name.startsWith(templateRoot!) && f.name.endsWith('.json')).toList();
+      if (files.isEmpty) throw const FormatException('Нет JSON-событий');
+      final chosen = await showDialog<String>(context: context, builder: (ctx) =>
+        SimpleDialog(title: const Text('Выбери JSON-событие'),
+          children: files.map((f) => SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, f.name),
+            child: Text(f.name.split('/').last))).toList()));
+      if (chosen == null || !mounted) return;
+      final file = files.firstWhere((f) => f.name == chosen);
+      final controller = TextEditingController(text: editedEvents[chosen] ??
+        utf8.decode(file.content as List<int>, allowMalformed: true));
+      final result = await showDialog<String>(context: context, builder: (ctx) =>
+        AlertDialog(title: Text(chosen.split('/').last),
+          content: SizedBox(width: 600, child: TextField(
+            controller: controller, minLines: 10, maxLines: 18)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена')),
+            FilledButton(onPressed: () {
+              try {
+                jsonDecode(controller.text);
+                Navigator.pop(ctx, controller.text);
+              } catch (_) {
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                  content: Text('Ошибка синтаксиса JSON')));
+              }
+            }, child: const Text('Сохранить')),
+          ]));
+      controller.dispose();
+      if (result != null && mounted) setState(() => editedEvents[chosen] = result);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка редактора: $e')));
     }
   }
 
@@ -142,7 +186,9 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     final result = Archive();
     for (final file in source.files) {
       if (!file.isFile) continue;
-      final bytes = replacement[file.name] ?? Uint8List.fromList(file.content as List<int>);
+      final bytes = editedEvents.containsKey(file.name)
+          ? Uint8List.fromList(utf8.encode(editedEvents[file.name]!))
+          : replacement[file.name] ?? Uint8List.fromList(file.content as List<int>);
       result.addFile(ArchiveFile(file.name, bytes.length, bytes));
     }
     final encoded = Uint8List.fromList(ZipEncoder().encode(result));
@@ -231,6 +277,9 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       OutlinedButton.icon(onPressed: busy ? null : importTemplate,
         icon: const Icon(Icons.folder_zip_outlined), label: const Text('Открыть ZIP-шаблон')),
       if (templateName != null) Text('Шаблон: $templateName (${templatePhotoNames.length} фотографий)'),
+      if (templateName != null) OutlinedButton.icon(onPressed: busy ? null : editEventJson,
+        icon: const Icon(Icons.edit_note), label: const Text('Редактировать JSON-события')),
+      if (editedEvents.isNotEmpty) Text('Изменено событий: ${editedEvents.length}'),
       if (templateError != null) Text(templateError!, style: const TextStyle(color: Colors.redAccent)),
       if (templateName != null) TextButton(onPressed: busy ? null : () => setState(() {
         templateBytes = null; templateName = null; templateRoot = null; templatePhotoNames = [];

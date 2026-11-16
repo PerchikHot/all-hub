@@ -1,15 +1,21 @@
-# All Hub v0.1.0
+# All Hub 0.8.0
 
-Cross-platform Flutter project launcher for Android and Windows.
+Кроссплатформенный лаунчер для Android и Windows.
 
-Features: project catalog, GitHub release checks, CI status, and links to downloads.
+## Обновления внутри лаунчера
+На вкладке «Проекты» выбери All Hub и нажми «Обновить», когда GitHub Release опубликует новую версию. На Android система предложит установить APK; на Windows приложение передаёт обновление отдельному процессу и перезапускается. Нужны опубликованные файлы релиза, а не только исходный код или GitHub Actions artifact.
 
-## Build
+## Snapshot Pack Creator
+Вкладка «Snapshot»: создание фотопаков, импорт ZIP-шаблонов, импорт изображений PNG/JPEG/WebP/GIF/BMP/TIFF из файлов и ZIP, конвертация в PNG, редактирование JSON-событий с проверкой синтаксиса, экспорт ZIP. Анимированные изображения экспортируются как статичный кадр.
 
+**Важно:** совместимость созданных с нуля паков с конкретной версией Snapshot пока не подтверждена игровым тестом. Для надёжного сохранения структуры рекомендуется импортировать рабочий шаблон.
+
+## Сборка
 ```bash
 flutter create --platforms=android,windows --project-name all_hub .
 flutter pub get
+flutter analyze
 flutter run
 ```
 
-GitHub Actions builds Android APK and Windows desktop bundles. The initial version does not yet install or update apps automatically.
+GitHub Actions собирает Android APK и Windows portable ZIP, а затем публикует релиз, только если обе платформы собраны успешно.

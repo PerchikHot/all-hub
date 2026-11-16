@@ -13,6 +13,7 @@ import 'development_center.dart';
 import 'project_covers.dart';
 import 'ai_models_page.dart';
 import 'media_search_page.dart';
+import 'snapshot_pack_creator_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -453,7 +454,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Row(children: [HubAvatar(size: 32), SizedBox(width: 10), Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))]), actions: [IconButton(tooltip: 'Обновить каталог', onPressed: refresh, icon: const Icon(Icons.refresh_rounded))]),
-    body: tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? const MediaSearchPage() : tab == 4 ? _settings() :
+    body: tab == 5 ? const SnapshotPackCreatorPage() : tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? const MediaSearchPage() : tab == 4 ? _settings() :
       FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
       if (!snap.hasData) return const Center(child: CircularProgressIndicator());
@@ -791,6 +792,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'ИИ'),
       NavigationDestination(icon: Icon(Icons.travel_explore), label: 'Медиа'),
       NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
+      NavigationDestination(icon: Icon(Icons.photo_library_outlined), label: 'Snapshot'),
     ]),
   );
 }

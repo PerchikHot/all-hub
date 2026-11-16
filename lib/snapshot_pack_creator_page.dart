@@ -56,6 +56,43 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
   }
 
 
+  Future<void> addPhotosFromZip() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['zip'], withData: true);
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.single;
+      final bytes = file.bytes ??
+          (file.path == null ? null : await File(file.path!).readAsBytes());
+      if (bytes == null) throw const FormatException('ZIP недоступен');
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final imported = <Uint8List>[];
+      for (final entry in archive.files) {
+        if (!entry.isFile) continue;
+        final lower = entry.name.toLowerCase();
+        if (!lower.endsWith('.png') && !lower.endsWith('.dat')) continue;
+        final data = Uint8List.fromList(entry.content as List<int>);
+        if (data.length >= 8 && data[0] == 137 && data[1] == 80 &&
+            data[2] == 78 && data[3] == 71 &&
+            data[4] == 13 && data[5] == 10 &&
+            data[6] == 26 && data[7] == 10) {
+          imported.add(data);
+        }
+      }
+      if (imported.isEmpty) {
+        throw const FormatException('В ZIP нет PNG-изображений');
+      }
+      if (mounted) {
+        setState(() => photos.addAll(imported));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Добавлено из ZIP: ${imported.length}')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка импорта ZIP: $e')));
+    }
+  }
+
   Future<void> importTemplate() async {
     try {
       final picked = await FilePicker.platform.pickFiles(
@@ -206,6 +243,8 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       const SizedBox(height: 16),
       OutlinedButton.icon(onPressed: busy ? null : addPhotos,
         icon: const Icon(Icons.add_photo_alternate), label: const Text('Добавить PNG')),
+      OutlinedButton.icon(onPressed: busy ? null : addPhotosFromZip,
+        icon: const Icon(Icons.archive_outlined), label: const Text('Добавить фотографии из ZIP')),
       const SizedBox(height: 8),
       Text('Изображений: ${photos.length}'),
       const SizedBox(height: 12),

@@ -83,6 +83,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
         final lower = entry.name.toLowerCase();
         if (!RegExp(r'\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff|dat)$').hasMatch(lower)) continue;
         final data = Uint8List.fromList(entry.content as List<int>);
+        final png = convertToPng(data);
         if (png != null) imported.add(png);
       }
       if (imported.isEmpty) {

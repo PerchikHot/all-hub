@@ -43,7 +43,10 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     final added = <Uint8List>[];
     for (final file in picked.files) {
       final bytes = file.bytes ?? (file.path == null ? null : await File(file.path!).readAsBytes());
-      if (bytes != null && bytes.isNotEmpty) added.add(bytes);
+      if (bytes == null || bytes.length < 8 || bytes[0] != 137 || bytes[1] != 80 || bytes[2] != 78 || bytes[3] != 71) {
+        throw FormatException('Файл ${file.name} не является PNG');
+      }
+      added.add(bytes);
     }
     if (mounted) setState(() => photos.addAll(added));
   }

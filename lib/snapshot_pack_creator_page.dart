@@ -110,31 +110,6 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       content: Text(saved == null ? 'Сохранение отменено' : 'ZIP сохранён: $saved')));
   }
 
-  Future<void> exportTemplate() async {
-    if (templateBytes == null || templateRoot == null || photos.isEmpty) {
-      throw const FormatException('Выбери ZIP-шаблон и добавь фотографии');
-    }
-    final source = ZipDecoder().decodeBytes(templateBytes!);
-    final root = templateRoot!;
-    final replacement = <String, Uint8List>{};
-    for (var i = 0; i < photos.length && i < templatePhotoNames.length; i++) {
-      replacement['${root}Data/${templatePhotoNames[i]}.dat'] = photos[i];
-    }
-    final result = Archive();
-    for (final file in source.files) {
-      if (!file.isFile) continue;
-      final bytes = replacement[file.name] ?? Uint8List.fromList(file.content as List<int>);
-      result.addFile(ArchiveFile(file.name, bytes.length, bytes));
-    }
-    final encoded = Uint8List.fromList(ZipEncoder().encode(result));
-    final saved = await FilePicker.platform.saveFile(
-      dialogTitle: 'Экспорт ZIP по шаблону',
-      fileName: 'Snapshot_Custom_Template.zip',
-      type: FileType.custom, allowedExtensions: ['zip'], bytes: encoded);
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(saved == null ? 'Сохранение отменено' : 'ZIP сохранён: $saved')));
-  }
-
   String safeId(String input) {
     final value = input.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
     return value.isEmpty ? 'customSnapshotPack' : value;
@@ -148,6 +123,10 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     }
     setState(() => busy = true);
     try {
+      if (templateBytes != null) {
+        await exportTemplate();
+        return;
+      }
       final id = safeId(packId.text);
       final root = 'Snapshot_Pack_$id';
       final names = List.generate(photos.length, (i) => 'custom_photo_${(i + 1).toString().padLeft(3, '0')}');
@@ -205,6 +184,13 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       const Text('Создай собственный фотопак для Snapshot',
         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
       const SizedBox(height: 16),
+      OutlinedButton.icon(onPressed: busy ? null : importTemplate,
+        icon: const Icon(Icons.folder_zip_outlined), label: const Text('Открыть ZIP-шаблон')),
+      if (templateName != null) Text('Шаблон: $templateName (${templatePhotoNames.length} фотографий)'),
+      if (templateError != null) Text(templateError!, style: const TextStyle(color: Colors.redAccent)),
+      if (templateName != null) TextButton(onPressed: busy ? null : () => setState(() {
+        templateBytes = null; templateName = null; templateRoot = null; templatePhotoNames = [];
+      }), child: const Text('Создать новый пак')),
       TextField(controller: title, decoration: const InputDecoration(labelText: 'Название пака')),
       const SizedBox(height: 12),
       TextField(controller: packId, decoration: const InputDecoration(labelText: 'ID пака (латиница)')),
@@ -232,7 +218,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       const SizedBox(height: 20),
       FilledButton.icon(onPressed: busy ? null : exportPack,
         icon: const Icon(Icons.archive_outlined),
-        label: Text(busy ? 'Сборка...' : 'Собрать и сохранить ZIP')),
+        label: Text(busy ? 'Сборка...' : templateBytes != null ? 'Экспорт по шаблону' : 'Собрать и сохранить ZIP')),
       const SizedBox(height: 12),
       const Text('Экспериментальный формат на основе PhotoOpps. Совместимость с импортом игры требует проверки.',
         style: TextStyle(color: Colors.grey)),

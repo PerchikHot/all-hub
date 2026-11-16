@@ -81,8 +81,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       for (final entry in archive.files) {
         if (!entry.isFile) continue;
         final lower = entry.name.toLowerCase();
-        if (!RegExp(r'\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff|dat)
-        final data = Uint8List.fromList(entry.content as List<int>);
+        if (!RegExp(r'\.(png|jpg|jpeg|webp|gif|bmp|tif|tiff|dat)        final data = Uint8List.fromList(entry.content as List<int>);
         final png = convertToPng(data);
         if (png != null) imported.add(png);
       }
@@ -332,7 +331,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
         if (png != null) imported.add(png);
       }
       if (imported.isEmpty) {
-        throw const FormatException('В ZIP нет PNG-изображений');
+        throw const FormatException('В ZIP нет поддерживаемых изображений');
       }
       if (mounted) {
         setState(() => photos.addAll(imported));
@@ -426,8 +425,8 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
   }
 
   Future<void> exportTemplate() async {
-    if (templateBytes == null || templateRoot == null || photos.isEmpty) {
-      throw const FormatException('Выбери ZIP-шаблон и добавь фотографии');
+    if (templateBytes == null || templateRoot == null) {
+      throw const FormatException('Выбери ZIP-шаблон');
     }
     final source = ZipDecoder().decodeBytes(templateBytes!);
     final root = templateRoot!;
@@ -458,7 +457,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
   }
 
   Future<void> exportPack() async {
-    if (photos.isEmpty) {
+    if (photos.isEmpty && (templateBytes == null || editedEvents.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Сначала добавь изображения')));
       return;
@@ -534,7 +533,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       if (editedEvents.isNotEmpty) Text('Изменено событий: ${editedEvents.length}'),
       if (templateError != null) Text(templateError!, style: const TextStyle(color: Colors.redAccent)),
       if (templateName != null) TextButton(onPressed: busy ? null : () => setState(() {
-        templateBytes = null; templateName = null; templateRoot = null; templatePhotoNames = [];
+        templateBytes = null; templateName = null; templateRoot = null; templatePhotoNames = []; editedEvents.clear();
       }), child: const Text('Создать новый пак')),
       TextField(controller: title, decoration: const InputDecoration(labelText: 'Название пака')),
       const SizedBox(height: 12),

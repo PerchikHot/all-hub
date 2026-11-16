@@ -41,6 +41,7 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     );
     if (picked == null || !mounted) return;
     final added = <Uint8List>[];
+    try {
     for (final file in picked.files) {
       final bytes = file.bytes ?? (file.path == null ? null : await File(file.path!).readAsBytes());
       if (bytes == null || bytes.length < 8 || bytes[0] != 137 || bytes[1] != 80 || bytes[2] != 78 || bytes[3] != 71) {
@@ -49,6 +50,9 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       added.add(bytes);
     }
     if (mounted) setState(() => photos.addAll(added));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка изображения: $e')));
+    }
   }
 
 

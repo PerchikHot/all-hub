@@ -129,14 +129,24 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
   List<String> relevantMemory(String query) {
     if (!memoryEnabled) return const [];
-    final words = RegExp(r'[а-яёa-z0-9]{3,}', caseSensitive: false)
-        .allMatches(query.toLowerCase()).map((m) => m.group(0)!).toSet();
-    final ranked = memoryNotes.map((note) {
-      final lower = note.toLowerCase();
-      final score = words.where((word) => lower.contains(word)).length;
-      return (note: note, score: score);
-    }).where((item) => item.score > 0).toList()
-      ..sort((a, b) => b.score.compareTo(a.score));
+    // Match complete words, not substrings: «кот» must not match «котлета».
+    // Ignore common short words and keep a deterministic order for ties.
+    final tokenizer = RegExp(r'[а-яёa-z0-9]{3,}', caseSensitive: false);
+    final words = tokenizer.allMatches(query.toLowerCase())
+        .map((m) => m.group(0)!).toSet();
+    if (words.isEmpty) return const [];
+    final ranked = <({String note, int score, int index})>[];
+    for (var i = 0; i < memoryNotes.length; i++) {
+      final note = memoryNotes[i];
+      final tokens = tokenizer.allMatches(note.toLowerCase())
+          .map((m) => m.group(0)!).toSet();
+      final score = words.intersection(tokens).length;
+      if (score > 0) ranked.add((note: note, score: score, index: i));
+    }
+    ranked.sort((a, b) {
+      final scoreOrder = b.score.compareTo(a.score);
+      return scoreOrder != 0 ? scoreOrder : a.index.compareTo(b.index);
+    });
     return ranked.take(5).map((item) => item.note).toList();
   }
   Future<void> send() async {

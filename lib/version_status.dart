@@ -1,9 +1,10 @@
 /// Parse a single published version from release notes. GitHub rolling tags
 /// are channels, not version numbers. Some CI release bodies put Version
 /// after a semicolon (e.g. "Windows ZIP; Version: 1.0.263").
+/// Also recognize Markdown bullet/bold version labels in release bodies.
 String publishedVersionFromRelease(String tag, String? notes) {
   final matches = RegExp(
-    r'(?:^|;)[ \t]*(?:Version|Версия):[ \t]*([vV]?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*(?=\r?$|;)',
+    r'(?:^|;)[ \t]*(?:[-*][ \t]+)?(?:\*\*)?(?:Version|Версия):(?:\*\*)?[ \t]*([vV]?\d+\.\d+\.\d+(?:\+\d+)?)[ \t]*(?=\r?$|;)',
     multiLine: true,
     caseSensitive: false,
   ).allMatches(notes ?? '').map((match) => match.group(1)!).toList();

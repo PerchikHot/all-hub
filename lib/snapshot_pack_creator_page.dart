@@ -180,6 +180,27 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     }
   }
 
+  // On Windows/Linux/macOS the save dialog only selects a destination; it
+  // does not write the supplied bytes. Write and verify the ZIP explicitly.
+  Future<String?> saveZip(String filename, Uint8List bytes, String dialogTitle) async {
+    final selected = await FilePicker.platform.saveFile(
+      dialogTitle: dialogTitle,
+      fileName: filename,
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+      bytes: Platform.isAndroid || Platform.isIOS ? bytes : null,
+    );
+    if (selected == null) return null;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      final destination = File(selected);
+      await destination.writeAsBytes(bytes, flush: true);
+      if (await destination.length() != bytes.length) {
+        throw FileSystemException('ZIP записан не полностью', selected);
+      }
+    }
+    return selected;
+  }
+
   Future<void> exportTemplate() async {
     if (templateBytes == null || templateRoot == null) {
       throw const FormatException('Выбери ZIP-шаблон');
@@ -206,10 +227,8 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       result.addFile(ArchiveFile(file.name, bytes.length, bytes));
     }
     final encoded = Uint8List.fromList(ZipEncoder().encode(result));
-    final saved = await FilePicker.platform.saveFile(
-      dialogTitle: 'Экспорт ZIP по шаблону',
-      fileName: 'Snapshot_Custom_Template.zip',
-      type: FileType.custom, allowedExtensions: ['zip'], bytes: encoded);
+    final saved = await saveZip('Snapshot_Custom_Template.zip', encoded,
+        'Экспорт ZIP по шаблону');
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(saved == null ? 'Сохранение отменено' : 'ZIP сохранён: $saved')));
   }
@@ -262,13 +281,8 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
       }
       add('$root/pack.ini', Uint8List.fromList(utf8.encode(ini.toString())));
       final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
-      final saved = await FilePicker.platform.saveFile(
-        dialogTitle: 'Сохранить Snapshot ZIP',
-        fileName: 'Snapshot_Pack_$id.zip',
-        type: FileType.custom,
-        allowedExtensions: ['zip'],
-        bytes: bytes,
-      );
+      final saved = await saveZip('Snapshot_Pack_$id.zip', bytes,
+          'Сохранить Snapshot ZIP');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(saved == null ? 'Сохранение отменено' : 'ZIP сохранён: $saved')));

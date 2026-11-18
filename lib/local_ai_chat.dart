@@ -128,7 +128,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
     if (mounted) setState(() { memoryNotes..clear()..addAll(next); });
   }
   List<String> relevantMemory(String query) {
-    if (!memoryEnabled || !personalityEnabled) return const [];
+    if (!memoryEnabled) return const [];
     final words = RegExp(r'[а-яёa-z0-9]{3,}', caseSensitive: false)
         .allMatches(query.toLowerCase()).map((m) => m.group(0)!).toSet();
     final ranked = memoryNotes.map((note) {

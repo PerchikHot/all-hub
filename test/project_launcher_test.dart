@@ -70,6 +70,31 @@ void main() {
     }
   });
 
+  test('resumable APK rejects short HTTP 206 bodies even with valid range', () async {
+    final directory = await Directory.systemTemp.createTemp('allhub-short-range-');
+    final file = File('${directory.path}/partial.apk.download');
+    var requests = 0;
+    final client = MockClient((request) async {
+      requests++;
+      expect(request.headers['Range'], 'bytes=2-');
+      return http.Response('x', 206, headers: {
+        'content-range': 'bytes 2-3/4',
+      });
+    });
+    try {
+      await file.writeAsString('ab');
+      await expectLater(
+        ProjectLauncher.downloadResumableApk(
+          client, Uri.parse('https://github.com/example/release.apk'), file),
+        throwsA(isA<HttpException>()),
+      );
+      expect(requests, 5);
+    } finally {
+      client.close();
+      await directory.delete(recursive: true);
+    }
+  });
+
   test('Windows version receipt requires an existing registered EXE', () async {
     final directory = await Directory.systemTemp.createTemp('allhub-receipt-');
     try {

@@ -184,6 +184,13 @@ class _SnapshotPackCreatorPageState extends State<SnapshotPackCreatorPage> {
     if (templateBytes == null || templateRoot == null) {
       throw const FormatException('Выбери ZIP-шаблон');
     }
+    // A template has a fixed set of image IDs referenced by its events.
+    // Never silently discard extra imported images during export.
+    if (photos.length > templatePhotoNames.length) {
+      throw FormatException('В шаблоне ${templatePhotoNames.length} слотов для фото, '
+          'но добавлено ${photos.length}. Удали лишние изображения или '
+          'выбери другой шаблон.');
+    }
     final source = ZipDecoder().decodeBytes(templateBytes!);
     final root = templateRoot!;
     final replacement = <String, Uint8List>{};

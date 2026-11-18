@@ -110,9 +110,15 @@ class _LocalAiChatState extends State<LocalAiChat> {
     try {
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
       final recent = messages.length > 40 ? messages.sublist(messages.length - 40) : messages;
+      // Keep the instruction out of persisted history so switching models or
+      // clearing the chat does not duplicate it. Ollama accepts system roles.
+      final requestMessages = <Map<String, String>>[
+        {'role': 'system', 'content': 'Отвечай на русском языке, если пользователь явно не попросил другой язык. Не выдумывай выполненные действия или доступ к файлам и инструментам.'},
+        ...recent,
+      ];
       final response = await http.post(Uri.parse('$base/api/chat'),
         headers: {'Content-Type':'application/json'},
-        body: jsonEncode({'model':selected,'stream':false,'messages':recent}))
+        body: jsonEncode({'model':selected,'stream':false,'messages':requestMessages}))
         .timeout(const Duration(minutes: 5));
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}: ${response.body}');
       final result = jsonDecode(response.body) as Map<String, dynamic>;

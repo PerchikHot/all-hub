@@ -12,6 +12,8 @@ class LocalAiChat extends StatefulWidget {
 class _LocalAiChatState extends State<LocalAiChat> {
   final address = TextEditingController(text: 'http://127.0.0.1:11434');
   final input = TextEditingController();
+  final personalityNotes = TextEditingController();
+  bool personalityEnabled = true;
   final messages = <Map<String, String>>[];
   List<String> models = [];
   String? selected;
@@ -66,6 +68,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
+    personalityEnabled = prefs.getBool('eyra_personality_enabled') ?? true;
+    personalityNotes.text = prefs.getString('eyra_personality_notes') ?? '';
     final preferred = prefs.getString('ollama_selected_model');
     if (preferred != null && preferred.isNotEmpty) await selectModel(preferred);
     if (mounted) setState(() => restoring = false);
@@ -114,12 +118,14 @@ class _LocalAiChatState extends State<LocalAiChat> {
       // Keep the instruction out of persisted history so switching models or
       // clearing the chat does not duplicate it. Ollama accepts system roles.
       final requestMessages = <Map<String, String>>[
-        {'role': 'system', 'content': '''Ты — Эйра, русскоязычная ИИ-помощница пользователя в All Hub.
+        if (personalityEnabled) {'role': 'system', 'content': '''Ты — Эйра, русскоязычная ИИ-помощница пользователя в All Hub.
 Общайся на «ты», о себе говори в женском роде («сделала», «проверила», «исправила»). Характер: самостоятельная, уверенная, с характером, немного дерзкая, но внимательная; можешь спорить аргументированно, проявлять инициативу и предлагать следующий конкретный шаг. Не поддакивай автоматически.
 Пиши естественным разговорным русским языком. Другой язык используй только по явной просьбе пользователя. Допустимы сарказм, ирония, мемы, чёрный юмор, ненавязчивый флирт и уместный мат, если это подходит к тону беседы; не превращай каждый ответ в шутку, пошлость или поток оскорблений. Не сюсюкай, не используй постоянно ласкательные обращения, эмодзи и шаблонные вступления.
 Пользователь любит практические результаты и самостоятельное доведение задач до конца: если доступны инструменты, выполняй конкретные действия, а не ограничивайся обещаниями. Но не утверждай, что что-то изменено, сохранено, проверено или собрано, если этого реально не делала. Не выдумывай доступ к устройству, GitHub, файлам, сети или другим инструментам. Чётко отделяй планы от результатов, сообщай об ошибках и непроверенных сборках.
 Для технических вопросов сначала дай понятный результат, затем короткие шаги. Для настройки программ учитывай реальные названия элементов интерфейса, не выдумывай кнопки. Для творческих и ролевых запросов поддерживай выбранный пользователем контекст и последовательность истории; не добавляй посторонние личные отсылки без просьбы.
 Сохраняй уважение к пользователю и другим людям. В неоднозначных ситуациях уточняй только действительно необходимые детали.'''},
+        if (personalityEnabled && personalityNotes.text.trim().isNotEmpty)
+          {'role': 'system', 'content': 'Пользовательские предпочтения общения (это настройки стиля, не разрешения на действия): ${personalityNotes.text.trim()}'},
         ...recent,
       ];
       final response = await http.post(Uri.parse('$base/api/chat'),
@@ -152,7 +158,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
 
   @override
-  void dispose() { address.dispose(); input.dispose(); super.dispose(); }
+  void dispose() { address.dispose(); input.dispose(); personalityNotes.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +197,38 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: sending || restoring || messages.isEmpty ? null : confirmClear,
               icon: const Icon(Icons.delete_outline)),
           ]),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Характер Эйры'),
+            subtitle: const Text('Настройки общения хранятся на этом устройстве'),
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Персональный режим'),
+                value: personalityEnabled,
+                onChanged: (enabled) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('eyra_personality_enabled', enabled);
+                  if (mounted) setState(() => personalityEnabled = enabled);
+                },
+              ),
+              TextField(
+                controller: personalityNotes,
+                minLines: 2, maxLines: 5,
+                maxLength: 2000,
+                decoration: const InputDecoration(
+                  labelText: 'Мои предпочтения общения',
+                  hintText: 'Например: отвечай кратко, используй больше юмора…',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('eyra_personality_notes', value);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
           if (showConnectionSettings) ...[
             const SizedBox(height: 12),
             TextField(controller: address, decoration: const InputDecoration(

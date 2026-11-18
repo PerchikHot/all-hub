@@ -86,7 +86,7 @@ void main() {
       await expectLater(
         ProjectLauncher.downloadResumableApk(
           client, Uri.parse('https://github.com/example/release.apk'), file),
-        throwsA(isA<HttpException>()),
+        throwsFormatException,
       );
       expect(requests, 5);
     } finally {

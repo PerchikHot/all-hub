@@ -18,6 +18,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool sending = false;
   bool restoring = true;
   bool checkingConnection = false;
+  bool showConnectionSettings = false;
   int connectionRevision = 0;
   String historyKey(String model) => 'ollama_chat_history_model_$model';
   Future<void> selectModel(String? model) async {
@@ -138,43 +139,117 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (mounted) { setState(() => sending = false); }
     }
   }
+  Future<void> confirmClear() async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Очистить переписку?'),
+      content: const Text('История этой модели будет удалена только из All Hub.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Очистить')),
+      ],
+    ));
+    if (confirmed == true && mounted) await clearMessages();
+  }
+
   @override
   void dispose() { address.dispose(); input.dispose(); super.dispose(); }
+
   @override
-  Widget build(BuildContext context) => Column(children: [
-    Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-      TextField(controller: address, decoration: const InputDecoration(labelText: 'Адрес Ollama (ПК или локальный сервер)', isDense:true)),
-      Row(children: [
-        Expanded(child: DropdownButton<String>(isExpanded:true, value:models.contains(selected) ? selected : null,
-          hint: const Text('Выбери модель'), items: models.map((m) => DropdownMenuItem(value:m,child:Text(m,overflow:TextOverflow.ellipsis))).toList(),
-          onChanged: sending ? null : selectModel)),
-        IconButton(onPressed:checkingConnection ? null : fetchModels,icon:const Icon(Icons.refresh),tooltip:'Найти модели'),
-        IconButton(onPressed:sending || restoring || messages.isEmpty ? null : () async {
-          final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-            title: const Text('Очистить переписку?'),
-            content: const Text('История Ollama будет удалена только из All Hub.'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Очистить')),
-            ],
-          ));
-          if (confirmed == true) await clearMessages();
-        }, icon: const Icon(Icons.delete_outline), tooltip: 'Очистить историю'),
-      ]),
-      if (checkingConnection) const LinearProgressIndicator(),
-      if (Platform.isAndroid) const Padding(padding: EdgeInsets.only(top:8), child: Text('На телефоне 127.0.0.1 означает сам телефон, а не компьютер. Чтобы подключить Ollama на ПК, укажи адрес компьютера в одной Wi-Fi сети, например http://192.168.1.10:11434. Ollama на ПК должна разрешать подключения из локальной сети.')),
-      if (error != null) Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
-    ])),
-    Expanded(child: ListView.builder(padding:const EdgeInsets.all(12),itemCount:messages.length,itemBuilder:(context,index) {
-      final m=messages[index]; final mine=m['role']=='user';
-      return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Card(
-        child:Padding(padding:const EdgeInsets.all(12),child:Text(m['content']??''))));
-    })),
-    if (sending) const LinearProgressIndicator(),
-    SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[
-      Expanded(child:TextField(controller:input, maxLines:3,minLines:1,
-        onSubmitted:(_) => send(),decoration:const InputDecoration(hintText:'Напиши сообщение…',border:OutlineInputBorder()))),
-      IconButton(onPressed:sending || !models.contains(selected) ? null : send,icon:const Icon(Icons.send)),
-    ]))),
-  ]);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final connected = models.isNotEmpty && models.contains(selected);
+    return Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 6), child: Card(
+        child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+          Row(children: [
+            CircleAvatar(child: const Icon(Icons.auto_awesome)),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Эйра', style: theme.textTheme.titleMedium),
+              Text(checkingConnection ? 'Подключаюсь…' : connected ? 'Ollama подключена' : 'Нет подключения',
+                style: TextStyle(color: connected ? Colors.green : theme.colorScheme.onSurfaceVariant)),
+            ])),
+            IconButton(tooltip: 'Обновить модели', onPressed: checkingConnection ? null : fetchModels,
+              icon: const Icon(Icons.refresh)),
+            IconButton(tooltip: 'Настройки подключения',
+              onPressed: () => setState(() => showConnectionSettings = !showConnectionSettings),
+              icon: Icon(showConnectionSettings ? Icons.tune : Icons.settings_outlined)),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: DropdownButtonFormField<String>(
+              isExpanded: true,
+              value: models.contains(selected) ? selected : null,
+              decoration: const InputDecoration(labelText: 'Модель', isDense: true,
+                border: OutlineInputBorder()),
+              hint: const Text('Выбери модель'),
+              items: models.map((m) => DropdownMenuItem(value: m,
+                child: Text(m, overflow: TextOverflow.ellipsis))).toList(),
+              onChanged: sending ? null : selectModel,
+            )),
+            IconButton(tooltip: 'Очистить чат',
+              onPressed: sending || restoring || messages.isEmpty ? null : confirmClear,
+              icon: const Icon(Icons.delete_outline)),
+          ]),
+          if (showConnectionSettings) ...[
+            const SizedBox(height: 12),
+            TextField(controller: address, decoration: const InputDecoration(
+              labelText: 'Адрес Ollama', hintText: 'http://127.0.0.1:11434',
+              border: OutlineInputBorder(), isDense: true)),
+            const SizedBox(height: 8),
+            if (Platform.isAndroid) const Text('Для Ollama на компьютере укажи IP компьютера в одной Wi-Fi сети. 127.0.0.1 на телефоне — это сам телефон.'),
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(
+              onPressed: checkingConnection ? null : fetchModels,
+              icon: const Icon(Icons.link), label: const Text('Подключиться'))),
+          ],
+          if (checkingConnection) const LinearProgressIndicator(),
+        ]))),
+      ),
+      if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Text(error!, style: TextStyle(color: theme.colorScheme.error))),
+      Expanded(child: messages.isEmpty ? Center(child: Padding(
+        padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.forum_outlined, size: 54, color: theme.colorScheme.primary),
+          const SizedBox(height: 12),
+          Text('О чём поболтаем?', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(connected ? 'Пиши как обычно — Эйра на связи.' :
+            'Подключи Ollama и выбери модель, чтобы начать.', textAlign: TextAlign.center),
+        ]))) : ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final m = messages[index];
+            final mine = m['role'] == 'user';
+            return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680),
+                child: Padding(padding: const EdgeInsets.only(bottom: 8), child: Card(
+                  color: mine ? theme.colorScheme.primaryContainer : null,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  child: Padding(padding: const EdgeInsets.all(14), child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium),
+                      const SizedBox(height: 6),
+                      SelectableText(m['content'] ?? ''),
+                    ])),
+                ))));
+          },
+        )),
+      if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16),
+        child: LinearProgressIndicator()),
+      SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(child: TextField(controller: input, maxLines: 5, minLines: 1,
+            textCapitalization: TextCapitalization.sentences,
+            onSubmitted: (_) => send(),
+            decoration: InputDecoration(hintText: 'Сообщение Эйре…',
+              filled: true, border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20))))),
+          const SizedBox(width: 8),
+          IconButton.filled(tooltip: 'Отправить',
+            onPressed: sending || !connected ? null : send,
+            icon: const Icon(Icons.arrow_upward)),
+        ]))),
+    ]);
+  }
 }

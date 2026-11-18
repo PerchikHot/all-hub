@@ -417,7 +417,19 @@ class ProjectLauncher {
           if (!isSafeApkContentRange(range, existing)) {
             throw const FormatException('Сервер вернул неверный диапазон APK');
           }
-          final bounds = RegExp(r'^bytes (\\d+)-(\\d+)/(\\d+)
+          final bounds = RegExp(r'bytes (\d+)-(\d+)/(\d+)')
+              .firstMatch(range!.trim())!;
+          final start = int.parse(bounds.group(1)!);
+          final end = int.parse(bounds.group(2)!);
+          expectedResponseBytes = end - start + 1;
+          totalLength = int.parse(bounds.group(3)!);
+          if (response.contentLength != null &&
+              response.contentLength != expectedResponseBytes) {
+            throw const FormatException('Размер HTTP-диапазона APK не совпадает с заголовком');
+          }
+        } else {
+          totalLength = response.contentLength;
+        }
         if (totalLength != null && totalLength > 256 * 1024 * 1024) {
           throw const FormatException('APK превышает ограничение 256 МиБ');
         }

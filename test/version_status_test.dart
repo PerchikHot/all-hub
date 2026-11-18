@@ -47,6 +47,12 @@ void main() {
       'Windows portable ZIP; version: 1.0.263'), '1.0.263');
     expect(publishedVersionFromRelease('kopilka-windows',
       'Windows portable ZIP; version: 1.0.263; SHA-256: abc'), '1.0.263');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      '- **Version:** 0.8.1+1202'), '0.8.1+1202');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      '* Версия: v0.8.2'), 'v0.8.2');
+    expect(publishedVersionFromRelease('all-hub-latest',
+      '- **Version:** 0.8.1\n- **Version:** 0.8.2'), 'all-hub-latest');
     expect(publishedVersionFromRelease('kopilka-windows', null), 'kopilka-windows');
     expect(publishedVersionFromRelease('all-hub-v0.7.3+859',
       'Version: 0.7.3+860\nVersion: 0.7.3+861'), 'all-hub-v0.7.3+859');

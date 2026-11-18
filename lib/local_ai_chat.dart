@@ -127,6 +127,47 @@ class _LocalAiChatState extends State<LocalAiChat> {
     if (!await prefs.setStringList('eyra_memory_notes', next)) return;
     if (mounted) setState(() { memoryNotes..clear()..addAll(next); });
   }
+  Future<void> editMemoryNote(int index) async {
+    if (index < 0 || index >= memoryNotes.length) return;
+    final controller = TextEditingController(text: memoryNotes[index]);
+    try {
+      final updated = await showDialog<String>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('Изменить заметку'),
+        content: TextField(controller: controller, autofocus: true, maxLines: 4,
+          maxLength: 500, decoration: const InputDecoration(border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Сохранить')),
+        ],
+      ));
+      if (!mounted || updated == null || updated.isEmpty || updated.length > 500 ||
+          index >= memoryNotes.length ||
+          (updated != memoryNotes[index] && memoryNotes.contains(updated))) return;
+      final next = [...memoryNotes];
+      next[index] = updated;
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setStringList('eyra_memory_notes', next)) return;
+      if (mounted) setState(() { memoryNotes..clear()..addAll(next); });
+    } finally {
+      controller.dispose();
+    }
+  }
+  Future<void> clearMemoryNotes() async {
+    if (memoryNotes.isEmpty) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Удалить всю память Эйры?'),
+      content: const Text('Все локальные заметки будут удалены. История переписки останется без изменений.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Удалить всё')),
+      ],
+    ));
+    if (confirmed != true || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setStringList('eyra_memory_notes', const <String>[])) return;
+    if (mounted) setState(() => memoryNotes.clear());
+  }
   List<String> relevantMemory(String query) {
     if (!memoryEnabled) return const [];
     // Match complete words, not substrings: «кот» must not match «котлета».
@@ -308,15 +349,24 @@ class _LocalAiChatState extends State<LocalAiChat> {
                   icon: const Icon(Icons.add_circle_outline),
                 ),
               ]),
+              if (memoryNotes.isNotEmpty)
+                Align(alignment: Alignment.centerRight, child: TextButton.icon(
+                  onPressed: clearMemoryNotes,
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: const Text('Удалить всю память'))),
               for (var i = 0; i < memoryNotes.length; i++)
                 ListTile(
                   dense: true,
                   title: Text(memoryNotes[i]),
-                  trailing: IconButton(
-                    tooltip: 'Удалить заметку',
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => removeMemoryNote(i),
-                  ),
+                  onTap: () => editMemoryNote(i),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(tooltip: 'Изменить заметку',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => editMemoryNote(i)),
+                    IconButton(tooltip: 'Удалить заметку',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => removeMemoryNote(i)),
+                  ]),
                 ),
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),

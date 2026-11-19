@@ -41,14 +41,7 @@ class EyraForgeClient {
     int height = 512,
     int steps = 20,
   }) async {
-    if (prompt.trim().isEmpty || prompt.length > 4000 ||
-        negativePrompt.length > 4000) {
-      throw ArgumentError('Промпт должен содержать от 1 до 4000 символов');
-    }
-    if (width < 256 || width > 1024 || height < 256 || height > 1024 ||
-        width % 8 != 0 || height % 8 != 0 || steps < 1 || steps > 50) {
-      throw ArgumentError('Размер 256–1024 (кратно 8), шаги 1–50');
-    }
+    _validateParameters(prompt, negativePrompt, width, height, steps);
     final response = await _client.post(url('/sdapi/v1/txt2img'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -58,10 +51,65 @@ class EyraForgeClient {
         'batch_size': 1, 'n_iter': 1, 'save_images': false,
       }),
     ).timeout(const Duration(minutes: 8));
+    return _decodeImageResponse(response);
+  }
+
+  /// Edit a user-selected PNG/JPEG. The source is never uploaded until called.
+  Future<Uint8List> edit({
+    required Uint8List source,
+    required String prompt,
+    String negativePrompt = '',
+    int width = 512,
+    int height = 512,
+    int steps = 20,
+    double denoisingStrength = 0.5,
+  }) async {
+    if (source.length < 8 || source.length > 12 * 1024 * 1024 ||
+        !(_isPng(source) || _isJpeg(source))) {
+      throw const FormatException('Выберите PNG/JPEG до 12 МиБ');
+    }
+    if (denoisingStrength < 0.05 || denoisingStrength > 1 ||
+        !denoisingStrength.isFinite) {
+      throw ArgumentError('Сила изменения должна быть от 0.05 до 1');
+    }
+    _validateParameters(prompt, negativePrompt, width, height, steps);
+    final response = await _client.post(url('/sdapi/v1/img2img'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'init_images': [base64Encode(source)],
+        'prompt': prompt.trim(), 'negative_prompt': negativePrompt,
+        'width': width, 'height': height, 'steps': steps,
+        'denoising_strength': denoisingStrength,
+        'batch_size': 1, 'n_iter': 1, 'save_images': false,
+      }),
+    ).timeout(const Duration(minutes: 8));
+    return _decodeImageResponse(response);
+  }
+
+  static bool _isPng(List<int> bytes) => bytes.length >= 8 &&
+    bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 &&
+    bytes[3] == 71 && bytes[4] == 13 && bytes[5] == 10 &&
+    bytes[6] == 26 && bytes[7] == 10;
+  static bool _isJpeg(List<int> bytes) => bytes.length >= 4 &&
+    bytes[0] == 255 && bytes[1] == 216 &&
+    bytes[bytes.length - 2] == 255 && bytes.last == 217;
+
+  static void _validateParameters(String prompt, String negativePrompt,
+      int width, int height, int steps) {
+    if (prompt.trim().isEmpty || prompt.length > 4000 ||
+        negativePrompt.length > 4000) {
+      throw ArgumentError('Промпт должен содержать от 1 до 4000 символов');
+    }
+    if (width < 256 || width > 1024 || height < 256 || height > 1024 ||
+        width % 8 != 0 || height % 8 != 0 || steps < 1 || steps > 50) {
+      throw ArgumentError('Размер 256–1024 (кратно 8), шаги 1–50');
+    }
+  }
+
+  static Uint8List _decodeImageResponse(http.Response response) {
     if (response.statusCode != 200) {
       throw StateError('Forge: HTTP ${response.statusCode}');
     }
-    // Bound decoded memory usage even when a server returns an oversized payload.
     if (response.bodyBytes.length > 24 * 1024 * 1024) {
       throw const FormatException('Ответ Forge превышает 24 МиБ');
     }
@@ -76,9 +124,7 @@ class EyraForgeClient {
       throw const FormatException('Изображение слишком большое');
     }
     final bytes = base64Decode(encoded);
-    if (bytes.length < 8 ||
-        !(bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71) &&
-        !(bytes[0] == 255 && bytes[1] == 216)) {
+    if (!_isPng(bytes) && !_isJpeg(bytes)) {
       throw const FormatException('Forge вернул неподдерживаемое изображение');
     }
     return bytes;

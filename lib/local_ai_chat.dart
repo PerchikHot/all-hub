@@ -358,10 +358,10 @@ class _LocalAiChatState extends State<LocalAiChat> {
       Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 6), child: Card(
         child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
           Row(children: [
-            CircleAvatar(child: const Icon(Icons.auto_awesome)),
+            Container(width: 32, height: 32, decoration: BoxDecoration(color: const Color(0xFF234879), borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB9D9FF), size: 20)),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Эйра', style: theme.textTheme.titleMedium),
+              Text('Локальная модель', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               Text(checkingConnection ? 'Подключаюсь…' : connected ? 'Ollama подключена' : 'Нет подключения',
                 style: TextStyle(color: connected ? Colors.green : theme.colorScheme.onSurfaceVariant)),
             ])),
@@ -608,12 +608,13 @@ class _LocalAiChatState extends State<LocalAiChat> {
         child: Text(error!, style: TextStyle(color: theme.colorScheme.error))),
       Expanded(child: messages.isEmpty ? Center(child: Padding(
         padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.forum_outlined, size: 54, color: theme.colorScheme.primary),
+          Container(width: 76, height: 76, decoration: BoxDecoration(color: const Color(0xFF1C3559), borderRadius: BorderRadius.circular(24)), child: const Icon(Icons.auto_awesome_rounded, size: 38, color: Color(0xFFB9D9FF))),
           const SizedBox(height: 12),
-          Text('О чём поболтаем?', style: theme.textTheme.titleLarge),
+          Text(connected ? 'О чём поговорим?' : 'Эйра ждёт подключения', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), textAlign: TextAlign.center),
           const SizedBox(height: 6),
           Text(connected ? 'Пиши как обычно — Эйра на связи.' :
             'Подключи Ollama и выбери модель, чтобы начать.', textAlign: TextAlign.center),
+           if (!connected) ...[const SizedBox(height: 14), FilledButton.tonalIcon(onPressed: () => setState(() => showConnectionSettings = true), icon: const Icon(Icons.settings_ethernet_rounded), label: const Text('Настроить подключение'))],
         ]))) : ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
           itemCount: messages.length,
@@ -623,11 +624,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
             return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680),
                 child: Padding(padding: const EdgeInsets.only(bottom: 8), child: Card(
-                  color: mine ? theme.colorScheme.primaryContainer : null,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  color: mine ? const Color(0xFF244A83) : const Color(0xFF18283F),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: Radius.circular(mine ? 18 : 5), bottomRight: Radius.circular(mine ? 5 : 18))),
                   child: Padding(padding: const EdgeInsets.all(14), child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium),
+                      Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium?.copyWith(color: const Color(0xFFB5D4FF), fontWeight: FontWeight.w700)),
                       const SizedBox(height: 6),
                       SelectableText(m['content'] ?? ''),
                     ])),

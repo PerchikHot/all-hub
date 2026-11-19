@@ -47,24 +47,11 @@ class EyraChatImageStore {
     // No subdirectories are created by this store; disallow nested paths.
     if (!right.startsWith(left)) return false;
     final name = right.substring(left.length);
-    return RegExp(r'^\d+_\d+\.(png|jpg)).hasMatch(name);
+    return RegExp(r'^\d+_\d+\.(png|jpg)$').hasMatch(name);
   }
 
   Future<void> delete(String path) async {
     if (!owns(path)) return;
-    // Never follow links or remove user-controlled targets.
-    if (await FileSystemEntity.type(path, followLinks: false) !=
-        FileSystemEntityType.file) return;
-    final file = File(path);
-    if (await file.exists()) await file.delete();
-  }
-}
-).hasMatch(name);
-  }
-
-  Future<void> delete(String path) async {
-    if (!owns(path)) return;
-    // Never follow links or remove user-controlled targets.
     if (await FileSystemEntity.type(path, followLinks: false) !=
         FileSystemEntityType.file) return;
     final file = File(path);

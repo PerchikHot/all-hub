@@ -105,6 +105,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int tab = 0;
   String category = 'All';
   String search = '';
+  final TextEditingController searchController = TextEditingController();
   bool showOnlyAvailable = false;
   bool allHubUpdateInProgress = false;
   late Future<List<Project>> projects = _loadProjects();
@@ -133,6 +134,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    searchController.dispose();
     super.dispose();
   }
   final Map<String, Future<GithubInfo>> info = {};
@@ -495,7 +497,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ]),
           ),
           const SizedBox(height: 14),
-          TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
+          TextField(controller: searchController, decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: FilledButton.icon(
@@ -581,6 +583,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               OutlinedButton.icon(
                 onPressed: () => setState(() {
                   search = '';
+                  searchController.clear();
                   category = 'All';
                   showOnlyAvailable = false;
                 }),

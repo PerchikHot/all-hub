@@ -30,28 +30,31 @@ class EyraChatImageStore {
     }
   }
 
-  /// Reject paths outside our private directory, including ../ traversal.
+  /// Only application-owned image paths are eligible for deletion.
+  /// URI normalization uses forward slashes on both Windows and Android;
+  /// Platform.pathSeparator alone is unreliable for mixed Windows paths.
   bool owns(String path) {
-    final root = directory.absolute.path;
-    final candidate = File(path).absolute.path;
-    final normalized = _normalize(candidate);
-    return normalized.startsWith('${_normalize(root)}${Platform.pathSeparator}');
-  }
-
-  String _normalize(String path) {
-    final parts = <String>[];
-    for (final part in path.split(Platform.pathSeparator)) {
-      if (part == '..') {
-        if (parts.isNotEmpty) parts.removeLast();
-      } else if (part.isNotEmpty && part != '.') {
-        parts.add(part);
-      }
-    }
-    return '${Platform.pathSeparator}${parts.join(Platform.pathSeparator)}';
+    if (path.isEmpty) return false;
+    final root = directory.absolute.uri.normalizePath();
+    final candidate = File(path).absolute.uri.normalizePath();
+    final rootPath = root.path.endsWith('/') ? root.path : '${root.path}/';
+    final imagePath = candidate.path;
+    final sameVolume = root.scheme == candidate.scheme &&
+        root.authority.toLowerCase() == candidate.authority.toLowerCase();
+    if (!sameVolume) return false;
+    final left = Platform.isWindows ? rootPath.toLowerCase() : rootPath;
+    final right = Platform.isWindows ? imagePath.toLowerCase() : imagePath;
+    // No subdirectories are created by this store; disallow nested paths.
+    if (!right.startsWith(left)) return false;
+    final name = right.substring(left.length);
+    return RegExp(r'^\\d+_\\d+\\.(png|jpg)$').hasMatch(name);
   }
 
   Future<void> delete(String path) async {
     if (!owns(path)) return;
+    // Never follow links or remove user-controlled targets.
+    if (await FileSystemEntity.type(path, followLinks: false) !=
+        FileSystemEntityType.file) return;
     final file = File(path);
     if (await file.exists()) await file.delete();
   }

@@ -1,5 +1,6 @@
 import 'hub_wait_indicator.dart';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'eyra_forge_client.dart';
@@ -20,6 +21,10 @@ class _EyraForgePageState extends State<EyraForgePage> {
   List<String> models = [];
   Uint8List? image;
   int steps = 20;
+  int imageSize = 512;
+  bool saving = false;
+  String? lastPrompt;
+  String? lastFileName;
 
   @override
   void initState() { super.initState(); restore(); }
@@ -40,9 +45,12 @@ class _EyraForgePageState extends State<EyraForgePage> {
       await prefs.setString('eyra_forge_endpoint', endpoint.text.trim());
       if (generate) {
         final bytes = await client.generate(
-          prompt: prompt.text, negativePrompt: negative.text, steps: steps);
+          prompt: prompt.text, negativePrompt: negative.text, steps: steps,
+          width: imageSize, height: imageSize);
         if (mounted) setState(() {
           image = bytes;
+          lastPrompt = prompt.text.trim();
+          lastFileName = null;
           status = 'Изображение получено. Оно пока только в памяти приложения.';
         });
       } else {
@@ -58,6 +66,37 @@ class _EyraForgePageState extends State<EyraForgePage> {
     } finally {
       client?.close();
       if (mounted) setState(() => busy = false);
+    }
+  }
+
+  /// Explicit user-initiated export; generated images are never written in the
+  /// background. The picker owns the destination and can be cancelled safely.
+  Future<void> saveGeneratedImage() async {
+    final bytes = image;
+    if (busy || saving || bytes == null) return;
+    setState(() => saving = true);
+    try {
+      final extension = bytes.length >= 8 && bytes[0] == 137 && bytes[1] == 80
+          ? 'png' : 'jpg';
+      final suggested = 'eyra-forge-${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final saved = await FilePicker.platform.saveFile(
+        dialogTitle: 'Сохранить изображение Forge',
+        fileName: suggested,
+        type: FileType.custom,
+        allowedExtensions: [extension],
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      setState(() {
+        lastFileName = saved;
+        status = saved == null
+            ? 'Сохранение отменено — изображение осталось в приложении.'
+            : 'Изображение сохранено: $saved';
+      });
+    } catch (e) {
+      if (mounted) setState(() => status = 'Не удалось сохранить изображение: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
     }
   }
 
@@ -88,6 +127,18 @@ class _EyraForgePageState extends State<EyraForgePage> {
       Text('Шаги: $steps'),
       Slider(value: steps.toDouble(), min: 5, max: 40, divisions: 7,
         onChanged: busy ? null : (v) => setState(() => steps = v.round())),
+      const SizedBox(height: 8),
+      Text('Разрешение: ${imageSize} × ${imageSize}'),
+      SegmentedButton<int>(
+        segments: const [
+          ButtonSegment(value: 512, label: Text('512')),
+          ButtonSegment(value: 768, label: Text('768')),
+          ButtonSegment(value: 1024, label: Text('1024')),
+        ],
+        selected: {imageSize},
+        onSelectionChanged: busy ? null : (values) => setState(() => imageSize = values.first),
+      ),
+      const Text('Большое разрешение требует больше видеопамяти. Для слабого ПК начните с 512.'),
       FilledButton.icon(onPressed: busy ? null : () => run(generate: true),
         icon: const Icon(Icons.auto_awesome), label: const Text('Создать изображение')),
       if (busy) const HubWaitIndicator(),
@@ -97,6 +148,15 @@ class _EyraForgePageState extends State<EyraForgePage> {
         const SizedBox(height: 12),
         Image.memory(image!, fit: BoxFit.contain, errorBuilder: (_, __, ___) =>
           const Text('Не удалось отобразить полученное изображение')),
+        const SizedBox(height: 8),
+        if (lastPrompt != null) SelectableText('Промпт: $lastPrompt'),
+        FilledButton.tonalIcon(
+          onPressed: busy || saving ? null : saveGeneratedImage,
+          icon: const Icon(Icons.save_alt_rounded),
+          label: Text(saving ? 'Сохранение…' : 'Сохранить PNG/JPEG'),
+        ),
+        if (lastFileName == null)
+          const Text('Файл не сохранён. При закрытии страницы изображение может исчезнуть.'),
       ],
     ]),
   );

@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'hub_liquid_progress.dart';
 import 'hub_wait_indicator.dart';
 import 'project_launcher.dart';
@@ -75,14 +76,38 @@ class GithubApi {
   }
 }
 
-class AllHub extends StatelessWidget {
+class AllHub extends StatefulWidget {
   const AllHub({super.key});
+  @override
+  State<AllHub> createState() => _AllHubState();
+}
+
+class _AllHubState extends State<AllHub> {
+  ThemeMode mode = ThemeMode.system;
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((prefs) {
+      if (!mounted) return;
+      final value = prefs.getString('all_hub_theme_mode');
+      setState(() => mode = value == 'light' ? ThemeMode.light
+          : value == 'dark' ? ThemeMode.dark : ThemeMode.system);
+    });
+  }
+  Future<void> setMode(ThemeMode value) async {
+    setState(() => mode = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('all_hub_theme_mode', value.name);
+  }
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'All Hub', debugShowCheckedModeBanner: false,
-    theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(seedColor: hubPurple, brightness: Brightness.dark),
-      scaffoldBackgroundColor: hubBackground,
+    themeMode: mode,
+    builder: (context, child) => _ThemeControls(
+      mode: mode, onChanged: setMode, child: child!),
+    theme: ThemeData(useMaterial3: true, brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(seedColor: hubPurple, brightness: Brightness.light),
+      scaffoldBackgroundColor: const Color(0xFFF0F4FC),
       cardTheme: CardThemeData(color: hubPanel, elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22),
           side: const BorderSide(color: Color(0xFF263956)))),
@@ -94,7 +119,21 @@ class AllHub extends StatelessWidget {
         backgroundColor: Color(0xFF101B30), indicatorColor: Color(0xFF234A88)),
       appBarTheme: const AppBarTheme(backgroundColor: hubBackground,
         centerTitle: false, surfaceTintColor: Colors.transparent)),
+    darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF739EFF), brightness: Brightness.dark),
+      scaffoldBackgroundColor: const Color(0xFF080F21)),
     home: const HomePage());
+}
+
+class _ThemeControls extends InheritedWidget {
+  const _ThemeControls({required this.mode, required this.onChanged,
+    required super.child});
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onChanged;
+  static _ThemeControls of(BuildContext context) =>
+    context.dependOnInheritedWidgetOfExactType<_ThemeControls>()!;
+  @override
+  bool updateShouldNotify(_ThemeControls old) => mode != old.mode;
 }
 
 class HomePage extends StatefulWidget {
@@ -110,6 +149,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String search = '';
   final TextEditingController searchController = TextEditingController();
   bool showOnlyAvailable = false;
+  bool showCatalogTools = false;
   bool allHubUpdateInProgress = false;
   late Future<List<Project>> projects = _loadProjects();
   @override
@@ -646,34 +686,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
         // Project artwork is the hero; avoid an oversized decorative banner.
         if (tab == 0) ...[
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF101C30),
-              border: Border.all(color: const Color(0xFF29405E)),
-              borderRadius: BorderRadius.circular(16)),
-            child: Row(children: [
-              const Icon(Icons.sync_rounded, color: Color(0xFF9CC6FF), size: 26),
-              const SizedBox(width: 12),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Центр приложений', style: Theme.of(context).textTheme.titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 3),
-                  Text('Проверка релизов при открытии · установка и обновления в карточках',
-                    style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: const Color(0xFFAABDD9))),
-                ],
-              )),
-              IconButton.filledTonal(
-                tooltip: 'Открыть центр обновлений',
-                onPressed: () => showUpdateCenter(items),
-                icon: const Icon(Icons.arrow_forward_rounded)),
-            ]),
-          ),
-          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Text('Мои проекты',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800))),
+            IconButton(
+              tooltip: 'Центр обновлений',
+              onPressed: () => showUpdateCenter(items),
+              icon: const Icon(Icons.system_update_alt_rounded)),
+            IconButton(
+              tooltip: 'Настройки каталога',
+              onPressed: () => setState(() =>
+                showCatalogTools = !showCatalogTools),
+              icon: Icon(showCatalogTools ? Icons.close_rounded
+                : Icons.tune_rounded)),
+          ]),
+          const SizedBox(height: 10),
           TextField(controller: searchController, decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
+          if (showCatalogTools) ...[
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: FilledButton.icon(
@@ -733,10 +763,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               onSelected: (enabled) =>
                 setState(() => showOnlyAvailable = enabled)),
           ]),
+          ],
           const SizedBox(height: 16),
         ],
-        Row(children: [Expanded(child: Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), Text('${(tab == 0 ? filtered : items).length} ПРОЕКТА', style: const TextStyle(color: hubAccent, fontSize: 11, fontWeight: FontWeight.w700))]),
-        const SizedBox(height: 16),
+        if (tab != 0) Row(children: [Expanded(child: Text('Состояние сборок', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), Text('${(tab == 0 ? filtered : items).length} ПРОЕКТА', style: const TextStyle(color: hubAccent, fontSize: 11, fontWeight: FontWeight.w700))]),
+        const SizedBox(height: 12),
         if (tab == 0 && filtered.isEmpty)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),

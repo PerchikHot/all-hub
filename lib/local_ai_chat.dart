@@ -901,7 +901,36 @@ class _LocalAiChatState extends State<LocalAiChat> {
       ),
       if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Text(error!, style: TextStyle(color: theme.colorScheme.error))),
-      Expanded(child: messages.isEmpty ? Center(child: Padding(
+      Expanded(child: LayoutBuilder(builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 1000;
+        return Row(children: [
+          if (wide) SizedBox(width: 258, child: Card(
+            margin: const EdgeInsets.fromLTRB(12, 6, 0, 8),
+            child: Padding(padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: avatarPath == null
+                    ? Container(color: const Color(0xFF18283F),
+                        child: const Center(child: Icon(Icons.face_rounded, size: 90)))
+                    : Image.file(File(avatarPath!), fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) =>
+                          const Center(child: Icon(Icons.broken_image_outlined, size: 56))))),
+                const SizedBox(height: 12),
+                Text('Эйра', style: theme.textTheme.titleLarge,
+                  textAlign: TextAlign.center),
+                Text(selected ?? 'Модель не выбрана', textAlign: TextAlign.center,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(onPressed: chooseAvatar,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('Изменить внешность')),
+                const SizedBox(height: 8),
+                Text(connected ? 'Ollama подключена' : 'Ollama недоступна',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: connected ? Colors.green : theme.colorScheme.error)),
+              ])))),
+          Expanded(child: messages.isEmpty ? Center(child: Padding(
         padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           avatar(size: 76),
           const SizedBox(height: 12),
@@ -945,6 +974,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 ))));
           },
         )),
+        ]);
+      })),
       if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Align(alignment: Alignment.centerLeft, child: HubAiResponding())),
       if (attachedImage != null) Padding(

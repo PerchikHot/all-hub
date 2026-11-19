@@ -6,7 +6,19 @@ List<String> extractChatGptExcerpts(dynamic data) {
   // Repeated text across conversations should not consume the limited local
   // excerpt budget or crowd out other relevant memories.
   final seen = <String>{};
-  for (final conversation in data) {
+  // Prefer recently updated conversations when the local excerpt budget fills.
+  // Missing timestamps retain the original export order.
+  final ordered = data.asMap().entries.toList()..sort((a, b) {
+    num timestamp(dynamic item) {
+      if (item is! Map) return 0;
+      final value = item['update_time'] ?? item['create_time'];
+      return value is num && value.isFinite ? value : 0;
+    }
+    final comparison = timestamp(b.value).compareTo(timestamp(a.value));
+    return comparison != 0 ? comparison : a.key.compareTo(b.key);
+  });
+  for (final entry in ordered) {
+    final conversation = entry.value;
     if (conversation is! Map) continue;
     final mapping = conversation['mapping'];
     if (mapping is! Map) continue;

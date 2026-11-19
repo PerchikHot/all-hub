@@ -707,6 +707,7 @@ class _FeedFallbackImage extends StatefulWidget {
 
 class _FeedFallbackImageState extends State<_FeedFallbackImage> {
   int index = 0;
+  int retryGeneration = 0;
 
   @override
   void didUpdateWidget(covariant _FeedFallbackImage oldWidget) {
@@ -728,6 +729,7 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
     final current = index < candidates.length ? index : candidates.length - 1;
     final url = candidates[current];
     return CachedNetworkImage(
+      key: ValueKey('$url-$retryGeneration'),
       imageUrl: url,
       fit: widget.fit,
       filterQuality: FilterQuality.medium,
@@ -764,7 +766,7 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
               for (final candidate in candidates) {
                 CachedNetworkImage.evictFromCache(candidate);
               }
-              setState(() => index = 0);
+              setState(() { index = 0; retryGeneration++; });
             },
           )),
         );

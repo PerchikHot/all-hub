@@ -10,7 +10,7 @@ Map<String, int> mediaLikedTagWeights(Iterable<Map<String, dynamic>> likes) {
   for (final like in likes) {
     final raw = like['tag_string'];
     if (raw is! String || raw.length > 4096) continue;
-    final unique = raw.split(RegExp(r'\\s+')).where((tag) =>
+    final unique = raw.split(RegExp(r'\s+')).where((tag) =>
       tag.length >= 3 && tag.length <= 80 &&
       RegExp(r'^[a-z0-9_():.\\-]+$').hasMatch(tag) &&
       !_ignoredRecommendationTags.contains(tag)).toSet();
@@ -24,7 +24,7 @@ Map<String, int> mediaLikedTagWeights(Iterable<Map<String, dynamic>> likes) {
 int mediaRecommendationScore(Map<String, dynamic> post, Map<String, int> weights) {
   final raw = post['tag_string'];
   if (raw is! String || raw.length > 4096 || weights.isEmpty) return 0;
-  return raw.split(RegExp(r'\\s+')).toSet().fold<int>(
+  return raw.split(RegExp(r'\s+')).toSet().fold<int>(
     0, (score, tag) => score + (weights[tag] ?? 0));
 }
 

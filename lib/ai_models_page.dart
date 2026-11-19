@@ -1,3 +1,4 @@
+import 'eyra_forge_page.dart';
 import 'eyra_access_page.dart';
 import 'gguf_chat_page.dart';
 import 'dart:io';
@@ -197,6 +198,12 @@ class _AiModelsPageState extends State<AiModelsPage> {
   Widget build(BuildContext context) => Column(children: [
     Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Row(children: [
       const Expanded(child: Text('Эйра · единый помощник', maxLines: 1, overflow: TextOverflow.ellipsis)),
+      TextButton.icon(
+        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+          builder: (_) => const EyraForgePage())),
+        icon: const Icon(Icons.image_outlined),
+        label: const Text('Forge'),
+      ),
       TextButton.icon(
         onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
           builder: (_) => const EyraAccessPage())),

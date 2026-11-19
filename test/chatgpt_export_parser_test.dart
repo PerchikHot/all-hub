@@ -77,6 +77,25 @@ void main() {
     ]);
   });
 
+  test('prioritizes recent conversations even if export is oldest first', () {
+    final export = [
+      {
+        'update_time': 100,
+        'current_node': 'old',
+        'mapping': {'old': node(null, 'user', 'Старое сообщение из архива')},
+      },
+      {
+        'update_time': 200,
+        'current_node': 'new',
+        'mapping': {'new': node(null, 'user', 'Новое сообщение из архива')},
+      },
+    ];
+    expect(extractChatGptExcerpts(export), [
+      'Новое сообщение из архива',
+      'Старое сообщение из архива',
+    ]);
+  });
+
   test('rejects malformed top-level export', () {
     expect(() => extractChatGptExcerpts({'mapping': {}}), throwsFormatException);
   });

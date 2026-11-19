@@ -547,7 +547,21 @@ class _LocalAiChatState extends State<LocalAiChat> {
     await saveMessages();
     try {
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
-      final recent = messages.length > 40 ? messages.sublist(messages.length - 40) : messages;
+      // Keep persisted history intact, but do not feed old repetitive answers
+      // back to Qwen: they reinforce the exact loop the user is reporting.
+      final isEyra41 = selected?.toLowerCase().startsWith('eyra41:') ?? false;
+      final historyWindow = isEyra41 ? 16 : 40;
+      final recentRaw = messages.length > historyWindow
+          ? messages.sublist(messages.length - historyWindow) : messages;
+      final recent = isEyra41
+          ? recentRaw.where((message) {
+              if (message['role'] != 'assistant') return true;
+              final content = (message['content'] ?? '').toLowerCase();
+              return !content.contains('я не та, кто убегает от ответов') &&
+                  !content.contains('я — та, кто делает') &&
+                  !content.contains('я не та, кто скрывается за шаблонами');
+            }).toList()
+          : recentRaw;
       // Keep the instruction out of persisted history so switching models or
       // clearing the chat does not duplicate it. Ollama accepts system roles.
       final recalled = maySendPersonalContext ? relevantMemory(text) : <String>[];

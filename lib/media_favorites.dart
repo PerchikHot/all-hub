@@ -28,6 +28,13 @@ Map<String, dynamic>? safeMediaFavorite(Map<String, dynamic> source) {
       result[key] = value;
     }
   }
+  // Keep only bounded public tag metadata for local recommendations.
+  // Never store the user's searches, browsing history or private files.
+  final tags = source['tag_string'];
+  if (tags is String && tags.length <= 4096 &&
+      !tags.contains(RegExp(r'[\\r\\n\\x00-\\x1f]'))) {
+    result['tag_string'] = tags;
+  }
   if (source['file_ext'] == 'gif') result['file_ext'] = 'gif';
   return result;
 }

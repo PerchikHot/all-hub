@@ -574,6 +574,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     tab = 0;
                                     search = project.name;
                                     searchController.text = project.name;
+                                    selectedProjectId = project.id;
                                     category = 'All';
                                     showOnlyAvailable = false;
                                   });

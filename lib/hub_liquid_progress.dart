@@ -56,32 +56,70 @@ class _LiquidPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final radius = Radius.circular(size.height / 2);
-    final track = RRect.fromRectAndRadius(Offset.zero & size, radius);
-    canvas.drawRRect(track, Paint()..color = const Color(0xFF293C59));
+    final h = size.height;
+    final w = size.width;
+    final track = RRect.fromRectAndRadius(
+      Offset.zero & size, Radius.circular(h / 2),
+    );
+    canvas.drawRRect(track, Paint()..color = const Color(0xFF1C2941));
     canvas.save();
     canvas.clipRRect(track);
 
     final bounded = progress?.isFinite == true
         ? progress!.clamp(0.0, 1.0).toDouble() : null;
-    final width = bounded == null ? size.width * .36 : size.width * bounded;
-    final start = bounded == null
-        ? (size.width + width) * phase - width : 0.0;
-    final path = Path()..moveTo(start, 0);
-    const segments = 48;
-    for (var i = 0; i <= segments; i++) {
-      final x = start + width * i / segments;
-      final wave = math.sin((i / segments * 3 * math.pi) - phase * 2 * math.pi)
-          * math.min(1.3, size.height * .13);
-      path.lineTo(x, size.height * .25 + wave);
+    final fill = bounded == null ? w * .32 : w * bounded;
+    final start = bounded == null ? (w + fill) * phase - fill : 0.0;
+    final end = start + fill;
+
+    // The actual downloaded fraction determines the fill boundary.
+    // Surface motion, viscosity and droplets are purely decorative.
+    final body = Path()..moveTo(start, h);
+    body.lineTo(start, h * .22);
+    const steps = 64;
+    for (var i = 0; i <= steps; i++) {
+      final x = start + fill * i / steps;
+      final ripple = math.sin(x * .065 - phase * math.pi * 2) * h * .035
+          + math.sin(x * .13 + phase * math.pi * 2) * h * .022;
+      body.lineTo(x, h * .20 + ripple);
     }
-    path..lineTo(start + width, size.height)
-        ..lineTo(start, size.height)..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFFF8FBFF));
-    canvas.drawPath(path, Paint()
-      ..color = const Color(0x88FFFFFF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .7);
+    body..lineTo(end, h)..close();
+    canvas.drawPath(body, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: const [Color(0xFFFFFFFF), Color(0xFFF0F2F6),
+          Color(0xFFCDD7E4)],
+      ).createShader(Offset.zero & size));
+
+    // Glossy streaks drift within the filled region.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 4; i++) {
+      final x = start + ((phase * .55 + i * .27) % 1.0) * fill;
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(x, h * .52),
+          width: math.max(3, fill * .12), height: h * .14),
+        Paint()..color = const Color(0x77FFFFFF),
+      );
+    }
+    canvas.restore();
+
+    // A rounded, slightly irregular meniscus and tiny suspended droplets.
+    if (fill > h * .5 && (bounded == null || bounded < 1)) {
+      final tip = end.clamp(0.0, w).toDouble();
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(tip - h * .10, h * .52),
+          width: h * .40, height: h * .72),
+        Paint()..color = const Color(0xFFF4F7FB),
+      );
+      for (var i = 0; i < 3; i++) {
+        final drift = math.sin(phase * math.pi * 2 + i * 2.1);
+        final dx = tip - h * (.20 + i * .28) + drift * h * .08;
+        final dy = h * (.30 + i * .18);
+        canvas.drawCircle(Offset(dx, dy), h * (.045 + i * .012),
+          Paint()..color = const Color(0xDDFBFCFF));
+      }
+    }
     canvas.restore();
   }
 

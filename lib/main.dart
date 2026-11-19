@@ -105,20 +105,22 @@ class _AllHubState extends State<AllHub> {
     themeMode: mode,
     builder: (context, child) => _ThemeControls(
       mode: mode, onChanged: setMode, child: child!),
-    theme: ThemeData(useMaterial3: true, brightness: Brightness.light,
-      colorScheme: ColorScheme.fromSeed(seedColor: hubPurple, brightness: Brightness.light),
+    theme: ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF4978D4),
+        brightness: Brightness.light),
       scaffoldBackgroundColor: const Color(0xFFF0F4FC),
-      cardTheme: CardThemeData(color: hubPanel, elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22),
-          side: const BorderSide(color: Color(0xFF263956)))),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18))),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true, fillColor: const Color(0xFF15223A),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none)),
-      navigationBarTheme: const NavigationBarThemeData(
-        backgroundColor: Color(0xFF101B30), indicatorColor: Color(0xFF234A88)),
-      appBarTheme: const AppBarTheme(backgroundColor: hubBackground,
-        centerTitle: false, surfaceTintColor: Colors.transparent)),
+        filled: true,
+        fillColor: const Color(0xFFFFFFFF),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14))),
+    ),
     darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF739EFF), brightness: Brightness.dark),
       scaffoldBackgroundColor: const Color(0xFF080F21)),
@@ -644,6 +646,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _settings() => ListView(padding: const EdgeInsets.all(20), children: [
         const Text('Настройки', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        const Text('Оформление', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        SegmentedButton<ThemeMode>(
+          segments: const [
+            ButtonSegment(value: ThemeMode.light, label: Text('Светлая'), icon: Icon(Icons.light_mode_outlined)),
+            ButtonSegment(value: ThemeMode.dark, label: Text('Тёмная'), icon: Icon(Icons.dark_mode_outlined)),
+            ButtonSegment(value: ThemeMode.system, label: Text('Система'), icon: Icon(Icons.settings_brightness_rounded)),
+          ],
+          selected: {_ThemeControls.of(context).mode},
+          onSelectionChanged: (value) => _ThemeControls.of(context).onChanged(value.first),
+        ),
+        const Divider(height: 30),
         const ListTile(leading: Icon(Icons.sync), title: Text('Общий каталог Android и Windows'),
           subtitle: Text('Каталог обновляется из GitHub, файлы загрузки выбираются под платформу.')),
         if (Platform.isWindows || Platform.isAndroid) ...[

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// Waiting / refreshing: a looping figure-eight with two rounded lobes and
 /// contrasting dots. Unlike file transfers, this never implies a percentage.
 class HubWaitIndicator extends StatefulWidget {
-  const HubWaitIndicator({super.key, this.size = 54});
+  const HubWaitIndicator({super.key, this.size = 60});
   final double size;
   @override
   State<HubWaitIndicator> createState() => _HubWaitIndicatorState();
@@ -13,7 +13,7 @@ class HubWaitIndicator extends StatefulWidget {
 class _HubWaitIndicatorState extends State<HubWaitIndicator>
     with SingleTickerProviderStateMixin {
   late final AnimationController controller = AnimationController(
-    vsync: this, duration: const Duration(milliseconds: 1500),
+    vsync: this, duration: const Duration(milliseconds: 1050),
   )..repeat();
 
   @override
@@ -54,20 +54,25 @@ class _WaitPainter extends CustomPainter {
       ..color = const Color(0xFFB97E73)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2 * scale;
-    for (final point in [left, right]) {
-      canvas.drawCircle(point, 10 * scale, lobePaint);
-      canvas.drawCircle(point, 10 * scale, outline);
-      canvas.drawCircle(point + Offset(0, 2 * scale), 2.7 * scale,
+    // Alternating elastic bounce: left rises, lands, then right rises.
+    // Both lobes stay visible; each bounce compresses briefly on landing.
+    for (var i = 0; i < 2; i++) {
+      final localPhase = (phase * 2 - i) % 2;
+      final active = localPhase < 1;
+      final progress = active ? localPhase : 0.0;
+      final lift = active ? math.pow(math.sin(progress * math.pi), 1.4).toDouble() * 8 * scale : 0.0;
+      final landing = active && progress > .84
+        ? math.sin((progress - .84) / .16 * math.pi) * .10 : 0.0;
+      final point = (i == 0 ? left : right) - Offset(0, lift);
+      canvas.save();
+      canvas.translate(point.dx, point.dy);
+      canvas.scale(1 + landing, 1 - landing);
+      canvas.drawCircle(Offset.zero, 10 * scale, lobePaint);
+      canvas.drawCircle(Offset.zero, 10 * scale, outline);
+      canvas.drawCircle(Offset(0, 2 * scale), 2.7 * scale,
         Paint()..color = const Color(0xFFB86B79));
+      canvas.restore();
     }
-    // An illuminated bead travels continuously around the figure-eight.
-    final t = phase * math.pi * 2;
-    final x = math.sin(t) * 20 * scale;
-    final y = math.sin(2 * t) * 9 * scale;
-    canvas.drawCircle(center + Offset(x, y), 3 * scale,
-      Paint()..color = const Color(0xFFFFC9A8));
-    canvas.drawCircle(center + Offset(x, y), 1.3 * scale,
-      Paint()..color = Colors.white);
   }
   @override
   bool shouldRepaint(covariant _WaitPainter old) => old.phase != phase;

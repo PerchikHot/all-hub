@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -143,7 +144,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
           )),
         ),
       )),
-      if (generating) const LinearProgressIndicator(),
+      if (generating) const HubLiquidProgress(),
       Padding(padding: const EdgeInsets.all(12), child: Row(children: [
         Expanded(child: TextField(
           controller: input,

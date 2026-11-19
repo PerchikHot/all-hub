@@ -1,4 +1,4 @@
-import 'hub_liquid_progress.dart';
+import 'hub_wait_indicator.dart';
 import 'eyra_forge_page.dart';
 import 'eyra_access_page.dart';
 import 'gguf_chat_page.dart';
@@ -277,7 +277,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     const SizedBox(height: 16),
     FilledButton.icon(onPressed: busy || importing ? null : addModels, icon: const Icon(Icons.add), label: Text(importing ? 'Импортируем модели…' : 'Добавить GGUF-модели')),
     if (importing) ...[
-      HubLiquidProgress(value: importProgress),
+      HubWaitIndicator(value: importProgress),
       if (importingName.isNotEmpty) Text('$importingName — ${(importProgress * 100).toStringAsFixed(0)}%'),
     ],
     const SizedBox(height: 16),

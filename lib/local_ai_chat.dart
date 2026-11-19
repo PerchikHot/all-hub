@@ -1,3 +1,4 @@
+import 'chatgpt_export_parser.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -174,47 +175,6 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
   // ChatGPT exports contain a conversation tree. Only the message text is kept;
   // metadata, identifiers, and unrelated files are never uploaded or persisted.
-  List<String> extractChatGptExcerpts(dynamic data) {
-    if (data is! List) throw const FormatException('Ожидался массив conversations.json');
-    final excerpts = <String>[];
-    for (final conversation in data) {
-      if (conversation is! Map) continue;
-      final mapping = conversation['mapping'];
-      if (mapping is! Map) continue;
-      // Follow only the visible conversation branch. Export mappings also
-      // contain abandoned regenerations and edited-message alternatives.
-      final currentNode = conversation['current_node'];
-      if (currentNode is! String || !mapping.containsKey(currentNode)) continue;
-      final branch = <Map>[];
-      final visited = <String>{};
-      String? cursor = currentNode;
-      while (cursor != null && visited.add(cursor)) {
-        final node = mapping[cursor];
-        if (node is! Map) break;
-        branch.add(node);
-        final parent = node['parent'];
-        cursor = parent is String ? parent : null;
-      }
-      for (final node in branch.reversed) {
-        if (node['message'] is! Map) continue;
-        final message = node['message'] as Map;
-        final author = message['author'];
-        if (author is! Map || !['user', 'assistant'].contains(author['role'])) continue;
-        final content = message['content'];
-        if (content is! Map || content['content_type'] != 'text') continue;
-        final parts = content['parts'];
-        if (parts is! List) continue;
-        for (final part in parts) {
-          if (part is! String) continue;
-          final cleaned = part.replaceAll(RegExp(r'\s+'), ' ').trim();
-          if (cleaned.length < 12) continue;
-          excerpts.add(cleaned.length > 500 ? cleaned.substring(0, 500) : cleaned);
-          if (excerpts.length >= 1000) return excerpts;
-        }
-      }
-    }
-    return excerpts;
-  }
   Future<void> importChatGpt() async {
     if (importBusy) return;
     final picked = await FilePicker.platform.pickFiles(type: FileType.custom,

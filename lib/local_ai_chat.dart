@@ -197,7 +197,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
           content: Text('Копия от ${backup.exportedAt.toLocal()} содержит '
             '${backup.notes.length} заметок и ${backup.excerpts.length} фрагментов. '
             'Сейчас сохранено ${memoryNotes.length} заметок и '
-            '${importedExcerpts.length} фрагментов.\\n\\n'
+            '${importedExcerpts.length} фрагментов.\n\n'
             'Объединить — сохранить текущий характер и добавить только '
             'отсутствующие записи. Заменить — использовать характер и '
             'память из копии. История чата и разрешения не меняются.'),

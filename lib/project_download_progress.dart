@@ -60,10 +60,7 @@ class ProjectDownloadProgress extends StatelessWidget {
                         )),
                       ]),
                       const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: safe,
-                        minHeight: 7,
-                        borderRadius: BorderRadius.circular(12),
+                      HubLiquidProgress(value: safe, height: 12),
                         backgroundColor: const Color(0xFF304262),
                         color: const Color(0xFF65B9FF),
                       ),

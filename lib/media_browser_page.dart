@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -302,7 +303,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       ],
     ),
     body: Column(children: [
-      if (loading || downloading) LinearProgressIndicator(
+      if (loading || downloading) HubLiquidProgress(
         minHeight: 4,
         value: downloading ? mediaTransferProgress(downloadReceived, downloadTotal) : null,
       ),

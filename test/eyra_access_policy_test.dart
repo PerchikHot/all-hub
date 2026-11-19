@@ -27,7 +27,7 @@ void main() {
   testWidgets('diagnostics requires consent and separate confirmation', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: EyraAccessPage()));
     await tester.pumpAndSettle();
-    final button = find.widgetWithText(FilledButton, 'Проверить сейчас');
+    final button = find.byKey(const ValueKey('eyra-run-diagnostics'));
     expect(button, findsOneWidget);
     expect(tester.widget<FilledButton>(button).onPressed, isNull);
 

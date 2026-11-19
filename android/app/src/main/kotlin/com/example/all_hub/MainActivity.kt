@@ -129,6 +129,7 @@ class MainActivity : FlutterActivity() {
                     }
                     "installApk" -> {
                         val apkPath = call.argument<String>("path")
+                        var installStage = "проверка файла"
                         try {
                             val apk = if (apkPath == null) null else File(apkPath)
                             if (apk == null || !apk.isFile || !apk.name.endsWith(".apk")) {
@@ -141,6 +142,7 @@ class MainActivity : FlutterActivity() {
                                 val signingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                                     PackageManager.GET_SIGNING_CERTIFICATES else
                                     PackageManager.GET_SIGNATURES
+                                installStage = "чтение метаданных APK"
                                 val archive = packageManager.getPackageArchiveInfo(apk.absolutePath, signingFlags)
                                     ?: throw IllegalArgumentException("Invalid APK package archive")
                                 if (archive.packageName.isNullOrBlank()) {
@@ -150,6 +152,7 @@ class MainActivity : FlutterActivity() {
                                     throw IllegalArgumentException(
                                         "APK package mismatch: expected $expected, got ${archive.packageName}")
                                 }
+                                installStage = "проверка сертификата и версии"
                                 verifyInstalledApkCompatibility(archive, signingFlags)
                                 val uri = FileProvider.getUriForFile(
                                     this, "${applicationContext.packageName}.fileprovider", apk)
@@ -157,11 +160,15 @@ class MainActivity : FlutterActivity() {
                                     setDataAndType(uri, "application/vnd.android.package-archive")
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
+                                installStage = "запуск системного установщика"
                                 startActivity(intent)
                                 result.success(true)
                             }
                         } catch (e: Exception) {
-                            result.error("APK_INSTALL", e.message, null)
+                            android.util.Log.e("AllHubInstaller", "APK install failed at: $installStage", e)
+                            result.error("APK_INSTALL",
+                                "$installStage: ${e.javaClass.simpleName}: ${e.message ?: "без описания"}",
+                                null)
                         }
                     }
                     "installedPackageVersion" -> {

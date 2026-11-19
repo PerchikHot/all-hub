@@ -59,6 +59,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool restoring = true;
   bool checkingConnection = false;
   bool showConnectionSettings = false;
+  bool showAdvancedSettings = false;
   int connectionRevision = 0;
   String historyKey(String model) => 'ollama_chat_history_model_$model';
   Future<void> selectModel(String? model) async {
@@ -444,16 +445,21 @@ class _LocalAiChatState extends State<LocalAiChat> {
             ])),
             IconButton(tooltip: 'Обновить модели', onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.refresh)),
-            IconButton(tooltip: 'Настройки подключения',
-              onPressed: () => setState(() => showConnectionSettings = !showConnectionSettings),
-              icon: Icon(showConnectionSettings ? Icons.tune : Icons.settings_outlined)),
+            IconButton(
+              key: const Key('eyra-settings-toggle'),
+              tooltip: showAdvancedSettings ? 'Скрыть настройки' : 'Настройки Эйры',
+              onPressed: () => setState(() => showAdvancedSettings = !showAdvancedSettings),
+              icon: Icon(showAdvancedSettings ? Icons.close_rounded : Icons.tune_rounded)),
           ]),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: models.isEmpty
               ? InkWell(
                   key: const Key('ollama-empty-model-picker'),
-                  onTap: () => setState(() => showConnectionSettings = true),
+                  onTap: () => setState(() {
+                    showAdvancedSettings = true;
+                    showConnectionSettings = true;
+                  }),
                   borderRadius: BorderRadius.circular(8),
                   child: InputDecorator(
                     decoration: const InputDecoration(
@@ -477,6 +483,12 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: sending || restoring || messages.isEmpty ? null : confirmClear,
               icon: const Icon(Icons.delete_outline)),
           ]),
+          if (showAdvancedSettings) ...[
+          const Divider(height: 22),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Настройки Эйры', style: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w800))),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             title: const Text('Характер Эйры'),
@@ -697,6 +709,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               icon: const Icon(Icons.link), label: const Text('Подключиться'))),
           ],
           if (checkingConnection) const LinearProgressIndicator(),
+          ],
         ]))),
       ),
       if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -709,7 +722,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
           const SizedBox(height: 6),
           Text(connected ? 'Пиши как обычно — Эйра на связи.' :
             'Подключи Ollama и выбери модель, чтобы начать.', textAlign: TextAlign.center),
-           if (!connected) ...[const SizedBox(height: 14), FilledButton.tonalIcon(onPressed: () => setState(() => showConnectionSettings = true), icon: const Icon(Icons.settings_ethernet_rounded), label: const Text('Настроить подключение'))],
+           if (!connected) ...[const SizedBox(height: 14), FilledButton.tonalIcon(onPressed: () => setState(() { showAdvancedSettings = true; showConnectionSettings = true; }), icon: const Icon(Icons.settings_ethernet_rounded), label: const Text('Настроить подключение'))],
         ]))) : ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
           itemCount: messages.length,

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// Waiting / refreshing: a looping figure-eight with two rounded lobes and
 /// contrasting dots. Unlike file transfers, this never implies a percentage.
 class HubWaitIndicator extends StatefulWidget {
-  const HubWaitIndicator({super.key, this.size = 42});
+  const HubWaitIndicator({super.key, this.size = 54});
   final double size;
   @override
   State<HubWaitIndicator> createState() => _HubWaitIndicatorState();
@@ -49,23 +49,23 @@ class _WaitPainter extends CustomPainter {
     final scale = size.width / 48;
     final left = center + Offset(-11 * scale, 0);
     final right = center + Offset(11 * scale, 0);
-    final lobePaint = Paint()..color = const Color(0xFFECF2FF);
+    final lobePaint = Paint()..color = const Color(0xFFE9B79F);
     final outline = Paint()
-      ..color = const Color(0xFF91B9F2)
+      ..color = const Color(0xFFB97E73)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2 * scale;
     for (final point in [left, right]) {
       canvas.drawCircle(point, 10 * scale, lobePaint);
       canvas.drawCircle(point, 10 * scale, outline);
       canvas.drawCircle(point + Offset(0, 2 * scale), 2.7 * scale,
-        Paint()..color = const Color(0xFF6886B6));
+        Paint()..color = const Color(0xFFB86B79));
     }
     // An illuminated bead travels continuously around the figure-eight.
     final t = phase * math.pi * 2;
     final x = math.sin(t) * 20 * scale;
     final y = math.sin(2 * t) * 9 * scale;
     canvas.drawCircle(center + Offset(x, y), 3 * scale,
-      Paint()..color = const Color(0xFF5D9BFF));
+      Paint()..color = const Color(0xFFFFC9A8));
     canvas.drawCircle(center + Offset(x, y), 1.3 * scale,
       Paint()..color = Colors.white);
   }

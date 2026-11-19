@@ -21,8 +21,8 @@ void main() {
   test('directories are rejected', () async {
     final dir = await Directory.systemTemp.createTemp('eyra-inspect-');
     try {
-      expect(() => EyraFileInspector.inspect(File(dir.path)),
-          throwsA(isA<FileSystemException>()));
+      await expectLater(EyraFileInspector.inspect(File(dir.path)),
+          throwsA(isA<FormatException>()));
     } finally {
       await dir.delete(recursive: true);
     }

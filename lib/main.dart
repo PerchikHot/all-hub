@@ -786,13 +786,74 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ]))])),
       ]));
     }),
-    bottomNavigationBar: NavigationBar(selectedIndex: tab, onDestinationSelected: (i) => setState(() => tab = i), destinations: const [
-      NavigationDestination(icon: Icon(Icons.grid_view), label: 'Проекты'),
-      NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Разработка'),
-      NavigationDestination(icon: Icon(Icons.smart_toy_outlined), label: 'ИИ'),
-      NavigationDestination(icon: Icon(Icons.travel_explore), label: 'Медиа'),
-      NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
-      NavigationDestination(icon: Icon(Icons.photo_library_outlined), label: 'Snapshot'),
-    ]),
+    bottomNavigationBar: LayoutBuilder(builder: (context, constraints) {
+      // Four destinations fit comfortably on narrow phones. Secondary tools
+      // remain one tap away without clipped or wrapped navigation labels.
+      if (constraints.maxWidth < 620) {
+        return NavigationBar(
+          height: 70,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          selectedIndex: tab == 0 ? 0 : tab == 2 ? 1 : tab == 3 ? 2 : 3,
+          onDestinationSelected: (index) {
+            if (index < 3) {
+              setState(() => tab = [0, 2, 3][index]);
+              return;
+            }
+            showModalBottomSheet<void>(
+              context: context,
+              showDragHandle: true,
+              builder: (sheetContext) => SafeArea(child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+                    child: Align(alignment: Alignment.centerLeft,
+                      child: Text('Инструменты All Hub',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.build_circle_outlined),
+                    title: const Text('Разработка'),
+                    subtitle: const Text('Проекты, сборки и GitHub'),
+                    onTap: () { Navigator.pop(sheetContext); setState(() => tab = 1); },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.settings_outlined),
+                    title: const Text('Настройки'),
+                    subtitle: const Text('Параметры приложения'),
+                    onTap: () { Navigator.pop(sheetContext); setState(() => tab = 4); },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library_outlined),
+                    title: const Text('Snapshot'),
+                    subtitle: const Text('Пакеты изображений'),
+                    onTap: () { Navigator.pop(sheetContext); setState(() => tab = 5); },
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              )),
+            );
+          },
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Проекты'),
+            NavigationDestination(icon: Icon(Icons.auto_awesome_rounded), label: 'Эйра'),
+            NavigationDestination(icon: Icon(Icons.perm_media_outlined), label: 'Медиа'),
+            NavigationDestination(icon: Icon(Icons.widgets_outlined), label: 'Ещё'),
+          ],
+        );
+      }
+      return NavigationBar(
+        selectedIndex: tab,
+        onDestinationSelected: (index) => setState(() => tab = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: 'Проекты'),
+          NavigationDestination(icon: Icon(Icons.build_circle_outlined), label: 'Разработка'),
+          NavigationDestination(icon: Icon(Icons.auto_awesome_rounded), label: 'Эйра'),
+          NavigationDestination(icon: Icon(Icons.perm_media_outlined), label: 'Медиа'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Настройки'),
+          NavigationDestination(icon: Icon(Icons.photo_library_outlined), label: 'Snapshot'),
+        ],
+      );
+    }),
   );
 }

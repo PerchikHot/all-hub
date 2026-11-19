@@ -192,7 +192,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         if (parts is! List) continue;
         for (final part in parts) {
           if (part is! String) continue;
-          final cleaned = part.replaceAll(RegExp(r'\\s+'), ' ').trim();
+          final cleaned = part.replaceAll(RegExp(r'\s+'), ' ').trim();
           if (cleaned.length < 12) continue;
           excerpts.add(cleaned.length > 500 ? cleaned.substring(0, 500) : cleaned);
           if (excerpts.length >= 1000) return excerpts;

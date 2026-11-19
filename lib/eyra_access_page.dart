@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'eyra_file_inspector.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -57,6 +59,8 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
   bool saving = false;
   bool diagnosing = false;
   String? diagnosticResult;
+  bool inspectingFile = false;
+  String? fileResult;
   @override
   void initState() { super.initState(); refresh(); }
 
@@ -82,7 +86,10 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось сохранить настройку')));
       }
-      if (id == 'diagnostics' && !enabled && mounted) setState(() => diagnosticResult = null);
+      if (mounted && !enabled) setState(() {
+        if (id == 'diagnostics') diagnosticResult = null;
+        if (id == 'files') fileResult = null;
+      });
       await refresh();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +118,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
       for (final id in EyraAccessPolicy.capabilities.keys) {
         if (await EyraAccessPolicy.enabled(id)) await EyraAccessPolicy.set(id, false);
       }
-      if (mounted) setState(() => diagnosticResult = null);
+      if (mounted) setState(() { diagnosticResult = null; fileResult = null; });
       await refresh();
     } finally {
       if (mounted) setState(() => saving = false);
@@ -157,13 +164,54 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
     }
   }
 
+  /// Foreground-only inspection of a file the user explicitly selects.
+  /// Never stores file bytes or uploads content; only an opt-in SHA-256 digest.
+  Future<void> inspectSelectedFile() async {
+    if (saving || inspectingFile || !await EyraAccessPolicy.enabled('files')) return;
+    if (!mounted) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.any, allowMultiple: false, withData: false);
+    if (picked == null || picked.files.isEmpty || !mounted) return;
+    final path = picked.files.single.path;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Не удалось получить доступ к выбранному файлу')));
+      return;
+    }
+    final confirmed = await showDialog<bool>(context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Проверить выбранный файл?'),
+        content: const Text('Будут прочитаны размер и SHA-256 только этого файла. Файл не изменяется, содержимое не сохраняется и не отправляется в сеть. Максимальный размер — 256 МиБ.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Проверить')),
+        ],
+      ));
+    if (confirmed != true || !mounted ||
+        !await EyraAccessPolicy.enabled('files')) return;
+    setState(() { inspectingFile = true; fileResult = null; });
+    try {
+      final info = await EyraFileInspector.inspect(File(path));
+      if (!await EyraAccessPolicy.enabled('files')) return;
+      await EyraAccessPolicy.appendLog('Проверка выбранного файла (без сохранения имени и содержимого)');
+      if (mounted) setState(() => fileResult =
+          'Файл: ${picked.files.single.name}\\nРазмер: ${info.bytes} байт\\nSHA-256: ${info.sha256}');
+      await refresh();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось проверить файл: $e')));
+    } finally {
+      if (mounted) setState(() => inspectingFile = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const explanations = <String, String>{
       'proactive': 'Только настройка предпочтения. Самостоятельная отправка сообщений пока не реализована.',
       'notifications': 'Системные уведомления пока не подключены. Никаких фоновых уведомлений эта настройка не запускает.',
       'diagnostics': 'Разрешает только ручную проверку платформы и версии ОС после отдельного подтверждения. Без фонового сбора.',
-      'files': 'Никакого доступа к файлам не выдаёт. Любое изменение или удаление потребует отдельного подтверждения.',
+      'files': 'Только ручная проверка выбранного файла после подтверждения. Никакого удаления, изменения или фонового доступа.',
       'apps': 'Не даёт права устанавливать, запускать или удалять приложения.',
       'sync': 'Синхронизация пока не реализована: переписки и память остаются на текущем устройстве.',
     };
@@ -208,6 +256,27 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
                   onPressed: () => setState(() => diagnosticResult = null),
                   child: const Text('Скрыть результат'),
                 ),
+              ],
+            ],
+          ))),
+          const SizedBox(height: 12),
+          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Проверка файла', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              const Text('Выбери файл самостоятельно: Эйра покажет размер и SHA-256. Ничего не изменяет и не отправляет в сеть.'),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: saving || inspectingFile || !(choices['files'] ?? false)
+                    ? null : inspectSelectedFile,
+                icon: const Icon(Icons.file_present_outlined),
+                label: Text(inspectingFile ? 'Проверяем…' : 'Выбрать и проверить файл'),
+              ),
+              if (fileResult != null) ...[
+                const SizedBox(height: 8),
+                SelectableText(fileResult!),
+                TextButton(onPressed: () => setState(() => fileResult = null),
+                  child: const Text('Скрыть результат')),
               ],
             ],
           ))),

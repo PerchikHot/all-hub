@@ -1,3 +1,4 @@
+import 'ollama_context_privacy.dart';
 import 'chatgpt_export_parser.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -21,12 +22,9 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool memoryEnabled = true;
   // Remote Ollama hosts must never receive local memory without opt-in.
   bool allowRemoteContext = false;
-  bool get isLoopbackEndpoint {
-    final uri = Uri.tryParse(address.text.trim());
-    return uri != null && (uri.scheme == 'http' || uri.scheme == 'https') &&
-        {'localhost', '127.0.0.1', '::1'}.contains(uri.host.toLowerCase());
-  }
-  bool get maySendPersonalContext => isLoopbackEndpoint || allowRemoteContext;
+  bool get isLoopbackEndpoint => isLocalOllamaEndpoint(address.text);
+  bool get maySendPersonalContext => maySendOllamaPersonalContext(
+      address.text, remoteOptIn: allowRemoteContext);
   final List<String> importedExcerpts = [];
   bool importBusy = false;
   final excerptSearch = TextEditingController();

@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'eyra_memory_backup.dart';
 import 'dart:typed_data';
 import 'ollama_context_privacy.dart';
@@ -708,7 +709,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.link), label: const Text('Подключиться'))),
           ],
-          if (checkingConnection) const LinearProgressIndicator(),
+          if (checkingConnection) const HubLiquidProgress(),
           ],
         ]))),
       ),
@@ -744,7 +745,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
           },
         )),
       if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16),
-        child: LinearProgressIndicator()),
+        child: HubLiquidProgress()),
       SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(child: TextField(controller: input, maxLines: 5, minLines: 1,

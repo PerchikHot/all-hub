@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -89,7 +90,7 @@ class _EyraForgePageState extends State<EyraForgePage> {
         onChanged: busy ? null : (v) => setState(() => steps = v.round())),
       FilledButton.icon(onPressed: busy ? null : () => run(generate: true),
         icon: const Icon(Icons.auto_awesome), label: const Text('Создать изображение')),
-      if (busy) const LinearProgressIndicator(),
+      if (busy) const HubLiquidProgress(),
       const SizedBox(height: 8),
       Text(status),
       if (image != null) ...[

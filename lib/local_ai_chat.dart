@@ -1,3 +1,5 @@
+import 'eyra_memory_backup.dart';
+import 'dart:typed_data';
 import 'ollama_context_privacy.dart';
 import 'chatgpt_export_parser.dart';
 import 'dart:convert';
@@ -146,6 +148,81 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (mounted && revision == connectionRevision) setState(() => checkingConnection = false);
     }
   }
+  Future<void> exportMemoryBackup() async {
+    if (importBusy) return;
+    try {
+      final snapshot = EyraMemoryBackup(
+        personality: personalityNotes.text,
+        notes: List<String>.of(memoryNotes),
+        excerpts: List<String>.of(importedExcerpts),
+        exportedAt: DateTime.now().toUtc(),
+      );
+      final bytes = Uint8List.fromList(utf8.encode(snapshot.encode()));
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Сохранить локальную память Эйры',
+        fileName: 'eyra-memory.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: bytes,
+      );
+      if (path != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Резервная копия памяти сохранена')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = 'Ошибка экспорта памяти: $e');
+    }
+  }
+
+  Future<void> importMemoryBackup() async {
+    if (importBusy) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['json']);
+    final path = picked?.files.single.path;
+    if (path == null) return;
+    setState(() => importBusy = true);
+    try {
+      final file = File(path);
+      if (await file.length() > 4 * 1024 * 1024) {
+        throw const FormatException('Файл больше 4 МБ');
+      }
+      final backup = EyraMemoryBackup.decode(await file.readAsString());
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Восстановить память Эйры?'),
+          content: Text('Заменить локальные настройки характера, '
+            '${memoryNotes.length} заметок и ${importedExcerpts.length} фрагментов '
+            'данными из копии от ${backup.exportedAt.toLocal()}? '
+            'Текущие записи будут заменены. История чата не изменится.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Восстановить')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      final prefs = await SharedPreferences.getInstance();
+      final ok = await prefs.setString('eyra_personality_notes', backup.personality) &&
+        await prefs.setStringList('eyra_memory_notes', backup.notes) &&
+        await prefs.setStringList('eyra_chatgpt_excerpts', backup.excerpts);
+      if (!ok) throw const FileSystemException('Не удалось сохранить память');
+      if (mounted) setState(() {
+        personalityNotes.text = backup.personality;
+        memoryNotes..clear()..addAll(backup.notes);
+        importedExcerpts..clear()..addAll(backup.excerpts);
+        excerptPage = 0;
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = 'Ошибка импорта памяти: $e');
+    } finally {
+      if (mounted) setState(() => importBusy = false);
+    }
+  }
+
   Future<void> addMemoryNote() async {
     final note = memoryInput.text.trim();
     if (note.isEmpty || note.length > 500 || memoryNotes.length >= 100) return;
@@ -484,6 +561,24 @@ class _LocalAiChatState extends State<LocalAiChat> {
                       onPressed: () => removeMemoryNote(i)),
                   ]),
                 ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.backup_outlined),
+                title: const Text('Перенос памяти между устройствами'),
+                subtitle: const Text('Локальный JSON: характер, заметки и фрагменты. '
+                  'Без паролей, разрешений и истории чата. Импорт заменяет текущую память.'),
+              ),
+              Wrap(spacing: 8, children: [
+                OutlinedButton.icon(
+                  onPressed: importBusy ? null : exportMemoryBackup,
+                  icon: const Icon(Icons.save_alt_outlined),
+                  label: const Text('Сохранить копию')),
+                OutlinedButton.icon(
+                  onPressed: importBusy ? null : importMemoryBackup,
+                  icon: const Icon(Icons.restore_outlined),
+                  label: const Text('Восстановить')),
+              ]),
               const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,

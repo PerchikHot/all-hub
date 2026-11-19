@@ -597,14 +597,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),
-                Row(children: [
-                  const Icon(Icons.system_update_alt_rounded, size: 17, color: hubAccent),
-                  const SizedBox(width: 7),
-                  Expanded(child: Text(i.downloadUrl != null
-                    ? 'Опубликован установочный файл'
-                    : 'Файл для этой платформы не опубликован',
-                    style: const TextStyle(fontWeight: FontWeight.w600))),
-                ]),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: i.downloadUrl != null
+                      ? const Color(0xFF183A39) : const Color(0xFF242D42),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(color: i.downloadUrl != null
+                      ? const Color(0xFF2E6E65) : const Color(0xFF35445E))),
+                  child: Row(children: [
+                    Icon(i.downloadUrl != null
+                      ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                      size: 20, color: i.downloadUrl != null
+                        ? const Color(0xFF8DE0C0) : const Color(0xFFB3C0D6)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(i.downloadUrl != null
+                      ? 'Установочный файл доступен'
+                      : 'Сборка для устройства ещё не опубликована',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+                  ]),
+                ),
                 ProjectDownloadProgress(projectId: project.id),
                 FutureBuilder<String?>(
                   future: ProjectLauncher.installedVersion(project.id),
@@ -698,9 +710,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         if (comparison == 1) {
                           return const Chip(label: Text('Установленная версия новее релиза'));
                         }
-                        return OutlinedButton.icon(
-                          icon: Icon(comparison == -1 ? Icons.system_update_alt : Icons.install_mobile),
-                          label: Text(comparison == -1 ? 'Обновить до ${i.version}' : 'Скачать APK и установить'),
+                        return FilledButton.icon(
+                          icon: Icon(comparison == -1 ? Icons.system_update_alt_rounded : Icons.install_mobile_rounded),
+                          label: Text(comparison == -1 ? 'Обновить до ${i.version}' : 'Скачать и установить'),
                           onPressed: () async {
                             try {
                               if (isPublishedDowngrade(

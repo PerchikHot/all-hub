@@ -20,6 +20,8 @@ class _EyraForgePageState extends State<EyraForgePage> {
   bool busy = false;
   String status = 'Forge должен быть запущен с параметром --api.';
   List<String> models = [];
+  String? selectedCheckpoint;
+  String? checkedEndpoint;
   Uint8List? image;
   Uint8List? sourceImage;
   double strength = 0.5;
@@ -68,6 +70,9 @@ class _EyraForgePageState extends State<EyraForgePage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('eyra_forge_endpoint', endpoint.text.trim());
       if (generate) {
+        if (selectedCheckpoint != null && checkedEndpoint != endpoint.text.trim()) {
+          throw StateError('Адрес Forge изменён. Сначала обновите список моделей.');
+        }
         if (editMode && sourceImage == null) {
           throw StateError('Сначала выберите исходное изображение');
         }
@@ -76,10 +81,11 @@ class _EyraForgePageState extends State<EyraForgePage> {
               source: sourceImage!, prompt: prompt.text,
               negativePrompt: negative.text, steps: steps,
               width: imageSize, height: imageSize,
-              denoisingStrength: strength)
+              denoisingStrength: strength, checkpoint: selectedCheckpoint)
           : await client.generate(
               prompt: prompt.text, negativePrompt: negative.text, steps: steps,
-              width: imageSize, height: imageSize);
+              width: imageSize, height: imageSize,
+              checkpoint: selectedCheckpoint);
         if (mounted) setState(() {
           image = bytes;
           lastPrompt = prompt.text.trim();
@@ -90,6 +96,8 @@ class _EyraForgePageState extends State<EyraForgePage> {
         final available = await client.models();
         if (mounted) setState(() {
           models = available;
+          checkedEndpoint = endpoint.text.trim();
+          if (!available.contains(selectedCheckpoint)) selectedCheckpoint = null;
           status = available.isEmpty ? 'Forge доступен, но моделей нет' :
               'Forge доступен. Моделей: ${available.length}';
         });
@@ -149,7 +157,26 @@ class _EyraForgePageState extends State<EyraForgePage> {
       const SizedBox(height: 8),
       OutlinedButton.icon(onPressed: busy ? null : () => run(generate: false),
         icon: const Icon(Icons.wifi_tethering), label: const Text('Проверить подключение и модели')),
-      if (models.isNotEmpty) Text('Модели: ${models.take(5).join(', ')}'),
+      if (models.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          key: ValueKey('forge-checkpoint-${selectedCheckpoint ?? 'default'}'),
+          isExpanded: true,
+          initialValue: models.contains(selectedCheckpoint) ? selectedCheckpoint : null,
+          decoration: const InputDecoration(
+            labelText: 'Модель генерации',
+            border: OutlineInputBorder(),
+            helperText: 'Выбор действует только на запрос; настройки Forge не меняются'),
+          hint: const Text('Текущая модель Forge'),
+          items: models.map((name) => DropdownMenuItem(
+            value: name, child: Text(name, overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: busy ? null : (value) => setState(() => selectedCheckpoint = value),
+        ),
+        Align(alignment: Alignment.centerRight,
+          child: TextButton(onPressed: busy ? null : () =>
+            setState(() => selectedCheckpoint = null),
+            child: const Text('Использовать модель Forge'))),
+      ],
       const SizedBox(height: 12),
       SegmentedButton<bool>(
         segments: const [

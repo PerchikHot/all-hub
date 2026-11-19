@@ -526,11 +526,45 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ProjectCover(id: project.id, title: project.name, type: project.type),
           Padding(
           padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [const Icon(Icons.widgets_outlined, size: 30), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(project.name, style: Theme.of(context).textTheme.titleLarge),
-              Text(project.type == 'Android game' ? 'Игра для Android' : project.type == 'Android app' ? 'Приложение для Android' : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft' : project.type, style: Theme.of(context).textTheme.bodySmall),
-            ]))]),
-            const SizedBox(height: 8), Text(project.description),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 42, height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1D3659),
+                  borderRadius: BorderRadius.circular(13)),
+                child: Icon(
+                  project.type.toLowerCase().contains('game') ? Icons.sports_esports_rounded
+                    : project.type.toLowerCase().contains('mod') ? Icons.extension_rounded
+                    : Icons.apps_rounded,
+                  color: const Color(0xFF9CC6FF), size: 23)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(project.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800)),
+                const SizedBox(height: 5),
+                Text(project.type == 'Android game' ? 'Игра для Android'
+                  : project.type == 'Android app' ? 'Приложение для Android'
+                  : project.type.toLowerCase().contains('mod') ? 'Мод Minecraft'
+                  : project.type,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF9BB7DC))),
+              ])),
+              const SizedBox(width: 6),
+              Tooltip(
+                message: project.repo == null
+                  ? 'Репозиторий не подключён' : 'Репозиторий подключён',
+                child: Icon(
+                  project.repo == null ? Icons.link_off_rounded : Icons.link_rounded,
+                  size: 19,
+                  color: project.repo == null
+                    ? const Color(0xFF8390A5) : const Color(0xFF7DCEAC))),
+            ]),
+            const SizedBox(height: 12),
+            Text(project.description, maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                height: 1.4, color: const Color(0xFFCDD6E6))),
             if (project.id.startsWith('external-'))
               ExternalScreenshotGallery(projectId: project.id),
             if (project.id.startsWith('external-'))

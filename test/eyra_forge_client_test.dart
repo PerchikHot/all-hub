@@ -109,4 +109,39 @@ void main() {
     expect(requests, 0);
   });
 
+  test('Forge checkpoint override is scoped to both generation modes', () async {
+    final png = <int>[137, 80, 78, 71, 13, 10, 26, 10, 0];
+    final overrides = <dynamic>[];
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        overrides.add(body['override_settings']);
+        return http.Response(jsonEncode({'images': [base64Encode(png)]}), 200);
+      }));
+    await client.generate(prompt: 'cat', checkpoint: 'Model A [abc]');
+    await client.edit(source: Uint8List.fromList(png), prompt: 'cat',
+      checkpoint: 'Model B [def]');
+    await client.generate(prompt: 'cat');
+    expect(overrides, [
+      {'sd_model_checkpoint': 'Model A [abc]'},
+      {'sd_model_checkpoint': 'Model B [def]'},
+      null,
+    ]);
+    client.close();
+  });
+
+  test('Forge rejects malformed checkpoint before making a request', () async {
+    var requests = 0;
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async {
+        requests++;
+        return http.Response('{}', 200);
+      }));
+    await expectLater(client.generate(prompt: 'cat', checkpoint: ''),
+      throwsArgumentError);
+    await expectLater(client.generate(prompt: 'cat', checkpoint: 'bad\\nmodel'),
+      throwsArgumentError);
+    expect(requests, 0);
+    client.close();
+  });
 }

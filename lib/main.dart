@@ -880,7 +880,51 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ]))])),
       ]));
     }),
-    bottomNavigationBar: LayoutBuilder(builder: (context, constraints) {
+    bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+      ValueListenableBuilder<String?>(
+        valueListenable: ProjectLauncher.activeDownloadProject,
+        builder: (context, active, _) {
+          if (active == null) return const SizedBox.shrink();
+          return ValueListenableBuilder<double?>(
+            valueListenable: ProjectLauncher.downloadProgress,
+            builder: (context, value, _) {
+              final safe = value != null && value.isFinite
+                ? value.clamp(0.0, 1.0).toDouble() : null;
+              return Material(
+                color: const Color(0xFF162D4D),
+                child: InkWell(
+                  onTap: () => setState(() => tab = 0),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                    child: Column(children: [
+                      Row(children: [
+                        const Icon(Icons.downloading_rounded,
+                          color: Color(0xFF8DC7FF), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(
+                          'Загрузка: ${active == 'all-hub' ? 'All Hub' : active}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700))),
+                        Text(safe == null ? 'Подготовка…'
+                          : '${(safe * 100).round()}%',
+                          style: const TextStyle(color: Color(0xFFB5D5FF))),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.chevron_right_rounded, size: 19),
+                      ]),
+                      const SizedBox(height: 7),
+                      LinearProgressIndicator(
+                        value: safe, minHeight: 4,
+                        backgroundColor: const Color(0xFF304767),
+                        color: const Color(0xFF77BBFF)),
+                    ]),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      LayoutBuilder(builder: (context, constraints) {
       // Four destinations fit comfortably on narrow phones. Secondary tools
       // remain one tap away without clipped or wrapped navigation labels.
       if (constraints.maxWidth < 620) {
@@ -948,6 +992,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           NavigationDestination(icon: Icon(Icons.photo_library_outlined), label: 'Snapshot'),
         ],
       );
-    }),
+      }),
+    ]),
   );
 }

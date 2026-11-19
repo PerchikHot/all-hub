@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/project_download_progress.dart';
+import 'package:all_hub/hub_liquid_progress.dart';
 
 void main() {
   testWidgets('update progress appears, advances, and disappears reactively',
@@ -14,23 +15,23 @@ void main() {
         projectId: 'shadow-rp', activeProject: active, progress: progress,
       )),
     ));
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(HubLiquidProgress), findsNothing);
 
     active.value = 'shadow-rp';
     await tester.pump();
     expect(find.text('Подготовка загрузки…'), findsOneWidget);
-    expect(tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator)).value, isNull);
+    expect(tester.widget<HubLiquidProgress>(
+        find.byType(HubLiquidProgress)).value, isNull);
 
     progress.value = 0.45;
     await tester.pump();
     expect(find.text('Загрузка: 45%'), findsOneWidget);
-    expect(tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator)).value, 0.45);
+    expect(tester.widget<HubLiquidProgress>(
+        find.byType(HubLiquidProgress)).value, 0.45);
 
     active.value = 'all-hub';
     await tester.pump();
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(HubLiquidProgress), findsNothing);
   });
 
   testWidgets('progress never exposes invalid percentages or claims install',
@@ -42,13 +43,13 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body:
       ProjectDownloadProgress(projectId: 'nova',
         activeProject: active, progress: progress))));
-    expect(tester.widget<LinearProgressIndicator>(
-      find.byType(LinearProgressIndicator)).value, isNull);
+    expect(tester.widget<HubLiquidProgress>(
+      find.byType(HubLiquidProgress)).value, isNull);
     progress.value = 1.8;
     await tester.pump();
     expect(find.text('Загрузка: 100%'), findsOneWidget);
-    expect(tester.widget<LinearProgressIndicator>(
-      find.byType(LinearProgressIndicator)).value, 1.0);
+    expect(tester.widget<HubLiquidProgress>(
+      find.byType(HubLiquidProgress)).value, 1.0);
     expect(find.textContaining('подтверждение установки'), findsOneWidget);
   });
 }

@@ -46,8 +46,10 @@ Future<File> reserveUniqueMediaFile(Directory directory, String fileName) async 
 Future<void> migrateAllHubMedia() => MediaBrowserPage.migrateLegacyMedia();
 
 class MediaBrowserPage extends StatefulWidget {
-  const MediaBrowserPage({super.key, required this.url});
+  const MediaBrowserPage({super.key, required this.url, this.galleryUrls = const [], this.initialIndex = 0});
   final Uri url;
+  final List<Uri> galleryUrls;
+  final int initialIndex;
 
   static bool _migrationStarted = false;
   static Future<void> migrateLegacyMedia() async {
@@ -83,6 +85,8 @@ class MediaBrowserPage extends StatefulWidget {
 class _MediaBrowserPageState extends State<MediaBrowserPage> {
   WebViewController? browser;
   String currentUrl = '';
+  late final PageController galleryController;
+  late int galleryIndex;
   bool loading = true;
   bool downloading = false;
   int downloadReceived = 0;
@@ -98,7 +102,9 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   @override
   void initState() {
     super.initState();
-    currentUrl = widget.url.toString();
+    galleryIndex = widget.initialIndex.clamp(0, widget.galleryUrls.isEmpty ? 0 : widget.galleryUrls.length - 1);
+    galleryController = PageController(initialPage: galleryIndex);
+    currentUrl = widget.galleryUrls.isEmpty ? widget.url.toString() : widget.galleryUrls[galleryIndex].toString();
     // Direct images/GIFs should open inside the app, never auto-download
     // through Android WebView's navigation delegate.
     if (isDirectImage(widget.url)) {
@@ -128,6 +134,12 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
         ))
         ..loadRequest(widget.url);
     }
+  }
+
+  @override
+  void dispose() {
+    galleryController.dispose();
+    super.dispose();
   }
 
   Future<void> download(Uri uri) async {
@@ -261,14 +273,21 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Медиа • All Hub'),
+      title: Text(widget.galleryUrls.isEmpty ? 'Медиа • All Hub' : 'Фото ${galleryIndex + 1} из ${widget.galleryUrls.length}'),
       actions: [
         IconButton(
           tooltip: 'Назад по страницам',
-          onPressed: browser == null ? null : () async {
-            if (await browser!.canGoBack()) await browser!.goBack();
-          },
+          onPressed: widget.galleryUrls.isNotEmpty
+              ? (galleryIndex == 0 ? null : () => galleryController.previousPage(duration: const Duration(milliseconds: 220), curve: Curves.easeOut))
+              : browser == null ? null : () async {
+                  if (await browser!.canGoBack()) await browser!.goBack();
+                },
           icon: const Icon(Icons.arrow_back),
+        ),
+        if (widget.galleryUrls.isNotEmpty) IconButton(
+          tooltip: 'Следующее фото',
+          onPressed: galleryIndex + 1 >= widget.galleryUrls.length ? null : () => galleryController.nextPage(duration: const Duration(milliseconds: 220), curve: Curves.easeOut),
+          icon: const Icon(Icons.arrow_forward),
         ),
         IconButton(
           tooltip: 'Обновить',
@@ -317,7 +336,26 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
       if (savedFile != null)
         Padding(padding: const EdgeInsets.all(8), child: Text(
           'Последний файл: $savedFile', maxLines: 2, overflow: TextOverflow.ellipsis)),
-      Expanded(child: browser != null
+      Expanded(child: widget.galleryUrls.isNotEmpty
+          ? PageView.builder(
+              controller: galleryController,
+              itemCount: widget.galleryUrls.length,
+              onPageChanged: (index) => setState(() {
+                galleryIndex = index;
+                currentUrl = widget.galleryUrls[index].toString();
+              }),
+              itemBuilder: (context, index) => InteractiveViewer(
+                key: ValueKey(widget.galleryUrls[index].toString()),
+                minScale: 1, maxScale: 5,
+                child: Center(child: Image.network(widget.galleryUrls[index].toString(),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Center(child: Text('Не удалось загрузить изображение')),
+                  loadingBuilder: (_, child, progress) => progress == null ? child
+                      : Center(child: CircularProgressIndicator(value: progress.expectedTotalBytes == null ? null : progress.cumulativeBytesLoaded / progress.expectedTotalBytes!)),
+                )),
+              ),
+            )
+          : browser != null
           ? WebViewWidget(controller: browser!)
           : isDirectImage(widget.url)
               ? ClipRect(child: InteractiveViewer(

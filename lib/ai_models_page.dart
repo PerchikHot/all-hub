@@ -196,24 +196,73 @@ class _AiModelsPageState extends State<AiModelsPage> {
       : '${(bytes / 1048576).toStringAsFixed(0)} МБ';
   @override
   Widget build(BuildContext context) => Column(children: [
-    Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Row(children: [
-      const Expanded(child: Text('Эйра · единый помощник', maxLines: 1, overflow: TextOverflow.ellipsis)),
-      TextButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
-          builder: (_) => const EyraForgePage())),
-        icon: const Icon(Icons.image_outlined),
-        label: const Text('Forge'),
-      ),
-      TextButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
-          builder: (_) => const EyraAccessPage())),
-        icon: const Icon(Icons.admin_panel_settings_outlined),
-        label: const Text('Доступ'),
-      ),
-    ])),
-    Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<int>(
-      segments: const [ButtonSegment(value:0,label:Text('Ollama')),ButtonSegment(value:1,label:Text('Codex')),ButtonSegment(value:2,label:Text('GGUF'))],
-      selected:{mode},onSelectionChanged:(v)=>setState(()=>mode=v.first))),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(children: [
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF315BA7), Color(0xFF6C5BB5)]),
+            borderRadius: BorderRadius.circular(14)),
+          child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Эйра', style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800)),
+            Text('Твой помощник в All Hub',
+              style: Theme.of(context).textTheme.bodySmall),
+          ],
+        )),
+        IconButton.filledTonal(
+          tooltip: 'Генерация изображений · Forge',
+          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+            builder: (_) => const EyraForgePage())),
+          icon: const Icon(Icons.image_outlined),
+        ),
+        const SizedBox(width: 6),
+        IconButton.filledTonal(
+          tooltip: 'Разрешения и приватность',
+          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+            builder: (_) => const EyraAccessPage())),
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+        ),
+      ]),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: LayoutBuilder(builder: (context, constraints) => Row(children: [
+        for (final entry in const [(0, 'Чат', Icons.chat_bubble_outline_rounded),
+                                   (1, 'Codex', Icons.code_rounded),
+                                   (2, 'GGUF', Icons.memory_rounded)]) ...[
+          if (entry.$1 != 0) const SizedBox(width: 8),
+          Expanded(child: Material(
+            color: mode == entry.$1 ? const Color(0xFF25477E) : const Color(0xFF172239),
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              key: ValueKey('eyra-mode-${entry.$1}'),
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => setState(() => mode = entry.$1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 6),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(entry.$3, size: 18,
+                    color: mode == entry.$1 ? Colors.white : const Color(0xFFAEBBD2)),
+                  const SizedBox(width: 6),
+                  Flexible(child: Text(entry.$2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: mode == entry.$1 ? Colors.white : const Color(0xFFAEBBD2),
+                      fontWeight: mode == entry.$1 ? FontWeight.w700 : FontWeight.w500))),
+                ]),
+              ),
+            ),
+          )),
+        ],
+      ])),
+    ),
     Expanded(child:mode == 0 ? const LocalAiChat() : mode == 1 ? const CodexPage() : ListView(padding: const EdgeInsets.all(20), children: [
     Text('Локальные ИИ-модели', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 12),

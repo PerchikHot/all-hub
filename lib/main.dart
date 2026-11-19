@@ -531,6 +531,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   }
                                 },
                                 icon: const Icon(Icons.system_update_alt_rounded))
+                            else if (data?.downloadUrl != null &&
+                                comparison != 0 && comparison != 1 &&
+                                Platform.isWindows && project.id != 'all-hub' &&
+                                (Uri.tryParse(data!.downloadUrl!)?.path.toLowerCase().endsWith('.exe') == true ||
+                                 Uri.tryParse(data.downloadUrl!)?.path.toLowerCase().endsWith('.zip') == true))
+                              IconButton.filledTonal(
+                                tooltip: comparison == -1 ? 'Обновить Windows-приложение'
+                                  : 'Установить Windows-приложение',
+                                onPressed: () async {
+                                  Navigator.pop(sheetContext);
+                                  try {
+                                    if (!await confirmExternalInstall(project)) return;
+                                    await ProjectLauncher.updateAndLaunchWindows(
+                                      project.id, data!.downloadUrl!,
+                                      version: data.version,
+                                      externalRepo: project.id.startsWith('external-')
+                                        ? project.repo : null,
+                                      sha256Digest: data.sha256Digest);
+                                    installedVersionChecks.remove(project.id);
+                                    if (mounted) {
+                                      setState(() {});
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text(
+                                          'Приложение установлено и запущено')));
+                                    }
+                                  } catch (error) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Ошибка установки: $error')));
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.system_update_alt_rounded))
                             else
                               IconButton(
                                 tooltip: 'Открыть карточку проекта',

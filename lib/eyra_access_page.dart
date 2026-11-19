@@ -144,8 +144,8 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
     try {
       // Recheck consent after confirmation to respect revocation.
       if (!await EyraAccessPolicy.enabled('diagnostics')) return;
-      final result = 'Платформа: ${Platform.operatingSystem}\\nВерсия ОС: ${Platform.operatingSystemVersion}\\n'
-          'Сеть: не проверялась\\nФайлы и приложения: не проверялись';
+      final result = 'Платформа: ${Platform.operatingSystem}\nВерсия ОС: ${Platform.operatingSystemVersion}\n'
+          'Сеть: не проверялась\nФайлы и приложения: не проверялись';
       await EyraAccessPolicy.appendLog('Диагностика запущена вручную (без сохранения результатов)');
       if (mounted) setState(() => diagnosticResult = result);
       await refresh();

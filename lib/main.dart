@@ -127,6 +127,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // returning from the package installer or bringing All Hub to foreground.
       // A stale cached release must not hide a newly available update.
       info.clear();
+      installedVersionChecks.clear();
       setState(() {});
     }
   }
@@ -138,6 +139,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.dispose();
   }
   final Map<String, Future<GithubInfo>> info = {};
+  final Map<String, Future<String?>> installedVersionChecks = {};
+  Future<String?> cachedInstalledVersion(String id) =>
+    installedVersionChecks.putIfAbsent(
+      id, () => ProjectLauncher.installedVersion(id));
   Future<List<Project>> _loadProjects() async {
     final data = await rootBundle.loadString('assets/projects.json');
     final live = await HubService.catalog(data);
@@ -406,6 +411,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<GithubInfo> getInfo(String repo, String id) => info.putIfAbsent(id, () => GithubApi.inspect(repo, projectId: id));
   Future<void> showUpdateCenter(List<Project> catalog) async {
     final available = catalog.where((p) => p.repo != null).toList();
+    // A fresh opening rechecks installed versions once per project.
+    installedVersionChecks.clear();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -442,7 +449,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: FutureBuilder<GithubInfo>(
                       future: getInfo(project.repo!, project.id),
                       builder: (context, release) => FutureBuilder<String?>(
-                        future: ProjectLauncher.installedVersion(project.id),
+                        future: cachedInstalledVersion(project.id),
                         builder: (context, installed) {
                           final data = release.data;
                           final comparison = data?.version != null &&
@@ -510,7 +517,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> refresh() async {
-    setState(() { info.clear(); projects = _loadProjects(); });
+    setState(() { info.clear(); installedVersionChecks.clear(); projects = _loadProjects(); });
     await projects;
     CoverSettings.revision.value++;
   }

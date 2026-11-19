@@ -637,7 +637,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Импорт переписок ChatGPT'),
                 subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Повторный импорт объединяет записи, новые имеют приоритет. Только локально; файл до 64 МБ.'),
-                trailing: importBusy ? const HubWaitIndicator(size: 30) :
+                trailing: importBusy ? const HubWaitIndicator(size: 42) :
                   IconButton(tooltip: 'Импортировать conversations.json',
                     onPressed: importChatGpt, icon: const Icon(Icons.file_open_outlined)),
               ),
@@ -749,7 +749,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.link), label: const Text('Подключиться'))),
           ],
-          if (checkingConnection) const HubWaitIndicator(size: 32),
+          if (checkingConnection) const HubWaitIndicator(size: 44),
           ],
         ]))),
       ),

@@ -55,6 +55,28 @@ void main() {
     ]);
   });
 
+  test('deduplicates excerpts across conversations without changing order', () {
+    final export = [
+      {
+        'current_node': 'b',
+        'mapping': {
+          'a': node(null, 'user', 'Повторяющийся текст из переписки'),
+          'b': node('a', 'assistant', 'Уникальный ответ помощника'),
+        },
+      },
+      {
+        'current_node': 'c',
+        'mapping': {
+          'c': node(null, 'user', 'Повторяющийся текст из переписки'),
+        },
+      },
+    ];
+    expect(extractChatGptExcerpts(export), [
+      'Повторяющийся текст из переписки',
+      'Уникальный ответ помощника',
+    ]);
+  });
+
   test('rejects malformed top-level export', () {
     expect(() => extractChatGptExcerpts({'mapping': {}}), throwsFormatException);
   });

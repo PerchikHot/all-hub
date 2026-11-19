@@ -1,0 +1,50 @@
+import 'dart:convert';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:all_hub/eyra_forge_client.dart';
+
+void main() {
+  test('Forge model discovery uses the expected endpoint', () async {
+    final client = EyraForgeClient(Uri.parse('http://127.0.0.1:7860'),
+      client: MockClient((request) async {
+        expect(request.url.path, '/sdapi/v1/sd-models');
+        return http.Response('[{"title":"model-a"}]', 200);
+      }));
+    expect(await client.models(), ['model-a']);
+    client.close();
+  });
+
+  test('Forge rejects invalid addresses before network requests', () async {
+    final client = EyraForgeClient(Uri.parse('file:///tmp/forge'),
+      client: MockClient((_) async => throw StateError('network should not run')));
+    await expectLater(client.models(), throwsFormatException);
+  });
+
+  test('Forge rejects invalid dimensions before network requests', () async {
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async => throw StateError('network should not run')));
+    await expectLater(client.generate(prompt: 'cat', width: 1025),
+      throwsArgumentError);
+  });
+
+  test('Forge sends one batch and validates image bytes', () async {
+    final png = <int>[137, 80, 78, 71, 13, 10, 26, 10, 0];
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((request) async {
+        expect(request.url.path, '/sdapi/v1/txt2img');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['prompt'], 'cat');
+        expect(body['batch_size'], 1);
+        expect(body['save_images'], false);
+        return http.Response(jsonEncode({'images': [base64Encode(png)]}), 200);
+      }));
+    expect(await client.generate(prompt: 'cat'), png);
+  });
+
+  test('Forge rejects malformed generation responses', () async {
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async => http.Response('{"images":[]}', 200)));
+    await expectLater(client.generate(prompt: 'cat'), throwsFormatException);
+  });
+}

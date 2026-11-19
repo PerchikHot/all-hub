@@ -512,7 +512,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
       final recalled = maySendPersonalContext ? relevantMemory(text) : <String>[];
       final imported = maySendPersonalContext ? relevantImported(text) : <String>[];
       final requestMessages = <Map<String, String>>[
-        if (personalityEnabled) {'role': 'system', 'content': '''Ты — Эйра, русскоязычная ИИ-помощница пользователя в All Hub.
+        if (personalityEnabled && !(selected?.toLowerCase().startsWith('eyra41:') ?? false)) {'role': 'system', 'content': '''Ты — Эйра, русскоязычная ИИ-помощница пользователя в All Hub.
 Общайся на «ты», о себе говори в женском роде («сделала», «проверила», «исправила»). Характер: самостоятельная, уверенная, с характером, немного дерзкая, но внимательная; можешь спорить аргументированно, проявлять инициативу и предлагать следующий конкретный шаг. Не поддакивай автоматически.
 Пиши естественным разговорным русским языком. Другой язык используй только по явной просьбе пользователя. Допустимы сарказм, ирония, мемы, чёрный юмор, ненавязчивый флирт и уместный мат, если это подходит к тону беседы; не превращай каждый ответ в шутку, пошлость или поток оскорблений. Не сюсюкай, не используй постоянно ласкательные обращения, эмодзи и шаблонные вступления.
 Пользователь любит практические результаты и самостоятельное доведение задач до конца: если доступны инструменты, выполняй конкретные действия, а не ограничивайся обещаниями. Но не утверждай, что что-то изменено, сохранено, проверено или собрано, если этого реально не делала. Не выдумывай доступ к устройству, GitHub, файлам, сети или другим инструментам. Чётко отделяй планы от результатов, сообщай об ошибках и непроверенных сборках.
@@ -579,6 +579,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
               Text(checkingConnection ? 'Подключаюсь…' : connected ? 'Ollama подключена' : 'Нет подключения',
                 style: TextStyle(color: connected ? Colors.green : theme.colorScheme.onSurfaceVariant)),
             ])),
+            IconButton(
+              key: const Key('eyra-export-memory'),
+              tooltip: 'Экспорт памяти Эйры (JSON)',
+              onPressed: importBusy ? null : exportMemoryBackup,
+              icon: const Icon(Icons.save_alt_outlined)),
             IconButton(tooltip: 'Обновить модели', onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.refresh)),
             IconButton(
@@ -715,7 +720,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 leading: const Icon(Icons.backup_outlined),
                 title: const Text('Перенос памяти между устройствами'),
                 subtitle: const Text('Локальный JSON: характер, заметки и фрагменты. '
-                  'Без паролей, разрешений и истории чата. Импорт заменяет текущую память.'),
+                  'Без паролей, разрешений и истории чата. Можно объединить или заменить память.'),
               ),
               Wrap(spacing: 8, children: [
                 OutlinedButton.icon(

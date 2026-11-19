@@ -49,12 +49,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ? widget.project.repo : null,
             sha256Digest: release.sha256Digest));
       } else if (Platform.isWindows) {
-        await ProjectLauncher.updateAndLaunchWindows(
-          widget.project.id, release.downloadUrl!,
-          version: release.version,
-          externalRepo: widget.project.id.startsWith('external-')
-            ? widget.project.repo : null,
-          sha256Digest: release.sha256Digest);
+        if (widget.project.id == 'all-hub') {
+          await ProjectLauncher.updateAllHubWindows(
+            release.downloadUrl!,
+            version: release.version,
+            sha256Digest: release.sha256Digest);
+        } else {
+          await ProjectLauncher.updateAndLaunchWindows(
+            widget.project.id, release.downloadUrl!,
+            version: release.version,
+            externalRepo: widget.project.id.startsWith('external-')
+              ? widget.project.repo : null,
+            sha256Digest: release.sha256Digest);
+        }
       }
       if (mounted) await refresh();
     } catch (error) {

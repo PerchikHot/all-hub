@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'project_launcher.dart';
+import 'hub_liquid_progress.dart';
 
 /// A single, platform-independent update surface. Installation is separate
 /// from downloading: the progress bar must never imply an APK was installed.

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -54,6 +55,8 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
   List<String> audit = [];
   bool loading = true;
   bool saving = false;
+  bool diagnosing = false;
+  String? diagnosticResult;
   @override
   void initState() { super.initState(); refresh(); }
 
@@ -79,6 +82,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось сохранить настройку')));
       }
+      if (id == 'diagnostics' && !enabled && mounted) setState(() => diagnosticResult = null);
       await refresh();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -107,9 +111,49 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
       for (final id in EyraAccessPolicy.capabilities.keys) {
         if (await EyraAccessPolicy.enabled(id)) await EyraAccessPolicy.set(id, false);
       }
+      if (mounted) setState(() => diagnosticResult = null);
       await refresh();
     } finally {
       if (mounted) setState(() => saving = false);
+    }
+  }
+
+  /// Explicit foreground-only diagnostic. No file access, network requests,
+  /// process enumeration, identifiers or background monitoring.
+  Future<void> runDiagnostics() async {
+    if (saving || diagnosing) return;
+    if (!await EyraAccessPolicy.enabled('diagnostics')) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сначала включите диагностику')));
+      return;
+    }
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Проверить устройство сейчас?'),
+        content: const Text('Эйра определит только платформу и версию ОС. Данные будут показаны на экране, не отправятся в сеть и не сохранятся в журнале. Никаких файлов или приложений проверка не читает.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Проверить')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => diagnosing = true);
+    try {
+      // Recheck consent after confirmation to respect revocation.
+      if (!await EyraAccessPolicy.enabled('diagnostics')) return;
+      final result = 'Платформа: ${Platform.operatingSystem}\\nВерсия ОС: ${Platform.operatingSystemVersion}\\n'
+          'Сеть: не проверялась\\nФайлы и приложения: не проверялись';
+      await EyraAccessPolicy.appendLog('Диагностика запущена вручную (без сохранения результатов)');
+      if (mounted) setState(() => diagnosticResult = result);
+      await refresh();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось выполнить диагностику')));
+    } finally {
+      if (mounted) setState(() => diagnosing = false);
     }
   }
 
@@ -118,7 +162,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
     const explanations = <String, String>{
       'proactive': 'Только настройка предпочтения. Самостоятельная отправка сообщений пока не реализована.',
       'notifications': 'Системные уведомления пока не подключены. Никаких фоновых уведомлений эта настройка не запускает.',
-      'diagnostics': 'Сбор характеристик и состояния устройства пока не реализован.',
+      'diagnostics': 'Разрешает только ручную проверку платформы и версии ОС после отдельного подтверждения. Без фонового сбора.',
       'files': 'Никакого доступа к файлам не выдаёт. Любое изменение или удаление потребует отдельного подтверждения.',
       'apps': 'Не даёт права устанавливать, запускать или удалять приложения.',
       'sync': 'Синхронизация пока не реализована: переписки и память остаются на текущем устройстве.',
@@ -144,6 +188,29 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
               value: choices[entry.key] ?? false,
               onChanged: saving ? null : (value) => change(entry.key, value),
             )),
+          const SizedBox(height: 12),
+          Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Диагностика по запросу', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              const Text('Без скрытого мониторинга: только ОС и её версия. Результат не отправляется и не сохраняется.'),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: saving || diagnosing || !(choices['diagnostics'] ?? false)
+                    ? null : runDiagnostics,
+                icon: const Icon(Icons.fact_check_outlined),
+                label: Text(diagnosing ? 'Проверяем…' : 'Проверить сейчас'),
+              ),
+              if (diagnosticResult != null) ...[
+                const SizedBox(height: 8),
+                SelectableText(diagnosticResult!),
+                TextButton(
+                  onPressed: () => setState(() => diagnosticResult = null),
+                  child: const Text('Скрыть результат'),
+                ),
+              ],
+            ],
+          ))),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: saving ? null : revokeAll,

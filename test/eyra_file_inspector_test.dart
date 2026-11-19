@@ -32,7 +32,7 @@ void main() {
     final dir = await Directory.systemTemp.createTemp('eyra-inspect-');
     try {
       final missing = File('${dir.path}/missing');
-      await expectLater(EyraFileInspector.inspect(missing), throwsA(isA<FileSystemException>()));
+      await expectLater(EyraFileInspector.inspect(missing), throwsA(isA<FormatException>()));
       expect(await missing.exists(), false);
     } finally {
       await dir.delete(recursive: true);

@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/services.dart';
@@ -2142,7 +2143,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             const SizedBox(height: 6),
             const Text('Расчёт по внесённым операциям, не баланс банков', style: TextStyle(color: Colors.white54, fontSize: 12)),
             const SizedBox(height: 16),
-            LinearProgressIndicator(value: (total / goal).clamp(0.0, 1.0)),
+            HubLiquidProgress(value: (total / goal).clamp(0.0, 1.0)),
             const SizedBox(height: 8),
             Text('Цель: ${money(goal)}'),
           ]))),
@@ -2186,7 +2187,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
             if (budgetProgress != null) ...[
               Text('Потрачено: ${money(monthlyExpenses)} из ${money(monthlyBudget)}'),
               const SizedBox(height: 8),
-              LinearProgressIndicator(value: budgetProgress),
+              HubLiquidProgress(value: budgetProgress),
               const SizedBox(height: 8),
               Text(monthlyExpenses > monthlyBudget
                 ? 'Лимит превышен на ${money(monthlyExpenses - monthlyBudget)}'
@@ -2248,7 +2249,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
               Row(children: [
                 SizedBox(width: 56, child: Text(
                   '${DateTime(now.year, now.month, now.day - 6 + index).day.toString().padLeft(2, '0')}.${DateTime(now.year, now.month, now.day - 6 + index).month.toString().padLeft(2, '0')}')),
-                Expanded(child: LinearProgressIndicator(
+                Expanded(child: HubLiquidProgress(
                   value: weeklyPeak > 0
                     ? (weeklyExpenses[index] / weeklyPeak).clamp(0.0, 1.0)
                     : 0.0)),
@@ -2277,7 +2278,7 @@ class _KopilkaPageState extends State<KopilkaPage> with WidgetsBindingObserver {
                 Text(money(item.value)),
               ]),
               const SizedBox(height: 4),
-              LinearProgressIndicator(value: monthlyExpenses > 0
+              HubLiquidProgress(value: monthlyExpenses > 0
                 ? (item.value / monthlyExpenses).clamp(0.0, 1.0) : 0),
             ],
           ]),

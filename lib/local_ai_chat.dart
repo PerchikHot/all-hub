@@ -216,10 +216,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
       final excerpts = await extractChatGptExcerptsFromFile(file.path!);
       if (excerpts.isEmpty) throw const FormatException('Текстовых сообщений не найдено');
       final prefs = await SharedPreferences.getInstance();
-      if (!await prefs.setStringList('eyra_chatgpt_excerpts', excerpts)) {
+      final merged = mergeChatGptExcerpts(importedExcerpts, excerpts);
+      if (!await prefs.setStringList('eyra_chatgpt_excerpts', merged)) {
         throw const FormatException('Не удалось сохранить импорт локально');
       }
-      if (mounted) setState(() { importedExcerpts..clear()..addAll(excerpts); excerptPage = 0; excerptQuery = ''; excerptSearch.clear(); });
+      if (mounted) setState(() { importedExcerpts..clear()..addAll(merged); excerptPage = 0; excerptQuery = ''; excerptSearch.clear(); });
     } catch (e) {
       if (mounted) setState(() => error = 'Ошибка импорта: $e');
     } finally {
@@ -467,7 +468,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Импорт переписок ChatGPT'),
-                subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Только локально; файл до 64 МБ.'),
+                subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Повторный импорт объединяет записи, новые имеют приоритет. Только локально; файл до 64 МБ.'),
                 trailing: importBusy ? const CircularProgressIndicator() :
                   IconButton(tooltip: 'Импортировать conversations.json',
                     onPressed: importChatGpt, icon: const Icon(Icons.file_open_outlined)),

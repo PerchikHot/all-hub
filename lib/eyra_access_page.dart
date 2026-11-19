@@ -244,6 +244,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
               const Text('Без скрытого мониторинга: только ОС и её версия. Результат не отправляется и не сохраняется.'),
               const SizedBox(height: 8),
               FilledButton.icon(
+                key: const ValueKey('eyra-run-diagnostics'),
                 onPressed: saving || diagnosing || !(choices['diagnostics'] ?? false)
                     ? null : runDiagnostics,
                 icon: const Icon(Icons.fact_check_outlined),

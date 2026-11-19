@@ -190,34 +190,74 @@ class _LocalAiChatState extends State<LocalAiChat> {
       }
       final backup = EyraMemoryBackup.decode(await file.readAsString());
       if (!mounted) return;
-      final confirmed = await showDialog<bool>(
+      final choice = await showDialog<String>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Восстановить память Эйры?'),
-          content: Text('Заменить локальные настройки характера, '
-            '${memoryNotes.length} заметок и ${importedExcerpts.length} фрагментов '
-            'данными из копии от ${backup.exportedAt.toLocal()}? '
-            'Текущие записи будут заменены. История чата не изменится.'),
+          title: const Text('Перенести память Эйры'),
+          content: Text('Копия от ${backup.exportedAt.toLocal()} содержит '
+            '${backup.notes.length} заметок и ${backup.excerpts.length} фрагментов. '
+            'Сейчас сохранено ${memoryNotes.length} заметок и '
+            '${importedExcerpts.length} фрагментов.\\n\\n'
+            'Объединить — сохранить текущий характер и добавить только '
+            'отсутствующие записи. Заменить — использовать характер и '
+            'память из копии. История чата и разрешения не меняются.'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            TextButton(onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Отмена')),
-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Восстановить')),
+            OutlinedButton(onPressed: () => Navigator.pop(dialogContext, 'replace'),
+              child: const Text('Заменить')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, 'merge'),
+              child: const Text('Объединить')),
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (choice == null) return;
+      final current = EyraMemoryBackup(
+        personality: personalityNotes.text,
+        notes: List<String>.of(memoryNotes),
+        excerpts: List<String>.of(importedExcerpts),
+        exportedAt: DateTime.now().toUtc(),
+      );
+      final result = choice == 'merge' ? current.mergeWith(backup) : backup;
       final prefs = await SharedPreferences.getInstance();
-      final ok = await prefs.setString('eyra_personality_notes', backup.personality) &&
-        await prefs.setStringList('eyra_memory_notes', backup.notes) &&
-        await prefs.setStringList('eyra_chatgpt_excerpts', backup.excerpts);
-      if (!ok) throw const FileSystemException('Не удалось сохранить память');
-      if (mounted) setState(() {
-        personalityNotes.text = backup.personality;
-        memoryNotes..clear()..addAll(backup.notes);
-        importedExcerpts..clear()..addAll(backup.excerpts);
-        excerptPage = 0;
-      });
+      // A failed preference write must not leave a half-imported snapshot.
+      final oldPersonality = prefs.getString('eyra_personality_notes');
+      final oldNotes = prefs.getStringList('eyra_memory_notes');
+      final oldExcerpts = prefs.getStringList('eyra_chatgpt_excerpts');
+      try {
+        if (!await prefs.setString('eyra_personality_notes', result.personality) ||
+            !await prefs.setStringList('eyra_memory_notes', result.notes) ||
+            !await prefs.setStringList('eyra_chatgpt_excerpts', result.excerpts)) {
+          throw const FileSystemException('Не удалось сохранить память');
+        }
+      } catch (_) {
+        if (oldPersonality == null) {
+          await prefs.remove('eyra_personality_notes');
+        } else {
+          await prefs.setString('eyra_personality_notes', oldPersonality);
+        }
+        if (oldNotes == null) {
+          await prefs.remove('eyra_memory_notes');
+        } else {
+          await prefs.setStringList('eyra_memory_notes', oldNotes);
+        }
+        if (oldExcerpts == null) {
+          await prefs.remove('eyra_chatgpt_excerpts');
+        } else {
+          await prefs.setStringList('eyra_chatgpt_excerpts', oldExcerpts);
+        }
+        rethrow;
+      }
+      if (mounted) {
+        setState(() {
+          personalityNotes.text = result.personality;
+          memoryNotes..clear()..addAll(result.notes);
+          importedExcerpts..clear()..addAll(result.excerpts);
+          excerptPage = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          choice == 'merge' ? 'Память объединена без дубликатов' : 'Память восстановлена из копии')));
+      }
     } catch (e) {
       if (mounted) setState(() => error = 'Ошибка импорта памяти: $e');
     } finally {

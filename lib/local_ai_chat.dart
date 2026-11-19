@@ -1,3 +1,4 @@
+import 'eyra_forge_client.dart';
 import 'hub_wait_indicator.dart';
 import 'eyra_memory_backup.dart';
 import 'dart:typed_data';
@@ -18,6 +19,67 @@ class LocalAiChat extends StatefulWidget {
 class _LocalAiChatState extends State<LocalAiChat> {
   final address = TextEditingController(text: 'http://127.0.0.1:11434');
   final input = TextEditingController();
+  Uint8List? attachedImage;
+  String? attachedName;
+  final Map<int, Uint8List> generatedImages = {};
+  bool get wantsImage => RegExp(
+    r'(нарисуй|сгенерируй|создай изображение|сделай картинк|изобрази|отрисуй|измени фото|отредактируй фото|переделай фото|поменяй фон|измени одежду)',
+    caseSensitive: false).hasMatch(input.text) || attachedImage != null;
+
+  Future<void> attachPhoto() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image, withData: true);
+    if (picked == null || picked.files.isEmpty) return;
+    final file = picked.files.single;
+    final bytes = file.bytes ?? (file.path == null ? null
+      : await File(file.path!).readAsBytes());
+    if (bytes == null || bytes.length > 12 * 1024 * 1024) {
+      if (mounted) setState(() => error = 'Фото должно быть не больше 12 МиБ');
+      return;
+    }
+    if (mounted) setState(() { attachedImage = bytes; attachedName = file.name; });
+  }
+
+  Future<void> sendForge(String request) async {
+    final photo = attachedImage;
+    final prefs = await SharedPreferences.getInstance();
+    final endpoint = prefs.getString('eyra_forge_endpoint') ?? 'http://127.0.0.1:7860';
+    final client = EyraForgeClient(Uri.parse(endpoint));
+    setState(() {
+      sending = true;
+      error = null;
+      messages.add({'role': 'user', 'content':
+        photo == null ? request : '$request\n[Фото: ${attachedName ?? 'вложение'}]'});
+      attachedImage = null;
+      attachedName = null;
+    });
+    input.clear();
+    await saveMessages();
+    try {
+      // A single natural-language instruction is enough. The photo determines
+      // img2img vs txt2img; no separate Forge settings page is required.
+      final description = request.isEmpty ? 'Сохрани композицию и улучши качество изображения' : request;
+      final bytes = photo == null
+        ? await client.generate(prompt: description)
+        : await client.edit(source: photo, prompt: description);
+      if (!mounted) return;
+      final index = messages.length;
+      setState(() {
+        generatedImages[index] = bytes;
+        messages.add({'role': 'assistant', 'content':
+          photo == null ? 'Готово, создала изображение через Forge.'
+            : 'Готово, обработала фотографию через Forge.'});
+      });
+      await saveMessages();
+    } catch (e) {
+      if (mounted) setState(() => error =
+        'Forge недоступен: $e. Проверь адрес Forge API в настройках и запуск с --api.');
+    } finally {
+      client.close();
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
   final personalityNotes = TextEditingController();
   bool personalityEnabled = true;
   final memoryInput = TextEditingController();
@@ -411,7 +473,12 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || sending || selected == null || restoring || !models.contains(selected)) return;
+    if (sending || restoring) return;
+    if (wantsImage) {
+      await sendForge(text);
+      return;
+    }
+    if (text.isEmpty || selected == null || !models.contains(selected)) return;
     input.clear();
     setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
     await saveMessages();
@@ -780,14 +847,42 @@ class _LocalAiChatState extends State<LocalAiChat> {
                       Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium?.copyWith(color: const Color(0xFFB5D4FF), fontWeight: FontWeight.w700)),
                       const SizedBox(height: 6),
                       SelectableText(m['content'] ?? ''),
+                      if (generatedImages[index] != null) ...[
+                        const SizedBox(height: 8),
+                        Image.memory(generatedImages[index]!, fit: BoxFit.contain),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final bytes = generatedImages[index]!;
+                            await FilePicker.platform.saveFile(
+                              dialogTitle: 'Сохранить результат Эйры',
+                              fileName: 'eyra-forge-${DateTime.now().millisecondsSinceEpoch}.png',
+                              type: FileType.custom,
+                              allowedExtensions: ['png'], bytes: bytes);
+                          },
+                          icon: const Icon(Icons.save_alt_rounded),
+                          label: const Text('Сохранить изображение')),
+                      ],
                     ])),
                 ))));
           },
         )),
       if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Align(alignment: Alignment.centerLeft, child: HubAiResponding())),
+      if (attachedImage != null) Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(children: [
+          const Icon(Icons.image_rounded), const SizedBox(width: 8),
+          Expanded(child: Text(attachedName ?? 'Фото прикреплено',
+            maxLines: 1, overflow: TextOverflow.ellipsis)),
+          IconButton(tooltip: 'Убрать фото', onPressed: () => setState(() {
+            attachedImage = null; attachedName = null;
+          }), icon: const Icon(Icons.close_rounded)),
+        ])),
       SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          IconButton(tooltip: 'Прикрепить фото для Forge',
+            onPressed: sending ? null : attachPhoto,
+            icon: const Icon(Icons.add_photo_alternate_outlined)),
           Expanded(child: TextField(controller: input, maxLines: 5, minLines: 1,
             textCapitalization: TextCapitalization.sentences,
             onSubmitted: (_) => send(),
@@ -796,7 +891,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 borderRadius: BorderRadius.circular(20))))),
           const SizedBox(width: 8),
           IconButton.filled(tooltip: 'Отправить',
-            onPressed: sending || !connected ? null : send,
+            onPressed: sending || (!connected && !wantsImage) ? null : send,
             icon: const Icon(Icons.arrow_upward)),
         ]))),
     ]);

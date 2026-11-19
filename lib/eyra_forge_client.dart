@@ -130,48 +130,5 @@ class EyraForgeClient {
     return bytes;
   }
 
-  Future<Uint8List> edit({
-    required Uint8List source,
-    required String prompt,
-    String negativePrompt = '',
-    int steps = 20,
-    double denoisingStrength = .55,
-  }) async {
-    if (source.isEmpty || source.length > 12 * 1024 * 1024) {
-      throw ArgumentError('Изображение должно быть не больше 12 МиБ');
-    }
-    if (prompt.trim().isEmpty || prompt.length > 4000) {
-      throw ArgumentError('Описание редактирования обязательно (до 4000 символов)');
-    }
-    final response = await _client.post(url('/sdapi/v1/img2img'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'init_images': [base64Encode(source)],
-        'prompt': prompt.trim(),
-        'negative_prompt': negativePrompt,
-        'steps': steps,
-        'denoising_strength': denoisingStrength,
-        'batch_size': 1, 'n_iter': 1, 'save_images': false,
-      }),
-    ).timeout(const Duration(minutes: 8));
-    if (response.statusCode != 200) {
-      throw StateError('Forge img2img: HTTP ${response.statusCode}');
-    }
-    if (response.bodyBytes.length > 24 * 1024 * 1024) {
-      throw const FormatException('Ответ Forge слишком большой');
-    }
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map || decoded['images'] is! List ||
-        (decoded['images'] as List).isEmpty ||
-        (decoded['images'] as List).first is! String) {
-      throw const FormatException('Forge не вернул отредактированное изображение');
-    }
-    final encoded = ((decoded['images'] as List).first as String).split(',').last;
-    if (encoded.length > 24 * 1024 * 1024) {
-      throw const FormatException('Изображение Forge слишком большое');
-    }
-    return base64Decode(encoded);
-  }
-
   void close() { if (_ownsClient) _client.close(); }
 }

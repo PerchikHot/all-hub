@@ -86,3 +86,19 @@ List<String> extractChatGptExcerpts(dynamic data) {
   }
   return excerpts;
 }
+
+/// Merge an additional ChatGPT export without silently discarding previously
+/// imported local excerpts. Newer imported entries take priority when full.
+List<String> mergeChatGptExcerpts(List<String> existing, List<String> incoming,
+    {int maxExcerpts = 1000}) {
+  if (maxExcerpts <= 0) return const [];
+  final merged = <String>[];
+  final seen = <String>{};
+  for (final excerpt in [...incoming, ...existing]) {
+    final value = excerpt.trim();
+    if (value.isEmpty || !seen.add(value)) continue;
+    merged.add(value);
+    if (merged.length == maxExcerpts) break;
+  }
+  return merged;
+}

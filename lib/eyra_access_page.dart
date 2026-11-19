@@ -30,7 +30,7 @@ class EyraAccessPolicy {
     final prefs = await SharedPreferences.getInstance();
     final entries = prefs.getStringList('${prefix}audit') ?? <String>[];
     final item = jsonEncode({'time': DateTime.now().toUtc().toIso8601String(), 'event': message});
-    await prefs.setStringList('${prefix}audit', [...entries, item].takeLast(100));
+    await prefs.setStringList('${prefix}audit', [...entries, item].takeLast(100).toList());
   }
 }
 

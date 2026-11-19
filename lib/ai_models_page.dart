@@ -1,3 +1,4 @@
+import 'eyra_access_page.dart';
 import 'gguf_chat_page.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -194,6 +195,15 @@ class _AiModelsPageState extends State<AiModelsPage> {
       : '${(bytes / 1048576).toStringAsFixed(0)} МБ';
   @override
   Widget build(BuildContext context) => Column(children: [
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Row(children: [
+      const Expanded(child: Text('Эйра · единый помощник', maxLines: 1, overflow: TextOverflow.ellipsis)),
+      TextButton.icon(
+        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(
+          builder: (_) => const EyraAccessPage())),
+        icon: const Icon(Icons.admin_panel_settings_outlined),
+        label: const Text('Доступ'),
+      ),
+    ])),
     Padding(padding: const EdgeInsets.all(12), child: SegmentedButton<int>(
       segments: const [ButtonSegment(value:0,label:Text('Ollama')),ButtonSegment(value:1,label:Text('Codex')),ButtonSegment(value:2,label:Text('GGUF'))],
       selected:{mode},onSelectionChanged:(v)=>setState(()=>mode=v.first))),

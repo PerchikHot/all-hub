@@ -7,6 +7,7 @@ import 'ollama_context_privacy.dart';
 import 'chatgpt_export_parser.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
@@ -102,6 +103,45 @@ class _LocalAiChatState extends State<LocalAiChat> {
     }
   }
 
+  String? avatarPath;
+  Future<void> chooseAvatar() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['png', 'jpg', 'jpeg'],
+        withData: true);
+      if (picked == null || picked.files.isEmpty) return;
+      final selectedFile = picked.files.single;
+      final bytes = selectedFile.bytes ??
+          (selectedFile.path == null ? null : await File(selectedFile.path!).readAsBytes());
+      if (bytes == null || bytes.isEmpty || bytes.length > 8 * 1024 * 1024) {
+        throw const FormatException('Нужен PNG/JPEG не больше 8 МиБ');
+      }
+      final isPng = bytes.length >= 8 && bytes[0] == 137 && bytes[1] == 80 &&
+          bytes[2] == 78 && bytes[3] == 71;
+      final isJpeg = bytes.length >= 3 && bytes[0] == 255 &&
+          bytes[1] == 216 && bytes[2] == 255;
+      if (!isPng && !isJpeg) throw const FormatException('Нужен PNG или JPEG');
+      final dir = await getApplicationSupportDirectory();
+      final target = File('${dir.path}/eyra_avatar.${isPng ? 'png' : 'jpg'}');
+      await target.writeAsBytes(bytes, flush: true);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('eyra_avatar_path', target.path);
+      if (mounted) setState(() => avatarPath = target.path);
+    } catch (e) {
+      if (mounted) setState(() => error = 'Не удалось установить внешность Эйры: $e');
+    }
+  }
+  Widget avatar({double size = 32}) => ClipRRect(
+    borderRadius: BorderRadius.circular(size * .3),
+    child: avatarPath == null
+      ? Container(width: size, height: size, color: const Color(0xFF234879),
+          child: Icon(Icons.auto_awesome_rounded, size: size * .62,
+            color: const Color(0xFFB9D9FF)))
+      : Image.file(File(avatarPath!), width: size, height: size,
+          fit: BoxFit.cover, errorBuilder: (_, __, ___) =>
+            Icon(Icons.broken_image_outlined, size: size)),
+  );
+
   final personalityNotes = TextEditingController();
   bool personalityEnabled = true;
   final memoryInput = TextEditingController();
@@ -191,6 +231,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   void initState() { super.initState(); restore(); }
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
+    avatarPath = prefs.getString('eyra_avatar_path');
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
     personalityEnabled = prefs.getBool('eyra_personality_enabled') ?? true;
     personalityNotes.text = prefs.getString('eyra_personality_notes') ?? '';
@@ -572,13 +613,18 @@ class _LocalAiChatState extends State<LocalAiChat> {
       Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 6), child: Card(
         child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
           Row(children: [
-            Container(width: 32, height: 32, decoration: BoxDecoration(color: const Color(0xFF234879), borderRadius: BorderRadius.circular(11)), child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB9D9FF), size: 20)),
+            avatar(),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Локальная модель', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               Text(checkingConnection ? 'Подключаюсь…' : connected ? 'Ollama подключена' : 'Нет подключения',
                 style: TextStyle(color: connected ? Colors.green : theme.colorScheme.onSurfaceVariant)),
             ])),
+            IconButton(
+              key: const Key('eyra-avatar-picker'),
+              tooltip: 'Выбрать внешность Эйры (PNG/JPEG)',
+              onPressed: chooseAvatar,
+              icon: const Icon(Icons.face_retouching_natural_outlined)),
             IconButton(
               key: const Key('eyra-export-memory'),
               tooltip: 'Экспорт памяти Эйры (JSON)',
@@ -857,7 +903,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         child: Text(error!, style: TextStyle(color: theme.colorScheme.error))),
       Expanded(child: messages.isEmpty ? Center(child: Padding(
         padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 76, height: 76, decoration: BoxDecoration(color: const Color(0xFF1C3559), borderRadius: BorderRadius.circular(24)), child: const Icon(Icons.auto_awesome_rounded, size: 38, color: Color(0xFFB9D9FF))),
+          avatar(size: 76),
           const SizedBox(height: 12),
           Text(connected ? 'О чём поговорим?' : 'Эйра ждёт подключения', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), textAlign: TextAlign.center),
           const SizedBox(height: 6),

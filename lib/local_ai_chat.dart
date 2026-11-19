@@ -21,6 +21,29 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool memoryEnabled = true;
   final List<String> importedExcerpts = [];
   bool importBusy = false;
+  final excerptSearch = TextEditingController();
+  String excerptQuery = '';
+  int excerptPage = 0;
+  static const excerptPageSize = 15;
+  List<int> get matchingExcerptIndices {
+    final query = excerptQuery.trim().toLowerCase();
+    if (query.isEmpty) return List<int>.generate(importedExcerpts.length, (i) => i);
+    return [for (var i = 0; i < importedExcerpts.length; i++)
+      if (importedExcerpts[i].toLowerCase().contains(query)) i];
+  }
+  Future<void> removeImportedExcerpt(int index) async {
+    if (importBusy || index < 0 || index >= importedExcerpts.length) return;
+    final next = [...importedExcerpts]..removeAt(index);
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setStringList('eyra_chatgpt_excerpts', next)) {
+      if (mounted) setState(() => error = 'Не удалось удалить фрагмент из локального хранилища');
+      return;
+    }
+    if (mounted) setState(() {
+      importedExcerpts..clear()..addAll(next);
+      excerptPage = 0;
+    });
+  }
   final messages = <Map<String, String>>[];
   List<String> models = [];
   String? selected;
@@ -196,7 +219,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (!await prefs.setStringList('eyra_chatgpt_excerpts', excerpts)) {
         throw const FormatException('Не удалось сохранить импорт локально');
       }
-      if (mounted) setState(() { importedExcerpts..clear()..addAll(excerpts); });
+      if (mounted) setState(() { importedExcerpts..clear()..addAll(excerpts); excerptPage = 0; excerptQuery = ''; excerptSearch.clear(); });
     } catch (e) {
       if (mounted) setState(() => error = 'Ошибка импорта: $e');
     } finally {
@@ -317,7 +340,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
 
   @override
-  void dispose() { address.dispose(); input.dispose(); personalityNotes.dispose(); memoryInput.dispose(); super.dispose(); }
+  void dispose() { address.dispose(); input.dispose(); personalityNotes.dispose(); memoryInput.dispose(); excerptSearch.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -444,7 +467,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Импорт переписок ChatGPT'),
-                subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Только локально; файл до 20 МБ.'),
+                subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Только локально; файл до 64 МБ.'),
                 trailing: importBusy ? const CircularProgressIndicator() :
                   IconButton(tooltip: 'Импортировать conversations.json',
                     onPressed: importChatGpt, icon: const Icon(Icons.file_open_outlined)),
@@ -454,6 +477,72 @@ class _LocalAiChatState extends State<LocalAiChat> {
                   onPressed: clearImportedExcerpts,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Удалить импортированные фрагменты'))),
+              if (importedExcerpts.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: excerptSearch,
+                  decoration: InputDecoration(
+                    labelText: 'Поиск по импортированным фрагментам',
+                    hintText: 'Слово или часть фразы',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: excerptQuery.isEmpty ? null : IconButton(
+                      tooltip: 'Очистить поиск',
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => setState(() {
+                        excerptSearch.clear();
+                        excerptQuery = '';
+                        excerptPage = 0;
+                      }),
+                    ),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (value) => setState(() {
+                    excerptQuery = value;
+                    excerptPage = 0;
+                  }),
+                ),
+                Builder(builder: (context) {
+                  final matches = matchingExcerptIndices;
+                  final pages = (matches.length + excerptPageSize - 1) ~/ excerptPageSize;
+                  final page = pages == 0 ? 0 : excerptPage.clamp(0, pages - 1);
+                  final visible = matches.skip(page * excerptPageSize).take(excerptPageSize);
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Найдено: ${matches.length} из ${importedExcerpts.length}'),
+                    ),
+                    if (matches.isEmpty)
+                      const Padding(padding: EdgeInsets.all(12),
+                        child: Text('Совпадений нет. Попробуй другой запрос.')),
+                    for (final index in visible)
+                      Card(child: ListTile(
+                        title: SelectableText(importedExcerpts[index],
+                          maxLines: 5),
+                        trailing: IconButton(
+                          tooltip: 'Удалить этот фрагмент',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: importBusy ? null : () => removeImportedExcerpt(index),
+                        ),
+                      )),
+                    if (pages > 1)
+                      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        IconButton(
+                          tooltip: 'Предыдущая страница',
+                          onPressed: page == 0 ? null :
+                            () => setState(() => excerptPage = page - 1),
+                          icon: const Icon(Icons.chevron_left),
+                        ),
+                        Text('${page + 1} / $pages'),
+                        IconButton(
+                          tooltip: 'Следующая страница',
+                          onPressed: page >= pages - 1 ? null :
+                            () => setState(() => excerptPage = page + 1),
+                          icon: const Icon(Icons.chevron_right),
+                        ),
+                      ]),
+                  ]);
+                }),
+              ],
               const Text('Из экспорта сохраняются только текстовые фрагменты. При повторном импорте старые заменяются. В запрос Ollama передаются до 3 совпадающих фрагментов; при подключении к удалённому серверу они покидают устройство.'),
               const Padding(
                 padding: EdgeInsets.only(bottom: 8),

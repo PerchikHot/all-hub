@@ -104,6 +104,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int tab = 0;
   String category = 'All';
+  String? selectedProjectId;
   String search = '';
   final TextEditingController searchController = TextEditingController();
   bool showOnlyAvailable = false;
@@ -640,13 +641,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
       return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
-        if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
+        // Project artwork is the hero; avoid an oversized decorative banner.
         if (tab == 0) ...[
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFF152A47),
-              border: Border.all(color: const Color(0xFF294B77)),
+              color: const Color(0xFF101C30),
+              border: Border.all(color: const Color(0xFF29405E)),
               borderRadius: BorderRadius.circular(16)),
             child: Row(children: [
               const Icon(Icons.sync_rounded, color: Color(0xFF9CC6FF), size: 26),
@@ -763,7 +764,82 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 label: const Text('Сбросить фильтры')),
             ]),
           ),
-        for (final project in (tab == 0 ? filtered : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
+        if (tab == 0 && filtered.isNotEmpty) ...[
+          LayoutBuilder(builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 920 ? 5
+                : constraints.maxWidth >= 600 ? 4 : 2;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filtered.length,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.84,
+              ),
+              itemBuilder: (context, index) {
+                final project = filtered[index];
+                final selected = selectedProjectId == project.id;
+                return Material(
+                  color: const Color(0xFF101B2D),
+                  borderRadius: BorderRadius.circular(14),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => setState(() =>
+                      selectedProjectId = selected ? null : project.id),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: selected ? const Color(0xFF7AAEFF)
+                            : const Color(0xFF263C57),
+                          width: selected ? 2 : 1),
+                        borderRadius: BorderRadius.circular(14)),
+                      child: Column(children: [
+                        Expanded(child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12)),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ProjectCover(
+                              id: project.id,
+                              title: project.name,
+                              type: project.type),
+                          ),
+                        )),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 8),
+                          child: Row(children: [
+                            Expanded(child: Text(project.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w700))),
+                            Icon(selected ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                              size: 19, color: const Color(0xFF9BC5FF)),
+                          ]),
+                        ),
+                      ]),
+                    ),
+                  ),
+                );
+              },
+            );
+          }),
+          const SizedBox(height: 12),
+          if (selectedProjectId == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Нажми на проект, чтобы открыть описание, установку и обновления.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFFA9BED9))),
+            ),
+        ],
+        for (final project in (tab == 0
+          ? filtered.where((p) => p.id == selectedProjectId)
+          : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
           if (project.id.startsWith('external-'))
             FutureBuilder<String?>(
               future: ExternalArtwork.load(project.id),

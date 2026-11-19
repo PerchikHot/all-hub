@@ -47,4 +47,28 @@ void main() {
       client: MockClient((_) async => http.Response('{"images":[]}', 200)));
     await expectLater(client.generate(prompt: 'cat'), throwsFormatException);
   });
+  test('Forge rejects invalid prompts and oversized steps before connecting', () async {
+    var calls = 0;
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async {
+        calls++;
+        return http.Response('{}', 200);
+      }));
+    await expectLater(client.generate(prompt: '  '), throwsArgumentError);
+    await expectLater(client.generate(prompt: 'cat', steps: 51), throwsArgumentError);
+    await expectLater(client.generate(prompt: 'cat', width: 513), throwsArgumentError);
+    expect(calls, 0);
+  });
+
+  test('Forge returns useful errors for unavailable API and invalid images', () async {
+    final offline = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async => http.Response('unavailable', 503)));
+    await expectLater(offline.models(), throwsStateError);
+    await expectLater(offline.generate(prompt: 'cat'), throwsStateError);
+    final invalid = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async => http.Response(
+        jsonEncode({'images': [base64Encode([1, 2, 3, 4, 5, 6, 7, 8])]}), 200)));
+    await expectLater(invalid.generate(prompt: 'cat'), throwsFormatException);
+  });
+
 }

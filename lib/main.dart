@@ -517,7 +517,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     await ProjectLauncher.runInstallExclusive(
                                       project.id,
                                       () => ProjectLauncher.installAndroidApk(
-                                        data!.downloadUrl!,
+                                        data.downloadUrl!,
                                         projectId: project.id,
                                         externalRepo: project.id.startsWith('external-')
                                           ? project.repo : null,
@@ -544,7 +544,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   try {
                                     if (!await confirmExternalInstall(project)) return;
                                     await ProjectLauncher.updateAndLaunchWindows(
-                                      project.id, data!.downloadUrl!,
+                                      project.id, data.downloadUrl!,
                                       version: data.version,
                                       externalRepo: project.id.startsWith('external-')
                                         ? project.repo : null,

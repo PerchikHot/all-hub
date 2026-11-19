@@ -88,7 +88,7 @@ class EyraMemoryStore {
       const JsonEncoder.withIndent('  ').convert(await read());
 
   Future<List<Map<String, dynamic>>> search(String query, {int limit = 8}) async {
-    final terms = query.toLowerCase().split(RegExp(r'\\s+'))
+    final terms = query.toLowerCase().split(RegExp(r'\s+'))
         .where((s) => s.length > 2).toSet();
     if (terms.isEmpty) return [];
     final data = await read();

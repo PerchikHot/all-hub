@@ -479,8 +479,20 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     final raw = mediaFeedImageUrl(post, highQuality: true);
     final uri = raw == null ? null : Uri.tryParse(raw);
     if (uri == null || uri.scheme != 'https') return;
+    // Snapshot the currently visible feed so navigation remains stable while
+    // more pages load in the background. Skip entries without direct media.
+    final urls = visiblePosts.map((item) =>
+        Uri.tryParse(mediaFeedImageUrl(item, highQuality: true) ?? ''))
+        .whereType<Uri>()
+        .where((item) => item.scheme == 'https')
+        .toList(growable: false);
+    final index = urls.indexOf(uri);
     Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => MediaBrowserPage(url: uri),
+      builder: (_) => MediaBrowserPage(
+        url: uri,
+        galleryUrls: urls,
+        initialIndex: index < 0 ? 0 : index,
+      ),
     ));
   }
 

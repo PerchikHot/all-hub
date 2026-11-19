@@ -404,6 +404,111 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
   Future<GithubInfo> getInfo(String repo, String id) => info.putIfAbsent(id, () => GithubApi.inspect(repo, projectId: id));
+  Future<void> showUpdateCenter(List<Project> catalog) async {
+    final available = catalog.where((p) => p.repo != null).toList();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.82,
+          child: Column(children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 6),
+              child: Row(children: [
+                Icon(Icons.system_update_alt_rounded,
+                  color: Color(0xFF9CC6FF), size: 27),
+                SizedBox(width: 12),
+                Expanded(child: Text('Обновления приложений',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800))),
+              ]),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              child: Text('Проверяем опубликованные версии и сравниваем с установленными. '
+                'Установка доступна из карточки проекта.',
+                style: TextStyle(color: Color(0xFFAABDD9))),
+            ),
+            Expanded(child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              itemCount: available.length,
+              itemBuilder: (context, index) {
+                final project = available[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: FutureBuilder<GithubInfo>(
+                      future: getInfo(project.repo!, project.id),
+                      builder: (context, release) => FutureBuilder<String?>(
+                        future: ProjectLauncher.installedVersion(project.id),
+                        builder: (context, installed) {
+                          final data = release.data;
+                          final comparison = data?.version != null &&
+                                  installed.data != null
+                            ? comparePublishedVersions(installed.data!, data!.version!)
+                            : null;
+                          final status = release.hasError ? 'Ошибка проверки релиза'
+                            : !release.hasData || !installed.hasData &&
+                                installed.connectionState != ConnectionState.done
+                              ? 'Проверяем версии…'
+                            : data?.downloadUrl == null
+                              ? 'Нет установочного файла для устройства'
+                            : comparison == -1 ? 'Доступно обновление'
+                            : comparison == 0 ? 'Актуальная версия'
+                            : comparison == 1 ? 'Установлена более новая версия'
+                            : 'Доступна установка';
+                          return Row(children: [
+                            Icon(comparison == -1
+                              ? Icons.new_releases_rounded
+                              : comparison == 0 ? Icons.check_circle_outline
+                              : Icons.apps_rounded,
+                              color: comparison == -1
+                                ? const Color(0xFF8DE0C0)
+                                : const Color(0xFF9CC6FF)),
+                            const SizedBox(width: 12),
+                            Expanded(child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(project.name, maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 3),
+                                Text(status, style: const TextStyle(
+                                  color: Color(0xFFAABDD9), fontSize: 12)),
+                                if (data?.version != null)
+                                  Text('Релиз: ${data!.version}',
+                                    style: const TextStyle(fontSize: 11)),
+                              ],
+                            )),
+                            IconButton(
+                              tooltip: 'Открыть карточку проекта',
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                setState(() {
+                                  tab = 0;
+                                  search = project.name;
+                                  searchController.text = project.name;
+                                  category = 'All';
+                                  showOnlyAvailable = false;
+                                });
+                              },
+                              icon: const Icon(Icons.chevron_right_rounded)),
+                          ]);
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> refresh() async {
     setState(() { info.clear(); projects = _loadProjects(); });
     await projects;
@@ -491,9 +596,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ],
               )),
               IconButton.filledTonal(
-                tooltip: 'Проверить обновления',
-                onPressed: refresh,
-                icon: const Icon(Icons.refresh_rounded)),
+                tooltip: 'Открыть центр обновлений',
+                onPressed: () => showUpdateCenter(items),
+                icon: const Icon(Icons.arrow_forward_rounded)),
             ]),
           ),
           const SizedBox(height: 14),

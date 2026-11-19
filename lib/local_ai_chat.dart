@@ -1,3 +1,4 @@
+import 'eyra_chat_image_store.dart';
 import 'eyra_forge_client.dart';
 import 'eyra_forge_privacy.dart';
 import 'hub_wait_indicator.dart';
@@ -23,7 +24,9 @@ class _LocalAiChatState extends State<LocalAiChat> {
   final input = TextEditingController();
   Uint8List? attachedImage;
   String? attachedName;
-  final Map<int, Uint8List> generatedImages = {};
+  EyraChatImageStore? _imageStore;
+  Future<EyraChatImageStore> get imageStore async => _imageStore ??=
+      EyraChatImageStore(Directory('${(await getApplicationSupportDirectory()).path}/eyra_chat_images'));
   bool get wantsImage => RegExp(
     r'(нарисуй|сгенерируй|создай изображение|сделай картинк|изобрази|отрисуй|измени фото|отредактируй фото|переделай фото|поменяй фон|измени одежду)',
     caseSensitive: false).hasMatch(input.text) || attachedImage != null;
@@ -86,12 +89,13 @@ class _LocalAiChatState extends State<LocalAiChat> {
         ? await client.generate(prompt: description)
         : await client.edit(source: photo, prompt: description);
       if (!mounted) return;
-      final index = messages.length;
+      final imagePath = await (await imageStore).save(bytes);
+      if (!mounted) return;
       setState(() {
-        generatedImages[index] = bytes;
         messages.add({'role': 'assistant', 'content':
           photo == null ? 'Готово, создала изображение через Forge.'
-            : 'Готово, обработала фотографию через Forge.'});
+            : 'Готово, обработала фотографию через Forge.',
+          'imagePath': imagePath});
       });
       await saveMessages();
     } catch (e) {
@@ -208,6 +212,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         loaded.addAll(decoded.whereType<Map>().map((m) => {
           'role': m['role']?.toString() ?? '',
           'content': m['content']?.toString() ?? '',
+          if (m['imagePath'] is String) 'imagePath': m['imagePath'] as String,
         }).where((m) => m['role'] == 'user' || m['role'] == 'assistant'));
       } catch (_) {}
     }
@@ -223,8 +228,13 @@ class _LocalAiChatState extends State<LocalAiChat> {
   }
   Future<void> clearMessages() async {
     if (sending) return;
+    final oldPaths = messages.map((m) => m['imagePath']).whereType<String>().toList();
     setState(() { messages.clear(); error = null; });
     await saveMessages();
+    final store = await imageStore;
+    for (final path in oldPaths) {
+      try { await store.delete(path); } catch (_) {}
+    }
   }
   String? error;
   @override
@@ -969,12 +979,14 @@ class _LocalAiChatState extends State<LocalAiChat> {
                       Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium?.copyWith(color: const Color(0xFFB5D4FF), fontWeight: FontWeight.w700)),
                       const SizedBox(height: 6),
                       SelectableText(m['content'] ?? ''),
-                      if (generatedImages[index] != null) ...[
+                      if (m['imagePath'] != null &&
+                          File(m['imagePath']!).existsSync()) ...[
                         const SizedBox(height: 8),
-                        Image.memory(generatedImages[index]!, fit: BoxFit.contain),
+                        Image.file(File(m['imagePath']!), fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Text('Изображение недоступно')),
                         TextButton.icon(
                           onPressed: () async {
-                            final bytes = generatedImages[index]!;
+                            final bytes = await File(m['imagePath']!).readAsBytes();
                             await FilePicker.platform.saveFile(
                               dialogTitle: 'Сохранить результат Эйры',
                               fileName: 'eyra-forge-${DateTime.now().millisecondsSinceEpoch}.png',

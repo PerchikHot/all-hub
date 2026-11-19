@@ -1,3 +1,4 @@
+import 'hub_wait_indicator.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -589,8 +590,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     if (loading && posts.isEmpty && (showFuta || showTrans)) Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(children: [
-        const SizedBox(width: 16, height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2)),
+        const HubWaitIndicator(size: 40),
         const SizedBox(width: 10),
         Expanded(child: Text(
           'Проверяем источник: страница $page · получено $fetchedPosts записей',
@@ -661,7 +661,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         itemCount: visiblePosts.length + (!favoritesOnly && loading ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= visiblePosts.length) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: HubWaitIndicator());
           }
           final post = visiblePosts[index];
           final id = (post['id'] ?? '').toString();

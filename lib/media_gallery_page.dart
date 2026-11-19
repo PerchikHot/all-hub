@@ -18,6 +18,7 @@ class MediaGalleryPage extends StatefulWidget {
 }
 
 class _MediaGalleryPageState extends State<MediaGalleryPage> {
+  bool expandedFilters = false;
   final queryController = TextEditingController();
   final scroll = ScrollController();
   final posts = <Map<String, dynamic>>[];
@@ -518,7 +519,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(child: Text('Фильтры · ${kind == 'gif' ? 'GIF' : 'Картинки'} · ${highQuality ? 'HD' : 'обычное качество'}',
+            maxLines: 1, overflow: TextOverflow.ellipsis)),
+          TextButton.icon(
+            onPressed: () => setState(() => expandedFilters = !expandedFilters),
+            icon: Icon(expandedFilters ? Icons.expand_less : Icons.tune_rounded),
+            label: Text(expandedFilters ? 'Скрыть' : 'Настроить')),
+        ]),
+        if (expandedFilters) ...[
         Wrap(spacing: 8, runSpacing: 4, children: [
           FilterChip(
             label: const Text('Футы'),
@@ -573,6 +583,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           Switch.adaptive(value: highQuality, onChanged: (value) { setState(() => highQuality = value); _saveFeedPreferences(); }),
           IconButton(tooltip: 'Обновить из сети', onPressed: () => search(bypassCache: true), icon: const Icon(Icons.refresh)),
         ]),
+        ],
       ]),
     ),
     if (loading && posts.isEmpty && (showFuta || showTrans)) Padding(

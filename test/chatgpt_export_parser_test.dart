@@ -12,6 +12,24 @@ Map<String, dynamic> node(String? parent, String role, String text) => {
 };
 
 void main() {
+  test('repeat imports retain previous unique excerpts', () {
+    expect(mergeChatGptExcerpts(['старый текст', 'общий текст'],
+        ['новый текст', 'общий текст']),
+        ['новый текст', 'общий текст', 'старый текст']);
+  });
+
+  test('new imports take priority when storage is full', () {
+    expect(mergeChatGptExcerpts(['старый 1', 'старый 2'],
+        ['новый 1', 'новый 2'], maxExcerpts: 3),
+        ['новый 1', 'новый 2', 'старый 1']);
+  });
+
+  test('empty entries and duplicates do not waste storage', () {
+    expect(mergeChatGptExcerpts([' запись ', 'другая'],
+        ['', 'запись', ' запись '], maxExcerpts: 2),
+        ['запись', 'другая']);
+  });
+
   test('imports only active branch in chronological order', () {
     final export = [{
       'current_node': 'final',

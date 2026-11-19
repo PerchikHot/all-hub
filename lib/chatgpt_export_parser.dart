@@ -1,3 +1,31 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
+
+/// Decode exports away from the UI isolate. A large conversations.json can
+/// otherwise block scrolling, buttons and Android's main-thread watchdog.
+/// The limit is checked before reading to avoid accidentally loading a
+/// multi-gigabyte archive into memory. Only extracted text leaves the isolate.
+Future<List<String>> extractChatGptExcerptsFromFile(String path,
+    {int maxBytes = 64 * 1024 * 1024}) async {
+  if (maxBytes <= 0) throw const FormatException('Неверный лимит импорта');
+  final source = File(path);
+  final size = await source.length();
+  if (size > maxBytes) {
+    throw FormatException(
+      'Экспорт больше ${maxBytes ~/ (1024 * 1024)} МБ. '
+      'Выбери меньший conversations.json; исходный файл не изменён.');
+  }
+  return Isolate.run(() async {
+    // Recheck the size in the worker in case the selected file changed.
+    if (await source.length() > maxBytes) {
+      throw const FormatException('Размер файла изменился во время импорта');
+    }
+    final decoded = jsonDecode(await source.readAsString());
+    return extractChatGptExcerpts(decoded);
+  });
+}
+
 // Parses only the active branch of each ChatGPT conversation.
 // No source identifiers or metadata are persisted.
 List<String> extractChatGptExcerpts(dynamic data) {

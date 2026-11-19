@@ -187,14 +187,10 @@ class _LocalAiChatState extends State<LocalAiChat> {
     }
     setState(() { importBusy = true; error = null; });
     try {
-      final source = File(file.path!);
-      // Limit memory use and SharedPreferences growth; large exports can be
-      // split externally, but must never be silently truncated on disk.
-      if (await source.length() > 20 * 1024 * 1024) {
-        throw const FormatException('Файл больше 20 МБ. Импорт больших архивов пока не поддерживается.');
-      }
-      final parsed = jsonDecode(await source.readAsString());
-      final excerpts = extractChatGptExcerpts(parsed);
+      // Parse on a worker isolate so importing a large export does not
+      // freeze the chat UI. The parser enforces a 64 MiB file limit and
+      // persists only the bounded, text-only excerpts.
+      final excerpts = await extractChatGptExcerptsFromFile(file.path!);
       if (excerpts.isEmpty) throw const FormatException('Текстовых сообщений не найдено');
       final prefs = await SharedPreferences.getInstance();
       if (!await prefs.setStringList('eyra_chatgpt_excerpts', excerpts)) {

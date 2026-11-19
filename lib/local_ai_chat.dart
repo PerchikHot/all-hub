@@ -528,7 +528,13 @@ class _LocalAiChatState extends State<LocalAiChat> {
       ];
       final response = await http.post(Uri.parse('$base/api/chat'),
         headers: {'Content-Type':'application/json'},
-        body: jsonEncode({'model':selected,'stream':false,'messages':requestMessages}))
+        body: jsonEncode({
+          'model': selected,
+          'stream': false,
+          // Qwen3 should answer directly, as with `ollama run --think=false`.
+          'think': false,
+          'messages': requestMessages,
+        }))
         .timeout(const Duration(minutes: 5));
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}: ${response.body}');
       final result = jsonDecode(response.body) as Map<String, dynamic>;

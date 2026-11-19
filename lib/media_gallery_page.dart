@@ -722,7 +722,8 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
     final candidates = mediaFeedImageCandidates(
       widget.post, highQuality: widget.highQuality);
     if (candidates.isEmpty) {
-      return const Center(child: Icon(Icons.broken_image_outlined));
+      return const Center(child: Icon(Icons.image_not_supported_outlined,
+        color: Colors.white38));
     }
     final current = index < candidates.length ? index : candidates.length - 1;
     final url = candidates[current];
@@ -736,8 +737,11 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
       maxWidthDiskCache: isAnimatedFeedAssetUrl(url)
           ? null : (widget.highQuality ? 900 : 420),
       fadeInDuration: Duration.zero,
-      placeholder: (context, _) => const Center(
-        child: Icon(Icons.image_outlined, color: Colors.white24)),
+      placeholder: (context, _) => const ColoredBox(
+        color: Color(0xFF17263C),
+        child: Center(child: SizedBox(width: 22, height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2,
+            color: Color(0xFF5C91D9))))),
       errorWidget: (context, failedUrl, error) {
         if (current + 1 < candidates.length) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -749,7 +753,21 @@ class _FeedFallbackImageState extends State<_FeedFallbackImage> {
           return const Center(child: Icon(
             Icons.downloading_outlined, color: Colors.white38));
         }
-        return const Center(child: Icon(Icons.broken_image_outlined));
+        return ColoredBox(
+          color: const Color(0xFF17263C),
+          child: Center(child: IconButton(
+            tooltip: 'Повторить загрузку изображения',
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFFB7C9E4)),
+            onPressed: () {
+              // Reset the URL candidate sequence and evict a failed cached
+              // response so a retry performs a fresh network request.
+              for (final candidate in candidates) {
+                CachedNetworkImage.evictFromCache(candidate);
+              }
+              setState(() => index = 0);
+            },
+          )),
+        );
       },
     );
   }

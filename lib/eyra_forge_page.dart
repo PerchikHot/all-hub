@@ -1,5 +1,6 @@
 import 'hub_wait_indicator.dart';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,9 @@ class _EyraForgePageState extends State<EyraForgePage> {
   String status = 'Forge должен быть запущен с параметром --api.';
   List<String> models = [];
   Uint8List? image;
+  Uint8List? sourceImage;
+  double strength = 0.5;
+  bool editMode = false;
   int steps = 20;
   int imageSize = 512;
   bool saving = false;
@@ -35,6 +39,26 @@ class _EyraForgePageState extends State<EyraForgePage> {
     });
   }
 
+  Future<void> pickSource() async {
+    if (busy) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['png', 'jpg', 'jpeg'],
+        withData: false);
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.single;
+      if (file.path == null) throw const FormatException('Файл недоступен');
+      final source = File(file.path!);
+      if (await source.length() > 12 * 1024 * 1024) {
+        throw const FormatException('Изображение больше 12 МиБ');
+      }
+      final bytes = await source.readAsBytes();
+      if (mounted) setState(() { sourceImage = bytes; editMode = true; });
+    } catch (e) {
+      if (mounted) setState(() => status = 'Не удалось открыть изображение: $e');
+    }
+  }
+
   Future<void> run({required bool generate}) async {
     if (busy) return;
     setState(() { busy = true; status = 'Подключаемся…'; });
@@ -44,9 +68,18 @@ class _EyraForgePageState extends State<EyraForgePage> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('eyra_forge_endpoint', endpoint.text.trim());
       if (generate) {
-        final bytes = await client.generate(
-          prompt: prompt.text, negativePrompt: negative.text, steps: steps,
-          width: imageSize, height: imageSize);
+        if (editMode && sourceImage == null) {
+          throw StateError('Сначала выберите исходное изображение');
+        }
+        final bytes = editMode
+          ? await client.edit(
+              source: sourceImage!, prompt: prompt.text,
+              negativePrompt: negative.text, steps: steps,
+              width: imageSize, height: imageSize,
+              denoisingStrength: strength)
+          : await client.generate(
+              prompt: prompt.text, negativePrompt: negative.text, steps: steps,
+              width: imageSize, height: imageSize);
         if (mounted) setState(() {
           image = bytes;
           lastPrompt = prompt.text.trim();
@@ -118,6 +151,28 @@ class _EyraForgePageState extends State<EyraForgePage> {
         icon: const Icon(Icons.wifi_tethering), label: const Text('Проверить подключение и модели')),
       if (models.isNotEmpty) Text('Модели: ${models.take(5).join(', ')}'),
       const SizedBox(height: 12),
+      SegmentedButton<bool>(
+        segments: const [
+          ButtonSegment(value: false, label: Text('Создать')),
+          ButtonSegment(value: true, label: Text('Изменить фото')),
+        ],
+        selected: {editMode},
+        onSelectionChanged: busy ? null : (values) =>
+          setState(() => editMode = values.first)),
+      if (editMode) ...[
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: busy ? null : pickSource,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(sourceImage == null ? 'Выбрать PNG/JPEG' : 'Заменить фото')),
+        if (sourceImage != null) Image.memory(sourceImage!,
+          height: 180, fit: BoxFit.contain),
+        Text('Сила изменения: ${strength.toStringAsFixed(2)}'),
+        Slider(value: strength, min: 0.05, max: 1,
+          onChanged: busy ? null : (v) => setState(() => strength = v)),
+        const Text('Меньше — ближе к оригиналу. Forge может менять детали лица.'),
+      ],
+      const SizedBox(height: 12),
       TextField(controller: prompt, enabled: !busy, minLines: 2, maxLines: 4,
         decoration: const InputDecoration(labelText: 'Описание изображения', border: OutlineInputBorder())),
       const SizedBox(height: 8),
@@ -140,7 +195,7 @@ class _EyraForgePageState extends State<EyraForgePage> {
       ),
       const Text('Большое разрешение требует больше видеопамяти. Для слабого ПК начните с 512.'),
       FilledButton.icon(onPressed: busy ? null : () => run(generate: true),
-        icon: const Icon(Icons.auto_awesome), label: const Text('Создать изображение')),
+        icon: const Icon(Icons.auto_awesome), label: Text(editMode ? 'Изменить фото' : 'Создать изображение')),
       if (busy) const HubWaitIndicator(),
       const SizedBox(height: 8),
       Text(status),

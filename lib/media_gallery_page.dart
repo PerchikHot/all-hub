@@ -8,6 +8,7 @@ import 'media_feed_query.dart';
 import 'media_feed_cache.dart';
 import 'media_feed_client.dart';
 import 'media_favorites.dart';
+import 'media_recommendations.dart';
 import 'multi_engine_search_page.dart';
 
 class MediaGalleryPage extends StatefulWidget {
@@ -30,7 +31,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final favoritePosts = <Map<String, dynamic>>[];
   final favoriteIds = <String>{};
   bool favoritesOnly = false;
-  List<Map<String, dynamic>> get visiblePosts => favoritesOnly ? favoritePosts : posts;
+  bool recommendationsEnabled = false;
+  List<Map<String, dynamic>> get visiblePosts => favoritesOnly
+      ? favoritePosts
+      : recommendationsEnabled ? rankMediaByLikes(posts, favoritePosts) : posts;
   bool loading = false;
   bool hasMore = true;
   int page = 1;
@@ -193,6 +197,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         showTrans = prefs.getBool('media_show_trans_v1') ?? true;
         highQuality = prefs.getBool('media_hd_v1') ?? true;
         showEntireImage = prefs.getBool('media_fit_v1') ?? false;
+        recommendationsEnabled = prefs.getBool('media_recommendations_v1') ?? false;
         kind = prefs.getString('media_kind_v1') == 'gif' ? 'gif' : 'all';
         favoritePosts
           ..clear()
@@ -214,6 +219,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       await prefs.setBool('media_show_trans_v1', showTrans);
       await prefs.setBool('media_hd_v1', highQuality);
       await prefs.setBool('media_fit_v1', showEntireImage);
+      await prefs.setBool('media_recommendations_v1', recommendationsEnabled);
       await prefs.setString('media_kind_v1', kind);
     } catch (_) {
       // Never block browsing because preferences could not be written.
@@ -530,6 +536,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             onSelected: (value) {
               setState(() => favoritesOnly = value);
               if (!value && posts.isEmpty && !loading) search();
+            },
+          ),
+          FilterChip(
+            avatar: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: const Text('По лайкам'),
+            tooltip: 'Сортировка загруженных изображений по тегам избранного без отправки данных',
+            selected: recommendationsEnabled,
+            onSelected: (value) {
+              setState(() => recommendationsEnabled = value);
+              _saveFeedPreferences();
             },
           ),
           FilterChip(

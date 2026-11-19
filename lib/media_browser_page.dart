@@ -304,7 +304,7 @@ class _MediaBrowserPageState extends State<MediaBrowserPage> {
     ),
     body: Column(children: [
       if (loading || downloading) HubLiquidProgress(
-        minHeight: 4,
+        height: 4,
         value: downloading ? mediaTransferProgress(downloadReceived, downloadTotal) : null,
       ),
       if (downloading)

@@ -517,7 +517,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     await ProjectLauncher.runInstallExclusive(
                                       project.id,
                                       () => ProjectLauncher.installAndroidApk(
-                                        data.downloadUrl!,
+                                        data!.downloadUrl!,
                                         projectId: project.id,
                                         externalRepo: project.id.startsWith('external-')
                                           ? project.repo : null,

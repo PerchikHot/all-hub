@@ -3,6 +3,9 @@
 List<String> extractChatGptExcerpts(dynamic data) {
   if (data is! List) throw const FormatException('Ожидался массив conversations.json');
   final excerpts = <String>[];
+  // Repeated text across conversations should not consume the limited local
+  // excerpt budget or crowd out other relevant memories.
+  final seen = <String>{};
   for (final conversation in data) {
     if (conversation is! Map) continue;
     final mapping = conversation['mapping'];
@@ -34,7 +37,9 @@ List<String> extractChatGptExcerpts(dynamic data) {
         if (part is! String) continue;
         final cleaned = part.replaceAll(RegExp(r'\s+'), ' ').trim();
         if (cleaned.length < 12) continue;
-        excerpts.add(cleaned.length > 500 ? cleaned.substring(0, 500) : cleaned);
+        final excerpt = cleaned.length > 500 ? cleaned.substring(0, 500) : cleaned;
+        if (!seen.add(excerpt)) continue;
+        excerpts.add(excerpt);
         if (excerpts.length >= 1000) return excerpts;
       }
     }

@@ -629,22 +629,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         const ListTile(title: Text('All Hub 0.6.0'),
           subtitle: Text('Общий каталог и загрузки APK / Windows')),
         ]);
-  Widget _mobileShortcut(IconData icon, String label, VoidCallback action) =>
-    OutlinedButton(
-      onPressed: action,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        side: const BorderSide(color: Color(0xFF244B85)),
-      ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: hubAccent, size: 22),
-        const SizedBox(height: 5),
-        Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11)),
-      ]),
-    );
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Row(children: [HubAvatar(size: 32), SizedBox(width: 10), Text('ALL HUB', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2))]), actions: [IconButton(tooltip: 'Обновить каталог', onPressed: refresh, icon: const Icon(Icons.refresh_rounded))]),

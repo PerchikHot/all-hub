@@ -1,3 +1,4 @@
+import 'project_detail_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'hub_liquid_progress.dart';
 import 'hub_wait_indicator.dart';
@@ -825,7 +826,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 crossAxisCount: columns,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 0.84,
+                childAspectRatio: 0.73,
               ),
               itemBuilder: (context, index) {
                 final project = filtered[index];
@@ -857,18 +858,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         )),
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 8),
-                          child: Row(children: [
-                            Expanded(child: Text(project.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700))),
-                            Icon(selected ? Icons.expand_less_rounded
-                              : Icons.expand_more_rounded,
-                              size: 19, color: const Color(0xFF9BC5FF)),
-                          ]),
+                          padding: const EdgeInsets.fromLTRB(9, 7, 9, 9),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(project.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13,
+                                  fontWeight: FontWeight.w800)),
+                              if (selected) ...[
+                                const SizedBox(height: 5),
+                                Text(project.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11)),
+                                const SizedBox(height: 5),
+                                FilledButton(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => ProjectDetailPage(
+                                        project: project))),
+                                  child: const Text('О проекте'),
+                                ),
+                              ] else
+                                const Text('Нажми для описания',
+                                  maxLines: 1,
+                                  style: TextStyle(fontSize: 10)),
+                            ],
+                          ),
                         ),
                       ]),
                     ),
@@ -881,13 +898,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           if (selectedProjectId == null)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
-              child: Text('Нажми на проект, чтобы открыть описание, установку и обновления.',
+              child: Text('Нажми на обложку, чтобы увидеть краткое описание.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Color(0xFFA9BED9))),
             ),
         ],
         for (final project in (tab == 0
-          ? filtered.where((p) => p.id == selectedProjectId)
+          ? <Project>[]
           : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
           if (project.id.startsWith('external-'))
             FutureBuilder<String?>(

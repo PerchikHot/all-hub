@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -69,6 +70,43 @@ void main() {
       client: MockClient((_) async => http.Response(
         jsonEncode({'images': [base64Encode([1, 2, 3, 4, 5, 6, 7, 8])]}), 200)));
     await expectLater(invalid.generate(prompt: 'cat'), throwsFormatException);
+  });
+
+  test('Forge img2img sends selected image only on explicit edit', () async {
+    final png = <int>[137, 80, 78, 71, 13, 10, 26, 10, 0];
+    var requests = 0;
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((request) async {
+        requests++;
+        expect(request.url.path, '/sdapi/v1/img2img');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['init_images'], [base64Encode(png)]);
+        expect(body['denoising_strength'], 0.4);
+        expect(body['save_images'], false);
+        expect(body['prompt'], 'new outfit');
+        return http.Response(jsonEncode({'images': [base64Encode(png)]}), 200);
+      }));
+    expect(requests, 0);
+    expect(await client.edit(source: Uint8List.fromList(png),
+      prompt: 'new outfit', denoisingStrength: 0.4), png);
+    expect(requests, 1);
+  });
+
+  test('Forge img2img rejects invalid input without uploading', () async {
+    var requests = 0;
+    final client = EyraForgeClient(Uri.parse('http://localhost:7860'),
+      client: MockClient((_) async {
+        requests++;
+        return http.Response('{}', 200);
+      }));
+    final png = Uint8List.fromList([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+    await expectLater(client.edit(source: Uint8List.fromList([1, 2, 3]),
+      prompt: 'test'), throwsFormatException);
+    await expectLater(client.edit(source: png, prompt: 'test',
+      denoisingStrength: 1.5), throwsArgumentError);
+    await expectLater(client.edit(source: png, prompt: ' '),
+      throwsArgumentError);
+    expect(requests, 0);
   });
 
 }

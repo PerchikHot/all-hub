@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'eyra_memory_store.dart';
+import 'eyra_forge_client.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +17,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
   final address = TextEditingController(text: 'http://127.0.0.1:11434');
   final input = TextEditingController();
   final memory = TextEditingController();
+  final forgeAddress = TextEditingController(text: 'http://127.0.0.1:7860');
+  final forgePrompt = TextEditingController();
+  bool forgeBusy = false;
+  Uint8List? forgeImage;
+  String? forgeStatus;
   EyraMemoryStore? memoryStore;
   String? memoryStatus;
   bool eyraMode = true;
@@ -74,6 +81,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     try { memoryStore = await EyraMemoryStore.open(); } catch (e) { memoryStatus = 'Память недоступна: $e'; }
+    forgeAddress.text = prefs.getString('eyra_forge_endpoint') ?? 'http://127.0.0.1:7860';
     address.text = prefs.getString('ollama_endpoint') ?? 'http://127.0.0.1:11434';
     eyraMode = prefs.getBool('eyra_mode_enabled') ?? true;
     proactiveSuggestions = prefs.getBool('eyra_proactive_suggestions') ?? false;
@@ -240,6 +248,38 @@ class _LocalAiChatState extends State<LocalAiChat> {
           if (mounted) setState(() => memory.clear());
         },
       )),
+      if (eyraMode) ExpansionTile(
+        title: const Text('Forge — генерация изображений'),
+        subtitle: const Text('Требуется запущенный Forge с --api'),
+        children: [
+          TextField(controller: forgeAddress, decoration: const InputDecoration(labelText: 'Адрес Forge API'),
+            onChanged: (v) async => (await SharedPreferences.getInstance()).setString('eyra_forge_endpoint', v.trim())),
+          TextField(controller: forgePrompt, minLines: 1, maxLines: 3,
+            decoration: const InputDecoration(labelText: 'Промпт изображения')),
+          Wrap(spacing: 8, children: [
+            OutlinedButton(onPressed: forgeBusy ? null : () async {
+              final client = EyraForgeClient(Uri.parse(forgeAddress.text.trim()));
+              try {
+                final ok = await client.checkConnection();
+                if (mounted) setState(() => forgeStatus = ok ? 'Forge доступен' : 'Forge не ответил');
+              } catch (e) { if (mounted) setState(() => forgeStatus = 'Ошибка Forge: $e'); }
+              finally { client.close(); }
+            }, child: const Text('Проверить Forge')),
+            FilledButton(onPressed: forgeBusy ? null : () async {
+              if (mounted) setState(() { forgeBusy = true; forgeStatus = null; });
+              final client = EyraForgeClient(Uri.parse(forgeAddress.text.trim()));
+              try {
+                final bytes = await client.generate(prompt: forgePrompt.text);
+                if (mounted) setState(() { forgeImage = bytes; forgeStatus = 'Изображение получено'; });
+              } catch (e) { if (mounted) setState(() => forgeStatus = 'Ошибка генерации: $e'); }
+              finally { client.close(); if (mounted) setState(() => forgeBusy = false); }
+            }, child: const Text('Создать изображение')),
+          ]),
+          if (forgeBusy) const LinearProgressIndicator(),
+          if (forgeStatus != null) Text(forgeStatus!),
+          if (forgeImage != null) Image.memory(forgeImage!, height: 256, fit: BoxFit.contain),
+        ],
+      ),
       TextField(controller: address, decoration: const InputDecoration(labelText: 'Адрес Ollama (ПК или локальный сервер)', isDense:true)),
       Row(children: [
         Expanded(child: DropdownButton<String>(isExpanded:true, value:models.contains(selected) ? selected : null,

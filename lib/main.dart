@@ -541,11 +541,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ]),
           const SizedBox(height: 14),
-          Wrap(spacing: 8, children: [for (final c in ['All', 'game', 'app', 'mod']) ChoiceChip(label: Text(c == 'All' ? 'Все' : c == 'game' ? 'Игры' : c == 'app' ? 'Приложения' : 'Моды'), selected: category == c, onSelected: (_) => setState(() => category = c))]),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final c in ['All', 'game', 'app', 'mod'])
+              ChoiceChip(
+                label: Text(c == 'All' ? 'Все' : c == 'game' ? 'Игры'
+                  : c == 'app' ? 'Приложения' : 'Моды'),
+                selected: category == c,
+                onSelected: (_) => setState(() => category = c)),
+            FilterChip(
+              avatar: const Icon(Icons.cloud_done_outlined, size: 18),
+              label: const Text('С GitHub'),
+              selected: showOnlyAvailable,
+              onSelected: (enabled) =>
+                setState(() => showOnlyAvailable = enabled)),
+          ]),
           const SizedBox(height: 16),
         ],
         Row(children: [Expanded(child: Text(tab == 0 ? 'Мои проекты' : 'Состояние сборок', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800))), Text('${(tab == 0 ? filtered : items).length} ПРОЕКТА', style: const TextStyle(color: hubAccent, fontSize: 11, fontWeight: FontWeight.w700))]),
         const SizedBox(height: 16),
+        if (tab == 0 && filtered.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+            decoration: BoxDecoration(
+              color: const Color(0xFF15243B),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF2A405E))),
+            child: Column(children: [
+              const Icon(Icons.search_off_rounded, size: 42,
+                color: Color(0xFF89B4E9)),
+              const SizedBox(height: 12),
+              Text('Проекты не найдены',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('Измени поиск или сбрось фильтры',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFFAFC2DC))),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: () => setState(() {
+                  search = '';
+                  category = 'All';
+                  showOnlyAvailable = false;
+                }),
+                icon: const Icon(Icons.filter_alt_off_rounded),
+                label: const Text('Сбросить фильтры')),
+            ]),
+          ),
         for (final project in (tab == 0 ? filtered : items)) Card(margin: const EdgeInsets.only(bottom: 14), clipBehavior: Clip.antiAlias, child: Column(children: [
           if (project.id.startsWith('external-'))
             FutureBuilder<String?>(

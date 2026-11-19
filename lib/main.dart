@@ -122,6 +122,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // installed package version only after the user returns: starting the
     // installer does not prove that installation was approved or completed.
     if (state == AppLifecycleState.resumed && mounted) {
+      // Revalidate both installed versions and published releases after
+      // returning from the package installer or bringing All Hub to foreground.
+      // A stale cached release must not hide a newly available update.
+      info.clear();
       setState(() {});
     }
   }
@@ -464,6 +468,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return RefreshIndicator(onRefresh: refresh, child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
         if (tab == 0) ...[const HubBanner(), const SizedBox(height: 20)],
         if (tab == 0) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF152A47),
+              border: Border.all(color: const Color(0xFF294B77)),
+              borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
+              const Icon(Icons.sync_rounded, color: Color(0xFF9CC6FF), size: 26),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Центр приложений', style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 3),
+                  Text('Проверка релизов при открытии · установка и обновления в карточках',
+                    style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: const Color(0xFFAABDD9))),
+                ],
+              )),
+              IconButton.filledTonal(
+                tooltip: 'Проверить обновления',
+                onPressed: refresh,
+                icon: const Icon(Icons.refresh_rounded)),
+            ]),
+          ),
+          const SizedBox(height: 14),
           TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Поиск проектов', border: OutlineInputBorder()), onChanged: (v) => setState(() => search = v)),
           const SizedBox(height: 12),
           Row(children: [

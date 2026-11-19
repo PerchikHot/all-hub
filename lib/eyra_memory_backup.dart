@@ -15,6 +15,30 @@ class EyraMemoryBackup {
     required this.exportedAt,
   });
 
+
+  /// Merge a portable snapshot without silently deleting local knowledge.
+  /// Existing records retain their order; imported duplicates are ignored.
+  /// Throws before writing anything if the combined storage limit is exceeded.
+  EyraMemoryBackup mergeWith(EyraMemoryBackup incoming, {bool useImportedPersonality = false}) {
+    List<String> combine(List<String> current, List<String> added, int limit) {
+      final merged = <String>[...current];
+      final seen = current.toSet();
+      for (final entry in added) {
+        if (seen.add(entry)) merged.add(entry);
+      }
+      if (merged.length > limit) {
+        throw FormatException('Недостаточно места: максимум $limit записей. Удалите ненужные записи перед объединением.');
+      }
+      return merged;
+    }
+    return EyraMemoryBackup(
+      personality: useImportedPersonality ? incoming.personality : personality,
+      notes: combine(notes, incoming.notes, 100),
+      excerpts: combine(excerpts, incoming.excerpts, 1000),
+      exportedAt: DateTime.now().toUtc(),
+    );
+  }
+
   String encode() => const JsonEncoder.withIndent('  ').convert({
     'format': 'all-hub-eyra-memory',
     'version': 1,

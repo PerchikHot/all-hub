@@ -966,7 +966,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!, project.id), builder: (context, s) {
-              if (!s.hasData) return const Center(child: Padding(padding: EdgeInsets.all(12), child: HubWaitIndicator(size: 34)));
+              if (!s.hasData) return const Center(child: Padding(padding: EdgeInsets.all(12), child: HubWaitIndicator(size: 46)));
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),

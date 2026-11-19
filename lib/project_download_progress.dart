@@ -61,9 +61,6 @@ class ProjectDownloadProgress extends StatelessWidget {
                       ]),
                       const SizedBox(height: 10),
                       HubLiquidProgress(value: safe, height: 12),
-                        backgroundColor: const Color(0xFF304262),
-                        color: const Color(0xFF65B9FF),
-                      ),
                       const SizedBox(height: 8),
                       const Text(
                         'После загрузки может потребоваться подтверждение установки.',

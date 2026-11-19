@@ -181,8 +181,22 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (conversation is! Map) continue;
       final mapping = conversation['mapping'];
       if (mapping is! Map) continue;
-      for (final node in mapping.values) {
-        if (node is! Map || node['message'] is! Map) continue;
+      // Follow only the visible conversation branch. Export mappings also
+      // contain abandoned regenerations and edited-message alternatives.
+      final currentNode = conversation['current_node'];
+      if (currentNode is! String || !mapping.containsKey(currentNode)) continue;
+      final branch = <Map>[];
+      final visited = <String>{};
+      String? cursor = currentNode;
+      while (cursor != null && visited.add(cursor)) {
+        final node = mapping[cursor];
+        if (node is! Map) break;
+        branch.add(node);
+        final parent = node['parent'];
+        cursor = parent is String ? parent : null;
+      }
+      for (final node in branch.reversed) {
+        if (node['message'] is! Map) continue;
         final message = node['message'] as Map;
         final author = message['author'];
         if (author is! Map || !['user', 'assistant'].contains(author['role'])) continue;

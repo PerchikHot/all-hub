@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:all_hub/chatgpt_export_parser.dart';
 
@@ -99,4 +101,50 @@ void main() {
   test('rejects malformed top-level export', () {
     expect(() => extractChatGptExcerpts({'mapping': {}}), throwsFormatException);
   });
+  test('file importer reads a valid export without persisting raw data', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-import-test-');
+    try {
+      final source = File('${dir.path}/conversations.json');
+      await source.writeAsString(jsonEncode([{
+        'current_node': 'last',
+        'mapping': {
+          'last': node(null, 'user', 'Сохранить только текст диалога'),
+        },
+      }]));
+      expect(await extractChatGptExcerptsFromFile(source.path),
+          ['Сохранить только текст диалога']);
+      expect(await source.exists(), isTrue);
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test('file importer rejects oversized exports before JSON parsing', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-import-limit-');
+    try {
+      final source = File('${dir.path}/conversations.json');
+      await source.writeAsString('not-json-and-over-limit');
+      await expectLater(
+        extractChatGptExcerptsFromFile(source.path, maxBytes: 5),
+        throwsFormatException,
+      );
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test('file importer reports malformed JSON', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-import-invalid-');
+    try {
+      final source = File('${dir.path}/conversations.json');
+      await source.writeAsString('invalid json');
+      await expectLater(
+        extractChatGptExcerptsFromFile(source.path),
+        throwsFormatException,
+      );
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
 }

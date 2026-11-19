@@ -949,18 +949,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       builder: (context, installed) {
                         final comparison = installed.data == null || i.version == null
                             ? null : comparePublishedVersions(installed.data!, i.version!);
-                        if (comparison == 0) {
-                          return const Chip(
-                            avatar: Icon(Icons.check_circle_outline, size: 18),
-                            label: Text('Установлена актуальная версия'),
-                          );
-                        }
-                        if (comparison == 1) {
-                          return const Chip(label: Text('Установленная версия новее релиза'));
-                        }
-                        return FilledButton.icon(
+                        // Always expose the Android installer action, including
+                        // self-update and same-version repair installs. The
+                        // version comparison is advisory, not a reason to hide
+                        // the only way to repair a broken installation.
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Установлено: ${installed.data ?? "не определено"} · Релиз: ${i.version ?? "не определено"}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFFAABDD9))),
+                            const SizedBox(height: 6),
+                            FilledButton.icon(
                           icon: Icon(comparison == -1 ? Icons.system_update_alt_rounded : Icons.install_mobile_rounded),
-                          label: Text(comparison == -1 ? 'Обновить до ${i.version}' : 'Скачать и установить'),
+                          label: Text(comparison == -1 ? 'Обновить до ${i.version}' :
+                            comparison == 0 ? 'Переустановить эту версию' :
+                            comparison == 1 ? 'Версия новее — открыть установщик' : 'Скачать и установить'),
                           onPressed: () async {
                             try {
                               if (isPublishedDowngrade(
@@ -980,6 +984,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               }
                             }
                           },
+                            ),
+                          ],
                         );
                       },
                     ),

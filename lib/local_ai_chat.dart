@@ -373,7 +373,20 @@ class _LocalAiChatState extends State<LocalAiChat> {
           ]),
           const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: DropdownButtonFormField<String>(
+            Expanded(child: models.isEmpty
+              ? InkWell(
+                  key: const Key('ollama-empty-model-picker'),
+                  onTap: () => setState(() => showConnectionSettings = true),
+                  borderRadius: BorderRadius.circular(8),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Модель', border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.settings_ethernet),
+                    ),
+                    child: Text(checkingConnection ? 'Поиск моделей…' : 'Нет моделей — настроить подключение'),
+                  ),
+                )
+              : DropdownButtonFormField<String>(
               isExpanded: true,
               value: models.contains(selected) ? selected : null,
               decoration: const InputDecoration(labelText: 'Модель', isDense: true,

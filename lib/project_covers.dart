@@ -19,6 +19,19 @@ class CoverSettings {
   static final Map<String, String> errors = {};
   static final ValueNotifier<int> statusRevision = ValueNotifier<int>(0);
   static final Map<String, Future<List<String>>> pending = {};
+  // Separate persistent positions for each project, content mode and source.
+  static final Map<String, int> coverPositions = {};
+  static Future<int> position(String key) async {
+    if (coverPositions.containsKey(key)) return coverPositions[key]!;
+    final prefs = await SharedPreferences.getInstance();
+    return coverPositions[key] = prefs.getInt('cover_cursor_$key') ?? 0;
+  }
+  static Future<void> advance(String key, int position) async {
+    coverPositions[key] = position;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('cover_cursor_$key', position);
+  }
+
   static Future<void> setAdultCovers(bool enabled) async {
     adultCovers = enabled;
     final prefs = await SharedPreferences.getInstance();
@@ -90,6 +103,16 @@ class _ProjectCoverState extends State<ProjectCover> {
   File? localFile;
   List<String> webCovers = [];
   int webIndex = 0;
+  int localIndex = 0;
+  String get webCursorKey => 'web:${widget.id}:${CoverSettings.adultCovers}';
+  String get localCursorKey => 'local:${widget.id}';
+  Future<void> restorePositions() async {
+    final web = await CoverSettings.position(webCursorKey);
+    final local = await CoverSettings.position(localCursorKey);
+    if (!mounted) return;
+    setState(() { webIndex = webCovers.isEmpty ? web : web % webCovers.length;
+      localIndex = local; });
+  }
   bool loadingWeb = false;
   bool reloadQueued = false;
   int generation = 0;
@@ -101,18 +124,22 @@ class _ProjectCoverState extends State<ProjectCover> {
   void initState() {
     super.initState();
     CoverSettings.revision.addListener(onSettingsChanged);
+    restorePositions();
     refresh();
     loadWebCovers();
     rotationTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       if (localCandidates.isNotEmpty) {
-        final alternatives = localCandidates.where((f) => f.path != localFile?.path).toList();
-        final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;
-        setState(() => localFile = candidates[Random().nextInt(candidates.length)]);
+        localIndex++;
+        setState(() => localFile = localCandidates[localIndex % localCandidates.length]);
+        CoverSettings.advance(localCursorKey, localIndex);
       } else if (webCovers.isNotEmpty) {
         final next = List.generate(webCovers.length, (i) => (webIndex + i + 1) % webCovers.length)
           .where((i) => !failedImages.contains(webCovers[i]));
-        if (next.isNotEmpty) setState(() => webIndex = next.first);
+        if (next.isNotEmpty) {
+          setState(() => webIndex = next.first);
+          CoverSettings.advance(webCursorKey, webIndex);
+        }
       }
     });
   }
@@ -130,7 +157,8 @@ class _ProjectCoverState extends State<ProjectCover> {
   // Danbooru tag search: general-rated art by default, explicit only by opt-in.
   void onSettingsChanged() {
     // Never display images from the previous content mode while fetching replacements.
-    setState(() { webCovers = []; webIndex = 0; failedImages.clear(); });
+    setState(() { webCovers = []; failedImages.clear(); });
+    restorePositions();
     refresh();
     if (loadingWeb) { reloadQueued = true; return; }
     loadWebCovers();
@@ -143,7 +171,7 @@ class _ProjectCoverState extends State<ProjectCover> {
     final cacheKey = '$id:$adult';
     final saved = CoverSettings.cache[cacheKey];
     if (saved != null && saved.isNotEmpty && DateTime.now().difference(CoverSettings.cacheAt[cacheKey] ?? DateTime(2000)).inMinutes < 30) {
-      if (mounted && CoverSettings.adultCovers == adult && widget.id == id) setState(() { webCovers = saved; webIndex = 0; failedImages.clear(); });
+      if (mounted && CoverSettings.adultCovers == adult && widget.id == id) setState(() { webCovers = saved; webIndex %= saved.length; failedImages.clear(); });
       loadingWeb = false;
       return;
     }
@@ -187,7 +215,7 @@ class _ProjectCoverState extends State<ProjectCover> {
         if (urls.isNotEmpty) { CoverSettings.cache[cacheKey] = urls; CoverSettings.cacheAt[cacheKey] = DateTime.now(); CoverSettings.errors.remove(id); }
         else { CoverSettings.errors[id] = 'Поиск не вернул подходящих изображений'; }
         CoverSettings.statusRevision.value++;
-        if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; webIndex = 0; failedImages.clear(); });
+        if (mounted && widget.id == id && CoverSettings.adultCovers == adult) setState(() { webCovers = urls; if (urls.isNotEmpty) webIndex %= urls.length; failedImages.clear(); });
         return;
       }
       final uri = Uri.https('danbooru.donmai.us', '/posts.json', {
@@ -218,7 +246,7 @@ class _ProjectCoverState extends State<ProjectCover> {
       }
       CoverSettings.statusRevision.value++;
       if (mounted && widget.id == id && CoverSettings.adultCovers == adult) {
-        setState(() { webCovers = urls; webIndex = 0; });
+        setState(() { webCovers = urls; if (urls.isNotEmpty) webIndex %= urls.length; });
       }
     } catch (e) {
       CoverSettings.errors[id] = 'Ошибка поиска: $e';
@@ -257,9 +285,7 @@ class _ProjectCoverState extends State<ProjectCover> {
           // Explicit project-prefixed filenames always take precedence.
           localCandidates = matching.isNotEmpty ? matching : shared;
           if (localCandidates.isNotEmpty) {
-            final alternatives = localCandidates.where((f) => f.path != localFile?.path).toList();
-            final candidates = alternatives.isNotEmpty ? alternatives : localCandidates;
-            selected = candidates[Random().nextInt(candidates.length)];
+            selected = localCandidates[localIndex % localCandidates.length];
           }
         }
       } catch (_) { /* Inaccessible directory: show built-in fallback. */ }
@@ -301,7 +327,10 @@ class _ProjectCoverState extends State<ProjectCover> {
                   if (!mounted || webCovers.isEmpty) return;
                   final next = List.generate(webCovers.length, (i) => (webIndex + i + 1) % webCovers.length)
                     .where((i) => !failedImages.contains(webCovers[i]));
-                  if (next.isNotEmpty) setState(() => webIndex = next.first);
+                  if (next.isNotEmpty) {
+                    setState(() => webIndex = next.first);
+                    CoverSettings.advance(webCursorKey, webIndex);
+                  }
                 });
               }
               return const SizedBox.shrink();

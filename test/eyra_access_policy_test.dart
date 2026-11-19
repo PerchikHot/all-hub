@@ -28,6 +28,9 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: EyraAccessPage()));
     await tester.pumpAndSettle();
     final button = find.byKey(const ValueKey('eyra-run-diagnostics'));
+    // ListView lazily builds off-screen children on compact test viewports.
+    await tester.scrollUntilVisible(
+      button, 180, scrollable: find.byType(Scrollable).first);
     expect(button, findsOneWidget);
     expect(tester.widget<FilledButton>(button).onPressed, isNull);
 
@@ -35,6 +38,8 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(const MaterialApp(home: EyraAccessPage()));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      button, 180, scrollable: find.byType(Scrollable).first);
     expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
     await tester.ensureVisible(button);
     await tester.tap(button);

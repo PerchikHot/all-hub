@@ -437,6 +437,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 'Установка доступна из карточки проекта.',
                 style: TextStyle(color: Color(0xFFAABDD9))),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(children: [
+                Expanded(child: Text('Подключено проектов: ${available.length}',
+                  style: const TextStyle(color: Color(0xFFB4C9E6),
+                    fontWeight: FontWeight.w600))),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
+                    refresh();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Проверить снова')),
+              ]),
+            ),
             Expanded(child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
               itemCount: available.length,

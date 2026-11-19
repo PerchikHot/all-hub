@@ -1,3 +1,4 @@
+import 'hub_liquid_progress.dart';
 import 'project_launcher.dart';
 import 'project_download_progress.dart';
 import 'external_repositories.dart';
@@ -918,7 +919,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!, project.id), builder: (context, s) {
-              if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
+              if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: HubLiquidProgress());
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),
@@ -1097,7 +1098,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 valueListenable: ProjectLauncher.downloadProgress,
                                 builder: (context, progress, _) => Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: LinearProgressIndicator(value: progress),
+                                  child: HubLiquidProgress(value: progress),
                                 ),
                               ),
                             FilledButton.icon(
@@ -1212,10 +1213,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         const Icon(Icons.chevron_right_rounded, size: 19),
                       ]),
                       const SizedBox(height: 7),
-                      LinearProgressIndicator(
-                        value: safe, minHeight: 4,
-                        backgroundColor: const Color(0xFF304767),
-                        color: const Color(0xFF77BBFF)),
+                      HubLiquidProgress(
+                        value: safe, height: 7,
+                        ),
                     ]),
                   ),
                 ),

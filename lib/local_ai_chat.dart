@@ -1,4 +1,5 @@
 import 'eyra_forge_client.dart';
+import 'eyra_forge_privacy.dart';
 import 'hub_wait_indicator.dart';
 import 'eyra_memory_backup.dart';
 import 'dart:typed_data';
@@ -44,6 +45,27 @@ class _LocalAiChatState extends State<LocalAiChat> {
     final photo = attachedImage;
     final prefs = await SharedPreferences.getInstance();
     final endpoint = prefs.getString('eyra_forge_endpoint') ?? 'http://127.0.0.1:7860';
+    // Explicit consent is required before sending either text or a photo to
+    // a non-loopback Forge server. Cancelling keeps the draft and attachment.
+    if (forgeRequiresRemoteConsent(endpoint)) {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Отправить данные на другой сервер?'),
+          content: Text(photo == null
+            ? 'Forge по адресу $endpoint не находится на этом устройстве. Текст запроса будет отправлен этому серверу.'
+            : 'Forge по адресу $endpoint не находится на этом устройстве. Текст запроса и выбранная фотография будут отправлены этому серверу.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Отмена')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Отправить')),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
     final client = EyraForgeClient(Uri.parse(endpoint));
     setState(() {
       sending = true;

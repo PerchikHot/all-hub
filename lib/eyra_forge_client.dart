@@ -40,8 +40,10 @@ class EyraForgeClient {
     int width = 512,
     int height = 512,
     int steps = 20,
+    String? checkpoint,
   }) async {
     _validateParameters(prompt, negativePrompt, width, height, steps);
+    _validateCheckpoint(checkpoint);
     final response = await _client.post(url('/sdapi/v1/txt2img'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -49,6 +51,7 @@ class EyraForgeClient {
         'negative_prompt': negativePrompt,
         'width': width, 'height': height, 'steps': steps,
         'batch_size': 1, 'n_iter': 1, 'save_images': false,
+        if (checkpoint != null) 'override_settings': {'sd_model_checkpoint': checkpoint},
       }),
     ).timeout(const Duration(minutes: 8));
     return _decodeImageResponse(response);
@@ -63,6 +66,7 @@ class EyraForgeClient {
     int height = 512,
     int steps = 20,
     double denoisingStrength = 0.5,
+    String? checkpoint,
   }) async {
     if (source.length < 8 || source.length > 12 * 1024 * 1024 ||
         !(_isPng(source) || _isJpeg(source))) {
@@ -73,6 +77,7 @@ class EyraForgeClient {
       throw ArgumentError('Сила изменения должна быть от 0.05 до 1');
     }
     _validateParameters(prompt, negativePrompt, width, height, steps);
+    _validateCheckpoint(checkpoint);
     final response = await _client.post(url('/sdapi/v1/img2img'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -81,9 +86,17 @@ class EyraForgeClient {
         'width': width, 'height': height, 'steps': steps,
         'denoising_strength': denoisingStrength,
         'batch_size': 1, 'n_iter': 1, 'save_images': false,
+        if (checkpoint != null) 'override_settings': {'sd_model_checkpoint': checkpoint},
       }),
     ).timeout(const Duration(minutes: 8));
     return _decodeImageResponse(response);
+  }
+
+  static void _validateCheckpoint(String? checkpoint) {
+    if (checkpoint != null && (checkpoint.trim().isEmpty ||
+        checkpoint.length > 300 || checkpoint.contains(RegExp(r'[\\r\\n\\x00]')))) {
+      throw ArgumentError('Некорректная модель Forge');
+    }
   }
 
   static bool _isPng(List<int> bytes) => bytes.length >= 8 &&

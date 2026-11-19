@@ -504,19 +504,47 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     style: const TextStyle(fontSize: 11)),
                               ],
                             )),
-                            IconButton(
-                              tooltip: 'Открыть карточку проекта',
-                              onPressed: () {
-                                Navigator.pop(sheetContext);
-                                setState(() {
-                                  tab = 0;
-                                  search = project.name;
-                                  searchController.text = project.name;
-                                  category = 'All';
-                                  showOnlyAvailable = false;
-                                });
-                              },
-                              icon: const Icon(Icons.chevron_right_rounded)),
+                            if (data?.downloadUrl != null &&
+                                comparison != 0 && comparison != 1 &&
+                                Platform.isAndroid &&
+                                Uri.tryParse(data!.downloadUrl!)?.path.toLowerCase().endsWith('.apk') == true)
+                              IconButton.filledTonal(
+                                tooltip: comparison == -1 ? 'Обновить APK' : 'Установить APK',
+                                onPressed: () async {
+                                  Navigator.pop(sheetContext);
+                                  try {
+                                    if (!await confirmExternalInstall(project)) return;
+                                    await ProjectLauncher.runInstallExclusive(
+                                      project.id,
+                                      () => ProjectLauncher.installAndroidApk(
+                                        data.downloadUrl!,
+                                        projectId: project.id,
+                                        externalRepo: project.id.startsWith('external-')
+                                          ? project.repo : null,
+                                        sha256Digest: data.sha256Digest));
+                                    if (mounted) setState(() {});
+                                  } catch (error) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Не удалось установить: $error')));
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.system_update_alt_rounded))
+                            else
+                              IconButton(
+                                tooltip: 'Открыть карточку проекта',
+                                onPressed: () {
+                                  Navigator.pop(sheetContext);
+                                  setState(() {
+                                    tab = 0;
+                                    search = project.name;
+                                    searchController.text = project.name;
+                                    category = 'All';
+                                    showOnlyAvailable = false;
+                                  });
+                                },
+                                icon: const Icon(Icons.chevron_right_rounded)),
                           ]);
                         },
                       ),

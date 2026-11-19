@@ -1,4 +1,5 @@
 import 'hub_liquid_progress.dart';
+import 'hub_wait_indicator.dart';
 import 'project_launcher.dart';
 import 'project_download_progress.dart';
 import 'external_repositories.dart';
@@ -638,7 +639,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     body: tab == 5 ? const SnapshotPackCreatorPage() : tab == 1 ? const DevelopmentCenter() : tab == 2 ? const AiModelsPage() : tab == 3 ? const MediaSearchPage() : tab == 4 ? _settings() :
       FutureBuilder<List<Project>>(future: projects, builder: (context, snap) {
       if (snap.hasError) return Center(child: Text('Ошибка каталога: ${snap.error}'));
-      if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+      if (!snap.hasData) return const Center(child: HubWaitIndicator());
       final items = snap.data!;
 
       final filtered = items.where((p) => (!showOnlyAvailable || p.repo != null) && (category == 'All' || p.type.toLowerCase().contains(category.toLowerCase())) && (search.isEmpty || ('${p.name} ${p.description}').toLowerCase().contains(search.toLowerCase()))).toList();
@@ -919,7 +920,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             if (project.repo == null) const Padding(padding: EdgeInsets.only(top: 12), child: Text('Репозиторий пока не подключён'))
             else FutureBuilder<GithubInfo>(future: getInfo(project.repo!, project.id), builder: (context, s) {
-              if (!s.hasData) return const Padding(padding: EdgeInsets.all(12), child: HubLiquidProgress());
+              if (!s.hasData) return const Center(child: Padding(padding: EdgeInsets.all(12), child: HubWaitIndicator(size: 34)));
               final i = s.data!;
               return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const SizedBox(height: 10),

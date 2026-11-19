@@ -1,4 +1,4 @@
-import 'hub_liquid_progress.dart';
+import 'hub_wait_indicator.dart';
 import 'eyra_memory_backup.dart';
 import 'dart:typed_data';
 import 'ollama_context_privacy.dart';
@@ -597,7 +597,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Импорт переписок ChatGPT'),
                 subtitle: Text('Фрагментов: ${importedExcerpts.length}/1000. Повторный импорт объединяет записи, новые имеют приоритет. Только локально; файл до 64 МБ.'),
-                trailing: importBusy ? const CircularProgressIndicator() :
+                trailing: importBusy ? const HubWaitIndicator(size: 30) :
                   IconButton(tooltip: 'Импортировать conversations.json',
                     onPressed: importChatGpt, icon: const Icon(Icons.file_open_outlined)),
               ),
@@ -709,7 +709,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.link), label: const Text('Подключиться'))),
           ],
-          if (checkingConnection) const HubLiquidProgress(),
+          if (checkingConnection) const HubWaitIndicator(size: 32),
           ],
         ]))),
       ),
@@ -744,8 +744,8 @@ class _LocalAiChatState extends State<LocalAiChat> {
                 ))));
           },
         )),
-      if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16),
-        child: HubLiquidProgress()),
+      if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Align(alignment: Alignment.centerLeft, child: HubAiResponding())),
       SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(child: TextField(controller: input, maxLines: 5, minLines: 1,

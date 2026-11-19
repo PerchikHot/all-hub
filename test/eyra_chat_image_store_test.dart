@@ -32,4 +32,31 @@ void main() {
     await store.delete(external.path);
     expect(await external.readAsString(), 'keep');
   });
+  test('only store-generated top-level image names are owned', () async {
+    final image = await store.save(Uint8List.fromList(
+        [137,80,78,71,13,10,26,10,1,2,3]));
+    expect(store.owns(image), isTrue);
+    expect(store.owns('${root.path}/images/manual.png'), isFalse);
+    expect(store.owns('${root.path}/images/nested/123_0.png'), isFalse);
+    expect(store.owns('${root.path}/images/../images/manual.png'), isFalse);
+    expect(store.owns(''), isFalse);
+  });
+
+  test('cannot delete a symbolic link to a file outside private storage', () async {
+    final external = File('${root.path}/important.png');
+    await external.writeAsString('keep');
+    await store.save(Uint8List.fromList([137,80,78,71,13,10,26,10,1]));
+    final link = Link('${root.path}/images/123_0.png');
+    try {
+      await link.create(external.path);
+    } on FileSystemException {
+      // Creating symlinks can require privileges on Windows runners.
+      return;
+    }
+    expect(store.owns(link.path), isTrue);
+    await store.delete(link.path);
+    expect(await external.readAsString(), 'keep');
+    expect(await link.exists(), isTrue);
+  });
+
 }

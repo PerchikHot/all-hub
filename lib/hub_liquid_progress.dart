@@ -37,29 +37,20 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
       value: safeValue == null ? 'Выполняется'
           : '${(safeValue * 100).round()}%',
       child: SizedBox(
-        height: math.max(widget.height + 18, 42),
+        height: math.max(widget.height + 12, 28),
         width: double.infinity,
         child: AnimatedBuilder(
           animation: _flow,
           builder: (context, _) {
-            final completed = safeValue == 1.0;
-            return Row(children: [
-              SizedBox(width: 46, height: 42,
-                child: CustomPaint(painter: _GelNozzlePainter(
-                  phase: reducedMotion ? 0 : _flow.value))),
-              const SizedBox(width: 2),
-              Expanded(child: SizedBox(height: widget.height,
-                child: CustomPaint(painter: _LiquidPainter(
-                  phase: reducedMotion ? 0 : _flow.value,
-                  progress: safeValue,
-                  style: widget.style,
-                )))),
-              const SizedBox(width: 3),
-              SizedBox(width: 42, height: 42,
-                child: CustomPaint(painter: _GelTargetPainter(
-                  completed: completed,
-                  phase: reducedMotion ? 0 : _flow.value))),
-            ]);
+            return SizedBox(
+              height: math.max(widget.height, 12),
+              width: double.infinity,
+              child: CustomPaint(painter: _LiquidPainter(
+                phase: reducedMotion ? 0 : _flow.value,
+                progress: safeValue,
+                style: widget.style,
+              )),
+            );
           },
         ),
       ),
@@ -86,10 +77,7 @@ class _LiquidPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = math.min(1.5, h * .12)
       ..color = const Color(0xFF5F9FEF));
-    canvas.drawRRect(track, Paint()
-      ..color = const Color(0xFF4D8DD7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.min(1.6, h * .12));
+
     canvas.save();
     canvas.clipRRect(track);
 
@@ -107,13 +95,14 @@ class _LiquidPainter extends CustomPainter {
     // Surface motion, viscosity and droplets are purely decorative.
     final body = Path()..moveTo(start, h);
     body.lineTo(start, h * .20);
-    const steps = 64;
+    const steps = 96;
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
       final ripple = (style == HubLiquidStyle.capsule ? .10 :
           style == HubLiquidStyle.segmented ? .012 : .12) * h *
           math.sin(x * .065 - phase * math.pi * 2)
-          + math.sin(x * .13 + phase * math.pi * 4) * h * .048;
+          + math.sin(x * .13 + phase * math.pi * 4) * h * .048
+          + math.sin(x * .23 - phase * math.pi * 6) * h * .024;
       body.lineTo(x, h * .20 + ripple);
     }
     body..lineTo(end, h)..close();
@@ -131,6 +120,18 @@ class _LiquidPainter extends CustomPainter {
     canvas.drawRect(Offset(start, h * .12) & Size(fill, h * .18), Paint()
       ..color = const Color(0x99FFFFFF)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * .14));
+    canvas.restore();
+
+    // Layered translucent flow makes the white liquid feel viscous.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 5; i++) {
+      final x = start + ((phase * .32 + i * .23) % 1.0) * fill;
+      canvas.drawOval(Rect.fromCenter(
+        center: Offset(x, h * (.40 + .07 * math.sin(i + phase * 6))),
+        width: math.max(h * .7, fill * .19), height: h * .35),
+        Paint()..color = const Color(0x55FFFFFF));
+    }
     canvas.restore();
 
     // Glossy streaks drift within the filled region.
@@ -195,95 +196,3 @@ class _LiquidPainter extends CustomPainter {
 }
 
  
-/// A clearly readable toy-like sci-fi pistol silhouette pointing into the
-/// progress track. Decorative artwork, never a functional control.
-class _GelNozzlePainter extends CustomPainter {
-  const _GelNozzlePainter({required this.phase});
-  final double phase;
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    canvas.save();
-    canvas.translate(0, (size.height - 36) / 2);
-    canvas.scale(size.width / 48, 36 / 36);
-    final glow = .55 + .45 * math.sin(phase * math.pi * 2).abs();
-    final body = Path()
-      ..moveTo(3, 8)..lineTo(27, 8)
-      ..quadraticBezierTo(31, 8, 32, 12)
-      ..lineTo(42, 12)..lineTo(42, 20)
-      ..lineTo(28, 20)..lineTo(23, 31)
-      ..quadraticBezierTo(22, 34, 19, 34)
-      ..lineTo(11, 34)..lineTo(15, 20)
-      ..lineTo(4, 20)..quadraticBezierTo(2, 20, 2, 18)
-      ..lineTo(2, 11)..quadraticBezierTo(2, 8, 3, 8)
-      ..close();
-    canvas.drawPath(body, Paint()..color = const Color(0xFF132A4D));
-    canvas.drawPath(body, Paint()
-      ..color = const Color(0xFF70B7FF)
-      ..style = PaintingStyle.stroke..strokeWidth = 1.6);
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      const Rect.fromLTWH(7, 11, 21, 5), const Radius.circular(2)),
-      Paint()..color = const Color(0xFF3E78BC));
-    canvas.drawLine(const Offset(9, 12), const Offset(25, 12),
-      Paint()..color = const Color(0xFFBCE6FF)..strokeWidth = 1.4);
-    // Trigger guard and trigger make the pistol unmistakable at compact sizes.
-    final guard = Path()
-      ..moveTo(14, 21)..quadraticBezierTo(15, 27, 21, 26)
-      ..lineTo(24, 21);
-    canvas.drawPath(guard, Paint()..color = const Color(0xFF7DBEFF)
-      ..style = PaintingStyle.stroke..strokeWidth = 1.6);
-    canvas.drawLine(const Offset(19, 21), const Offset(18, 24),
-      Paint()..color = const Color(0xFFE6F6FF)..strokeWidth = 1.4);
-    canvas.drawRRect(RRect.fromRectAndRadius(
-      const Rect.fromLTWH(39, 13, 7, 6), const Radius.circular(1)),
-      Paint()..color = const Color(0xFFB9DBFA));
-    canvas.drawCircle(const Offset(46, 16), 2.1 * glow,
-      Paint()..color = const Color(0xFFFFFFFF));
-    canvas.restore();
-  }
-  @override
-  bool shouldRepaint(covariant _GelNozzlePainter old) => old.phase != phase;
-}
-
-/// The receiving target glows and fills as the real download advances.
-class _GelTargetPainter extends CustomPainter {
-  const _GelTargetPainter({required this.completed, required this.phase});
-  final bool completed;
-  final double phase;
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) * .40;
-    canvas.drawCircle(center, radius + 2, Paint()
-      ..color = const Color(0xFF10213C));
-    canvas.drawCircle(center, radius, Paint()
-      ..color = const Color(0xFF73B8FF)
-      ..strokeWidth = 2.2..style = PaintingStyle.stroke);
-    canvas.drawCircle(center, radius * .77, Paint()
-      ..color = const Color(0xFF243D68));
-    canvas.drawCircle(center, radius * .58, Paint()
-      ..color = const Color(0xFFE3F5FF));
-    canvas.drawCircle(center, radius * .36, Paint()
-      ..color = const Color(0xFF356AA7));
-    final pulse = completed ? 1 + .12 * math.sin(phase * math.pi * 2) : 1.0;
-    canvas.drawCircle(center, radius * .19 * pulse, Paint()
-      ..color = const Color(0xFFFFFFFF));
-    // Crosshair guides visually connect the gun's stream to the bullseye.
-    for (var i = 0; i < 4; i++) {
-      final angle = i * math.pi / 2;
-      final from = center + Offset(math.cos(angle), math.sin(angle)) * (radius * .84);
-      final to = center + Offset(math.cos(angle), math.sin(angle)) * (radius * 1.12);
-      canvas.drawLine(from, to, Paint()
-        ..color = const Color(0xFFB9DFFF)..strokeWidth = 1.4);
-    }
-    if (completed) {
-      canvas.drawCircle(center, radius * 1.17, Paint()
-        ..color = const Color(0x8878D6FF)
-        ..strokeWidth = 2..style = PaintingStyle.stroke);
-    }
-  }
-  @override
-  bool shouldRepaint(covariant _GelTargetPainter old) =>
-      old.phase != phase || old.completed != completed;
-}

@@ -89,18 +89,43 @@ class HubUpdatePanel extends StatelessWidget {
             Text(versionText, style: const TextStyle(color: muted, fontSize: 13)),
           ],
           const SizedBox(height: 18),
-          Row(children: [
-            Expanded(child: HubLiquidProgress(value: p, height: 35)),
-            const SizedBox(width: 12),
-            SizedBox(width: 92, height: 92,
+          LayoutBuilder(builder: (context, constraints) {
+            final compact = constraints.maxWidth < 360;
+            final liquid = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(25),
+                color: const Color(0x9910203A),
+                border: Border.all(color: const Color(0xFF67BFFF), width: 1.4),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x5537A9FF), blurRadius: 15),
+                  BoxShadow(color: Color(0x331B75CB), blurRadius: 5,
+                    spreadRadius: 2),
+                ],
+              ),
+              child: HubLiquidProgress(value: p, height: compact ? 27 : 43),
+            );
+            final ring = SizedBox(
+              width: compact ? 82 : 106,
+              height: compact ? 82 : 106,
               child: CustomPaint(
                 painter: _UpdateRingPainter(p),
                 child: Center(child: Text('${(p * 100).round()}%',
-                  style: const TextStyle(color: Colors.white, fontSize: 24,
-                    fontWeight: FontWeight.bold))),
+                  style: TextStyle(color: Colors.white,
+                    fontSize: compact ? 21 : 27,
+                    fontWeight: FontWeight.w800,
+                    shadows: const [Shadow(color: Color(0xFF54B6FF),
+                      blurRadius: 12)]))),
               ),
-            ),
-          ]),
+            );
+            return compact
+                ? Column(children: [liquid, const SizedBox(height: 10), ring])
+                : Row(children: [
+                    Expanded(child: liquid),
+                    const SizedBox(width: 14),
+                    ring,
+                  ]);
+          }),
           const SizedBox(height: 12),
           Wrap(spacing: 18, runSpacing: 8, children: [
             _metric(Icons.download_rounded,
@@ -189,12 +214,28 @@ class _UpdateRingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 8;
     final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(center, radius + 4, Paint()
+      ..color = const Color(0x443A9BEE)
+      ..strokeWidth = 3..style = PaintingStyle.stroke);
     canvas.drawCircle(center, radius, Paint()
       ..color = const Color(0xFF25416B)
-      ..strokeWidth = 8..style = PaintingStyle.stroke);
+      ..strokeWidth = 9..style = PaintingStyle.stroke);
+    canvas.drawCircle(center, radius - 11, Paint()
+      ..color = const Color(0x552B7EBD)
+      ..strokeWidth = 1.5..style = PaintingStyle.stroke);
     if (value > 0) {
       canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * value, false, Paint()
-        ..color = const Color(0xFF68C8FF)
+        ..color = const Color(0x6651BCFF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7)
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 13..style = PaintingStyle.stroke);
+      canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * value, false, Paint()
+        ..shader = const SweepGradient(
+          startAngle: -math.pi / 2,
+          endAngle: 3 * math.pi / 2,
+          colors: [Color(0xFFB9F1FF), Color(0xFF4CA9FF),
+            Color(0xFF88D8FF), Color(0xFFB9F1FF)],
+        ).createShader(rect)
         ..strokeCap = StrokeCap.round
         ..strokeWidth = 8..style = PaintingStyle.stroke);
     }

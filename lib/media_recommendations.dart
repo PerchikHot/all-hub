@@ -42,3 +42,13 @@ List<Map<String, dynamic>> rankMediaByLikes(
   });
   return indexed.map((entry) => entry.value).toList();
 }
+
+/// Append only newly fetched posts. Existing visible tiles keep their position
+/// even if the new batch scores higher or likes change while browsing.
+void appendStableMediaRecommendations(
+  List<Map<String, dynamic>> destination,
+  List<Map<String, dynamic>> newPosts,
+  Iterable<Map<String, dynamic>> likes,
+) {
+  destination.addAll(rankMediaByLikes(newPosts, likes));
+}

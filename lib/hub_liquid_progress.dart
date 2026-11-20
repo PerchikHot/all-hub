@@ -35,7 +35,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
       value: widget.value == null ? 'Выполняется'
           : '${(widget.value!.clamp(0.0, 1.0) * 100).round()}%',
       child: SizedBox(
-        height: math.max(widget.height, 26),
+        height: math.max(widget.height + 18, 42),
         width: double.infinity,
         child: AnimatedBuilder(
           animation: _flow,
@@ -43,7 +43,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
             final completed = widget.value != null && widget.value!.isFinite
                 && widget.value! >= 1;
             return Row(children: [
-              SizedBox(width: 31, height: 26,
+              SizedBox(width: 46, height: 42,
                 child: CustomPaint(painter: _GelNozzlePainter(
                   phase: reducedMotion ? 0 : _flow.value))),
               const SizedBox(width: 2),
@@ -54,7 +54,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
                   style: widget.style,
                 )))),
               const SizedBox(width: 3),
-              SizedBox(width: 26, height: 26,
+              SizedBox(width: 42, height: 42,
                 child: CustomPaint(painter: _GelTargetPainter(
                   completed: completed,
                   phase: reducedMotion ? 0 : _flow.value))),
@@ -193,7 +193,9 @@ class _GelNozzlePainter extends CustomPainter {
   final double phase;
   @override
   void paint(Canvas canvas, Size size) {
-    final y = size.height / 2;
+    canvas.save();
+    canvas.scale(size.width / 31, size.height / 26);
+    const y = 13.0;
     final outline = Paint()..color = const Color(0xFF69B7FF)
       ..style = PaintingStyle.stroke..strokeWidth = 1.6;
     final body = Path()
@@ -209,6 +211,7 @@ class _GelNozzlePainter extends CustomPainter {
     final pulse = .65 + .35 * math.sin(phase * math.pi * 2).abs();
     canvas.drawCircle(Offset(29, y), 1.6 * pulse,
       Paint()..color = const Color(0xFFEAF9FF));
+    canvas.restore();
   }
   @override
   bool shouldRepaint(covariant _GelNozzlePainter old) => old.phase != phase;
@@ -221,7 +224,9 @@ class _GelTargetPainter extends CustomPainter {
   final double phase;
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+    canvas.save();
+    canvas.translate((size.width - 26) / 2, (size.height - 26) / 2);
+    const center = Offset(13, 13);
     for (var i = 0; i < 3; i++) {
       canvas.drawCircle(center, 11.5 - i * 3.5, Paint()
         ..color = completed ? const Color(0xFFECF8FF) :
@@ -231,6 +236,7 @@ class _GelTargetPainter extends CustomPainter {
     }
     canvas.drawCircle(center, completed ? 4.0 + math.sin(phase * math.pi * 2).abs() * 2 : 2.5,
       Paint()..color = const Color(0xFFFFFFFF));
+    canvas.restore();
   }
   @override
   bool shouldRepaint(covariant _GelTargetPainter old) =>

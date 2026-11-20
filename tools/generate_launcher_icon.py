@@ -64,6 +64,17 @@ def verify(project: str, root: Path) -> None:
         with Image.open(android / "drawable-nodpi" / "ic_launcher_foreground.png") as im:
             assert im.size == (432, 432)
         assert (android / "mipmap-anydpi-v26" / "ic_launcher.xml").exists()
+        with Image.open(source) as expected, Image.open(
+            android / "drawable-nodpi" / "ic_launcher_foreground.png"
+        ) as foreground:
+            # Verify the adaptive icon used by Android launchers too.
+            actual = foreground.convert("RGBA").crop((72, 72, 360, 360))
+            target = expected.convert("RGBA").resize(
+                (288, 288), Image.Resampling.LANCZOS
+            )
+            assert ImageChops.difference(actual, target).getbbox() is None, (
+                "Adaptive launcher foreground differs from approved artwork"
+            )
         with Image.open(source) as expected, Image.open(android / "mipmap-xxxhdpi" / "ic_launcher.png") as actual:
             assert ImageChops.difference(expected.convert("RGB"), actual.convert("RGB")).getbbox() is None, "Launcher artwork was overwritten"
     if windows.parent.exists():

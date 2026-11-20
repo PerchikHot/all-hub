@@ -1,6 +1,7 @@
 import 'project_detail_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'hub_liquid_progress.dart';
+import 'hub_cinematic_background.dart';
 import 'hub_wait_indicator.dart';
 import 'project_launcher.dart';
 import 'project_download_progress.dart';
@@ -104,24 +105,7 @@ class _AllHubState extends State<AllHub> {
   Widget build(BuildContext context) => MaterialApp(
     title: 'All Hub', debugShowCheckedModeBanner: false,
     themeMode: mode,
-    builder: (context, child) => DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: Theme.of(context).brightness == Brightness.dark
-          ? const LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF08162F),
-                Color(0xFF101B40),
-                Color(0xFF15102C),
-                Color(0xFF070E20),
-              ],
-              stops: [0, .36, .68, 1],
-            )
-          : const LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Color(0xFFF0F4FC), Color(0xFFE5EDFC)],
-            ),
-      ),
+    builder: (context, child) => HubCinematicBackground(
       child: _ThemeControls(
         mode: mode, onChanged: setMode, child: child!),
     ),

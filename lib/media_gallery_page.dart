@@ -389,15 +389,22 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           // Otherwise a mirror with a new preview reappears as another card.
           seenPostUrls.addAll(mediaFeedIdentityKeys(post));
         }
-        posts.addAll(newPosts);
-        emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;
-        if (posts.length > maxVisiblePosts) {
-          posts.removeRange(0, posts.length - maxVisiblePosts);
+        // Never evict the first cards while the user is viewing them.
+        // Removing from index 0 shifted the entire masonry grid and made
+        // stationary images appear to change or disappear at 180 items.
+        final remainingSlots = maxVisiblePosts - posts.length;
+        if (remainingSlots > 0) {
+          posts.addAll(newPosts.take(remainingSlots));
         }
+        emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;
         // One sparse category must not stop another category's pagination.
         if (sourceCount < pageSize) exhaustedFeedTags.add(selectedTag);
         page = effectivePage + 1;
-        hasMore = emptyPageRetries < 8 &&
+        // A bounded, stable session feed is preferable to silently
+        // replacing the cards the user has already scrolled past.
+        // An explicit refresh starts a new selection.
+        hasMore = posts.length < maxVisiblePosts &&
+            emptyPageRetries < 8 &&
             nextAvailableMediaFeedPage(
                 page, enabledTags, exhaustedFeedTags) != null;
       });

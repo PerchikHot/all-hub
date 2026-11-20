@@ -1165,7 +1165,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 valueListenable: ProjectLauncher.downloadProgress,
                                 builder: (context, progress, _) => Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                  child: HubLiquidProgress(value: progress),
+                                  child: HubLiquidProgress(value: progress, height: 22),
                                 ),
                               ),
                             FilledButton.icon(
@@ -1281,7 +1281,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ]),
                       const SizedBox(height: 7),
                       HubLiquidProgress(
-                        value: safe, height: 7,
+                        value: safe, height: 16,
                         ),
                     ]),
                   ),

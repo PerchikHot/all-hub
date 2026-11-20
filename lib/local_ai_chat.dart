@@ -564,8 +564,14 @@ class _LocalAiChatState extends State<LocalAiChat> {
     if (text.isEmpty || selected == null || !models.contains(selected)) return;
     input.clear();
     setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
-    await saveMessages();
     try {
+      // Local storage errors must not strand the chat in the busy state.
+      // The response can still be generated without a persisted draft.
+      try {
+        await saveMessages();
+      } catch (e) {
+        if (mounted) setState(() => error = 'Не удалось сохранить запрос: $e');
+      }
       final base = address.text.trim().replaceAll(RegExp(r'/$'), '');
       // Keep persisted history intact, but do not feed old repetitive answers
       // back to Qwen: they reinforce the exact loop the user is reporting.

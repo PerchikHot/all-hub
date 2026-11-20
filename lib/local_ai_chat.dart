@@ -1021,7 +1021,18 @@ class _LocalAiChatState extends State<LocalAiChat> {
               value: allowRemoteContext,
               onChanged: (enabled) async {
                 final prefs = await SharedPreferences.getInstance();
-                final endpoint = address.text.trim().replaceAll(RegExp(r'/+
+                final endpoint = address.text.trim().replaceAll(RegExp(r'/+$'), '');
+                if (enabled && !isLoopbackEndpoint) {
+                  await prefs.setString('eyra_approved_ollama_endpoint', endpoint);
+                  approvedRemoteEndpoint = endpoint;
+                } else {
+                  await prefs.remove('eyra_approved_ollama_endpoint');
+                  approvedRemoteEndpoint = null;
+                }
+                await prefs.setBool('eyra_allow_remote_context', enabled);
+                if (mounted) setState(() => allowRemoteContext =
+                    enabled && remoteOllamaContextApproved(
+                        address.text, approvedRemoteEndpoint));
               },
             ),
             Align(alignment: Alignment.centerRight, child: TextButton.icon(

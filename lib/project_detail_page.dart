@@ -135,11 +135,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   final available = release.version;
                   final comparison = local == null || available == null
                     ? null : comparePublishedVersions(local, available);
-                  final label = local == null ? 'Скачать / установить'
-                    : comparison == -1 ? 'Обновить'
-                    : comparison == 0 ? 'Переустановить'
-                    : comparison == 1 ? 'Установлена более новая версия'
-                    : 'Проверить и установить';
+                  final label = projectInstallActionLabel(local, available);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

@@ -26,7 +26,7 @@ void main() {
 
     progress.value = 0.45;
     await tester.pump();
-    expect(find.text('Загрузка: 45%'), findsOneWidget);
+    expect(find.text('45%'), findsOneWidget);
     expect(find.byType(HubWaitIndicator), findsNothing);
     expect(tester.widget<HubLiquidProgress>(
         find.byType(HubLiquidProgress)).value, 0.45);
@@ -49,10 +49,11 @@ void main() {
     expect(find.byType(HubLiquidProgress), findsNothing);
     progress.value = 1.8;
     await tester.pump();
-    expect(find.text('Загрузка: 100%'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
     expect(find.byType(HubWaitIndicator), findsNothing);
     expect(tester.widget<HubLiquidProgress>(
       find.byType(HubLiquidProgress)).value, 1.0);
-    expect(find.textContaining('подтверждение установки'), findsOneWidget);
+    expect(find.text('Установка'), findsOneWidget);
+    expect(find.text('Установлено'), findsNothing);
   });
 }

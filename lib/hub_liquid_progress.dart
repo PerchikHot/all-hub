@@ -134,6 +134,44 @@ class _LiquidPainter extends CustomPainter {
     }
     canvas.restore();
 
+    // Viscous strands stretch and merge with the main white flow. The
+    // geometry is strictly clipped to the measured fill, so decoration never
+    // makes the download appear further along than it really is.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 9; i++) {
+      final seed = i * .137;
+      final travel = (seed + phase * (.10 + (i % 3) * .025)) % 1.0;
+      final x = start + fill * travel;
+      final sway = math.sin(phase * math.pi * 2 + i * 1.8);
+      final strandWidth = h * (.12 + (i % 4) * .035);
+      final strandLength = h * (.20 + .22 * (1 + sway) / 2);
+      final strand = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, h * (.15 + .10 * sway),
+          strandWidth, strandLength),
+        Radius.circular(strandWidth / 2),
+      );
+      canvas.drawRRect(strand, Paint()
+        ..color = i.isEven
+          ? const Color(0x88FFFFFF)
+          : const Color(0x55D9E4F1));
+    }
+    // A smooth reflective ribbon reads as thick, cohesive liquid rather
+    // than a sequence of detached dots.
+    final ribbon = Path()..moveTo(start, h * .68);
+    for (var i = 0; i <= 72; i++) {
+      final x = start + fill * i / 72;
+      final y = h * (.68 + .075 *
+        math.sin(i * .20 - phase * math.pi * 2));
+      ribbon.lineTo(x, y);
+    }
+    canvas.drawPath(ribbon, Paint()
+      ..color = const Color(0xAAFFFFFF)
+      ..strokeWidth = math.max(1, h * .075)
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke);
+    canvas.restore();
+
     // Glossy streaks drift within the filled region.
     canvas.save();
     canvas.clipPath(body);

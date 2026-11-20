@@ -119,23 +119,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           if (repo != null) FutureBuilder<GithubInfo>(
             future: info,
             builder: (context, snapshot) {
+              if (snapshot.hasError) return Text('Не удалось проверить релиз: ${snapshot.error}');
               if (!snapshot.hasData) return const Center(child: HubWaitIndicator());
               final release = snapshot.data!;
               return FutureBuilder<String?>(
                 future: installed,
                 builder: (context, version) {
+                  if (version.hasError) {
+                    return Text('Не удалось определить установленную версию: ${version.error}');
+                  }
+                  if (version.connectionState != ConnectionState.done) {
+                    return const Center(child: HubWaitIndicator());
+                  }
                   final local = version.data;
                   final available = release.version;
                   final comparison = local == null || available == null
                     ? null : comparePublishedVersions(local, available);
                   final label = local == null ? 'Скачать / установить'
-                    : comparison != null && comparison < 0 ? 'Обновить'
-                    : 'Переустановить';
+                    : comparison == -1 ? 'Обновить'
+                    : comparison == 0 ? 'Переустановить'
+                    : comparison == 1 ? 'Установлена более новая версия'
+                    : 'Проверить и установить';
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text('Установлено: ${local ?? "не обнаружено"}'),
                       Text('Доступно: ${available ?? "не опубликовано"}'),
+                      Text(describeUpdateStatus(local, available)),
                       if (release.error != null) Text(release.error!),
                       const SizedBox(height: 12),
                       if (busy) ValueListenableBuilder<double?>(

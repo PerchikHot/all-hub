@@ -1029,6 +1029,28 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
     }
   }
 
+  /// A stale partial APK can have a valid HTTP range but a broken ZIP tail.
+  /// Retry once from byte zero on either container or digest corruption.
+  /// Never retry transport failures here: the resumable downloader already
+  /// handles them, and no unverified file is passed to Android.
+  @visibleForTesting
+  static Future<void> downloadVerifiedApk(
+    http.Client client, Uri uri, File temporary, {String? sha256Digest}
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await downloadResumableApk(client, uri, temporary);
+      try {
+        await requireCompleteApkContainer(temporary);
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        return;
+      } on FormatException {
+        if (await temporary.exists()) await temporary.delete();
+        downloadProgress.value = 0;
+        if (attempt == 1) rethrow;
+      }
+    }
+  }
+
   /// Downloads a published APK directly, then asks Android to install it.
   /// Android always requires user confirmation; this cannot silently install apps.
   static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo, String? sha256Digest}) async {
@@ -1053,22 +1075,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
       final temporary = File('${apk.path}.download');
       try {
         downloadProgress.value = 0;
-        await downloadResumableApk(client, uri, temporary);
-        await requireCompleteApkContainer(temporary);
-        // Rolling GitHub Releases replace the asset at the same URL. A partial
-        // download from the previous asset must never be resumed into the new
-        // APK. On a digest mismatch, discard the partial file and retry once
-        // from byte zero; never bypass SHA-256 verification.
-        try {
-          await verifyDownloadedDigest(temporary, sha256Digest);
-        } on FormatException {
-          if (sha256Digest == null) rethrow;
-          if (await temporary.exists()) await temporary.delete();
-          downloadProgress.value = 0;
-          await downloadResumableApk(client, uri, temporary);
-          await requireCompleteApkContainer(temporary);
-          await verifyDownloadedDigest(temporary, sha256Digest);
-        }
+        await downloadVerifiedApk(client, uri, temporary, sha256Digest: sha256Digest);
         if (await apk.exists()) await apk.delete();
         await temporary.rename(apk.path);
         // Android owns the final install confirmation. A false/null result

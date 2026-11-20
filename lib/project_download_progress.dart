@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'project_launcher.dart';
 import 'hub_liquid_progress.dart';
+import 'hub_wait_indicator.dart';
 
 /// A single, platform-independent update surface. Installation is separate
 /// from downloading: the progress bar must never imply an APK was installed.
@@ -60,7 +61,14 @@ class ProjectDownloadProgress extends StatelessWidget {
                         )),
                       ]),
                       const SizedBox(height: 10),
-                      HubLiquidProgress(value: safe, height: 12),
+                      // No known byte count means waiting, not fake progress.
+                      if (safe == null)
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: HubWaitIndicator(size: 66),
+                        )
+                      else
+                        HubLiquidProgress(value: safe, height: 12),
                       const SizedBox(height: 8),
                       const Text(
                         'После загрузки может потребоваться подтверждение установки.',

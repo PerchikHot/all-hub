@@ -961,6 +961,46 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
     }
   }
 
+  /// Verify that the APK has a complete ZIP central directory, not merely
+  /// the four-byte PK prefix. This rejects interrupted downloads with an
+  /// unknown Content-Length before invoking Android's package installer.
+  @visibleForTesting
+  static Future<void> requireCompleteApkContainer(File apk) async {
+    final length = await apk.length();
+    if (length < 1024) throw const FormatException('APK слишком мал');
+    final file = await apk.open();
+    try {
+      final header = await file.read(4);
+      if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
+          header[2] != 0x03 || header[3] != 0x04) {
+        throw const FormatException('Скачан не APK (не ZIP-контейнер)');
+      }
+      // EOCD is at most 22 + 65535 bytes from the end (ZIP comment).
+      final tailSize = length < 65557 ? length : 65557;
+      await file.setPosition(length - tailSize);
+      final tail = await file.read(tailSize);
+      int read16(int i) => tail[i] | (tail[i + 1] << 8);
+      int read32(int i) => tail[i] | (tail[i + 1] << 8) |
+          (tail[i + 2] << 16) | (tail[i + 3] << 24);
+      for (var i = tail.length - 22; i >= 0; i--) {
+        if (tail[i] != 0x50 || tail[i + 1] != 0x4b ||
+            tail[i + 2] != 0x05 || tail[i + 3] != 0x06) continue;
+        if (i + 22 + read16(i + 20) != tail.length) continue;
+        final centralSize = read32(i + 12);
+        final centralOffset = read32(i + 16);
+        final eocdOffset = length - tailSize + i;
+        if (read16(i + 4) != 0 || read16(i + 6) != 0 ||
+            read16(i + 8) != read16(i + 10) ||
+            centralSize == 0xffffffff || centralOffset == 0xffffffff ||
+            centralOffset + centralSize > eocdOffset) continue;
+        return;
+      }
+      throw const FormatException('APK повреждён или загружен не полностью (ZIP)');
+    } finally {
+      await file.close();
+    }
+  }
+
   /// A system installer intent being launched is NOT proof of installation,
   /// but false/null must be surfaced instead of marking the update successful.
   static void requireAndroidInstallerOpened(bool? opened) {
@@ -994,19 +1034,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
       try {
         downloadProgress.value = 0;
         await downloadResumableApk(client, uri, temporary);
-        if (await temporary.length() < 1024) {
-          throw const FormatException('APK слишком мал');
-        }
-        final file = await temporary.open();
-        try {
-          final header = await file.read(4);
-          if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
-              header[2] != 0x03 || header[3] != 0x04) {
-            throw const FormatException('Скачан не APK (не ZIP-контейнер)');
-          }
-        } finally {
-          await file.close();
-        }
+        await requireCompleteApkContainer(temporary);
         // Rolling GitHub Releases replace the asset at the same URL. A partial
         // download from the previous asset must never be resumed into the new
         // APK. On a digest mismatch, discard the partial file and retry once
@@ -1018,6 +1046,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
           if (await temporary.exists()) await temporary.delete();
           downloadProgress.value = 0;
           await downloadResumableApk(client, uri, temporary);
+          await requireCompleteApkContainer(temporary);
           await verifyDownloadedDigest(temporary, sha256Digest);
         }
         if (await apk.exists()) await apk.delete();

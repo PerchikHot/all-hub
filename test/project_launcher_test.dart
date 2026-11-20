@@ -514,4 +514,38 @@ void main() {
     }
   });
 
+  test('APK verification discards corrupt cache and retries a clean download', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-apk-retry-');
+    final temporary = File('${dir.path}/release.download');
+    final valid = List<int>.filled(1100, 0, growable: true);
+    valid.setRange(0, 4, [0x50, 0x4b, 0x03, 0x04]);
+    final centralOffset = valid.length;
+    valid.addAll([0x50, 0x4b, 0x01, 0x02, ...List<int>.filled(42, 0)]);
+    valid.addAll([
+      0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0,
+      1, 0, 1, 0, 46, 0, 0, 0,
+      centralOffset & 255, (centralOffset >> 8) & 255,
+      (centralOffset >> 16) & 255, (centralOffset >> 24) & 255,
+      0, 0,
+    ]);
+    final ranges = <String?>[];
+    final client = MockClient((request) async {
+      ranges.add(request.headers['Range']);
+      if (ranges.length == 1) {
+        return http.Response(List<int>.filled(1100, 0).toString(), 200);
+      }
+      return http.Response.bytes(valid, 200);
+    });
+    try {
+      await temporary.writeAsBytes([1, 2, 3, 4]);
+      await ProjectLauncher.downloadVerifiedApk(
+          client, Uri.parse('https://github.com/example/release.apk'), temporary);
+      expect(ranges, ['bytes=4-', null]);
+      expect(await temporary.readAsBytes(), valid);
+    } finally {
+      client.close();
+      await dir.delete(recursive: true);
+    }
+  });
+
 }

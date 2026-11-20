@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'local_ai_chat.dart';
 import 'codex_page.dart';
 import 'gguf_header.dart';
+import 'gguf_import_integrity.dart';
 import 'native_llama_runtime.dart';
 
 class AiModelsPage extends StatefulWidget {
@@ -115,11 +116,13 @@ class _AiModelsPageState extends State<AiModelsPage> {
           if (Platform.isAndroid) {
             final dest = Directory('${support.path}/models');
             await dest.create(recursive: true);
-            final filename = '${DateTime.now().microsecondsSinceEpoch}_${f.name}';
+            final filename = '${DateTime.now().microsecondsSinceEpoch}_${safeGgufFilename(f.name)}';
             temp = File('${dest.path}/$filename.part');
             await copyWithProgress(source, temp, f.name);
             final sourceSize = await source.length();
-            if (await temp.length() != sourceSize || await GgufHeader.read(temp.path) == null) {
+            if (await temp.length() != sourceSize ||
+                !await ggufCopiesMatch(source, temp) ||
+                await GgufHeader.read(temp.path) == null) {
               invalidCount++;
               continue;
             }

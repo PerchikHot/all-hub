@@ -194,7 +194,9 @@ class _LocalAiChatState extends State<LocalAiChat> {
   String historyKey(String? model) => EyraChatHistoryCodec.key(model);
   Future<void> selectModel(String? model) async {
     if (sending || model == null || model == selected) return;
-    await saveMessages();
+    // During initial restore the list is empty: never overwrite a previously
+    // saved Forge-only conversation with that temporary empty state.
+    if (selected != null || messages.isNotEmpty) await saveMessages();
     final prefs = await SharedPreferences.getInstance();
     var saved = prefs.getString(historyKey(model));
     // One-time migration from the older shared Ollama history.

@@ -45,6 +45,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   int page = 1;
   int _defaultFeedResumePage = 1;
   static const _feedResumeKey = 'media_default_feed_next_page_v1';
+  static const _feedResumeFilterKey = 'media_default_feed_filters_v1';
+  String _savedResumeFilters = '';
+  String get _currentResumeFilters => '$showFuta:$showTrans:$kind';
   int emptyPageRetries = 0;
   int fetchedPosts = 0;
   int filteredPosts = 0;
@@ -202,6 +205,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       _defaultFeedResumePage = (prefs.getInt(_feedResumeKey) ?? 1).clamp(1, 1000);
+      _savedResumeFilters = prefs.getString(_feedResumeFilterKey) ?? '';
       setState(() {
         showFuta = prefs.getBool('media_show_futa_v1') ?? true;
         showTrans = prefs.getBool('media_show_trans_v1') ?? true;
@@ -299,7 +303,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       exhaustedFeedTags.clear();
       // Resume the default discovery feed on a new page after app restart.
       // Explicit searches still start at page one; their queries stay private.
-      page = activeQuery.isEmpty && !bypassCache
+      page = activeQuery.isEmpty && !bypassCache &&
+              _savedResumeFilters == _currentResumeFilters
           ? _defaultFeedResumePage : 1;
       emptyPageRetries = 0;
       fetchedPosts = 0;
@@ -429,6 +434,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt(_feedResumeKey, _defaultFeedResumePage);
+          await prefs.setString(_feedResumeFilterKey, _currentResumeFilters);
+          _savedResumeFilters = _currentResumeFilters;
         } catch (_) {
           // Browsing remains available without persistent preferences.
         }

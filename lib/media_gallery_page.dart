@@ -23,6 +23,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   final queryController = TextEditingController();
   final scroll = ScrollController();
   final posts = <Map<String, dynamic>>[];
+  // A stable recommendation order: existing cards never move on pagination,
+  // favorite toggles or asynchronous image completion.
+  final recommendedPosts = <Map<String, dynamic>>[];
   // Session-only LRU: no searches or feed metadata are persisted to disk.
   final pageCache = MediaFeedMemoryCache(maxEntries: 16);
   final feedClient = MediaFeedClient();
@@ -36,7 +39,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool recommendationsEnabled = false;
   List<Map<String, dynamic>> get visiblePosts => favoritesOnly
       ? favoritePosts
-      : recommendationsEnabled ? rankMediaByLikes(posts, favoritePosts) : posts;
+      : recommendationsEnabled ? recommendedPosts : posts;
   bool loading = false;
   bool hasMore = true;
   int page = 1;
@@ -47,7 +50,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool showFuta = true;
   bool showTrans = true;
   static const feedTags = <String>['futanari', 'transgender'];
-  static const maxVisiblePosts = 180;
+  // Image bytes are already bounded by the Flutter/cache manager caches.
+  // Keep lightweight post metadata for the duration of the browsing session
+  // instead of silently dropping the first cards after 180 results.
   final seenPostIds = <String>{};
   final seenPostUrls = <String>{};
   final exhaustedFeedTags = <String>{};
@@ -282,7 +287,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       activeQuery = q.isEmpty ? '' : (aliases[q.toLowerCase()] ?? q.replaceAll(RegExp(r'\s+'), '_'));
       // Keep the previous cards visible while pull-to-refresh fetches page 1.
       // Replace them atomically only after the new page is validated.
-      if (refreshSnapshot == null) posts.clear();
+      if (refreshSnapshot == null) {
+        posts.clear();
+        recommendedPosts.clear();
+      }
       seenPostIds.clear();
       seenPostUrls.clear();
       exhaustedFeedTags.clear();
@@ -378,7 +386,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       setState(() {
         // A successful refresh replaces old cards rather than appending the
         // new page to them. The old grid remained visible during the request.
-        if (refreshSnapshot != null) posts.clear();
+        if (refreshSnapshot != null) {
+          posts.clear();
+          recommendedPosts.clear();
+        }
         refreshSnapshot = null;
         if (usedCachedPage) showingCachedPage = true;
         fetchedPosts += sourceCount;
@@ -392,10 +403,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         // Never evict the first cards while the user is viewing them.
         // Removing from index 0 shifted the entire masonry grid and made
         // stationary images appear to change or disappear at 180 items.
-        final remainingSlots = maxVisiblePosts - posts.length;
-        if (remainingSlots > 0) {
-          posts.addAll(newPosts.take(remainingSlots));
-        }
+        posts.addAll(newPosts);
+        // Rank only the newly arrived batch. Re-ranking the whole masonry
+        // grid makes visible cards jump when more pages arrive.
+        recommendedPosts.addAll(rankMediaByLikes(newPosts, favoritePosts));
         emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;
         // One sparse category must not stop another category's pagination.
         if (sourceCount < pageSize) exhaustedFeedTags.add(selectedTag);
@@ -403,8 +414,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         // A bounded, stable session feed is preferable to silently
         // replacing the cards the user has already scrolled past.
         // An explicit refresh starts a new selection.
-        hasMore = posts.length < maxVisiblePosts &&
-            emptyPageRetries < 8 &&
+        hasMore = emptyPageRetries < 8 &&
             nextAvailableMediaFeedPage(
                 page, enabledTags, exhaustedFeedTags) != null;
       });
@@ -416,6 +426,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           final backup = refreshSnapshot;
           if (backup != null) {
             posts..clear()..addAll(backup.posts);
+            recommendedPosts..clear()..addAll(rankMediaByLikes(posts, favoritePosts));
             seenPostIds..clear()..addAll(backup.seenIds);
             seenPostUrls..clear()..addAll(backup.seenUrls);
             exhaustedFeedTags..clear()..addAll(backup.exhaustedTags);
@@ -562,7 +573,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             tooltip: 'Сортировка загруженных изображений по тегам избранного без отправки данных',
             selected: recommendationsEnabled,
             onSelected: (value) {
-              setState(() => recommendationsEnabled = value);
+              setState(() {
+                recommendationsEnabled = value;
+                if (value) {
+                  recommendedPosts..clear()..addAll(rankMediaByLikes(posts, favoritePosts));
+                }
+              });
               _saveFeedPreferences();
             },
           ),

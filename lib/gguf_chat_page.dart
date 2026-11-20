@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'native_llama_runtime.dart';
+import 'gguf_prompt_builder.dart';
 
 class GgufChatPage extends StatefulWidget {
   const GgufChatPage({super.key, required this.modelPath});
@@ -77,22 +78,10 @@ class _GgufChatPageState extends State<GgufChatPage> {
       setState(() => elapsedSeconds = DateTime.now().difference(generationStarted!).inSeconds);
     });
     await saveChat();
-    // Limit conversation length to avoid exceeding the native 2048-token context.
-    final recent = messages.takeLast(8).toList();
-    var remaining = 3000;
-    final clipped = <(bool, String)>[];
-    for (final message in recent.reversed) {
-      if (remaining <= 0) break;
-      final value = message.$2.length > remaining
-          ? message.$2.substring(message.$2.length - remaining)
-          : message.$2;
-      clipped.insert(0, (message.$1, value));
-      remaining -= value.length;
-    }
-    final history = clipped.map((m) =>
-      '<|im_start|>${m.$1 ? "user" : "assistant"}\n${m.$2}\n<|im_end|>').join('\n');
-    final prompt = '<|im_start|>system\nТы полезный ассистент. Отвечай по-русски.\n<|im_end|>\n'
-        '$history\n<|im_start|>assistant\n';
+    // Keep ChatML role delimiters out of untrusted conversation text.
+    // Limit input for the native 2048-token context (approximate budget).
+    final prompt = buildGgufChatPrompt(messages
+        .map((m) => (user: m.$1, text: m.$2)).toList());
     try {
       final reply = await generateNativeGguf(widget.modelPath, prompt, maxTokens: maxTokens);
       final duration = DateTime.now().difference(generationStarted!).inMilliseconds / 1000;

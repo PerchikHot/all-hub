@@ -566,7 +566,6 @@ class _LocalAiChatState extends State<LocalAiChat> {
     }
     if (text.isEmpty || selected == null || !models.contains(selected)) return;
     final endpoint = address.text.trim().replaceAll(RegExp(r'/+
-    setState(() { messages.add({'role':'user','content':text}); sending = true; error = null; });
     try {
       // Local storage errors must not strand the chat in the busy state.
       // The response can still be generated without a persisted draft.
@@ -1167,6 +1166,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
     }
     if (!isLocalOllamaEndpoint(endpoint) &&
         !remoteOllamaContextApproved(endpoint, approvedRemoteChatEndpoint)) {
+      if (!mounted) return;
       final allowed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(

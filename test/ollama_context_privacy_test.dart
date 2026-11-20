@@ -28,4 +28,23 @@ void main() {
       expect(maySendOllamaPersonalContext(endpoint, remoteOptIn: true), isTrue);
     }
   });
+  test('remote memory grant is bound to the approved server', () {
+    const approved = 'http://192.168.1.5:11434';
+    expect(remoteOllamaContextApproved(approved, approved), isTrue);
+    expect(remoteOllamaContextApproved('$approved/', approved), isTrue);
+    for (final changed in [
+      'http://192.168.1.6:11434',
+      'http://192.168.1.5:11435',
+      'https://192.168.1.5:11434',
+      'http://other.example:11434',
+      'http://192.168.1.5:11434/another',
+    ]) {
+      expect(remoteOllamaContextApproved(changed, approved), isFalse,
+          reason: changed);
+    }
+    expect(remoteOllamaContextApproved(approved, null), isFalse);
+    expect(remoteOllamaContextApproved('http://127.0.0.1:11434', approved), isFalse);
+    expect(remoteOllamaContextApproved('ftp://192.168.1.5:11434', approved), isFalse);
+  });
+
 }

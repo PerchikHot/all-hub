@@ -6,7 +6,7 @@ void main() {
     final meter = HubTransferMeter();
     expect(meter.update(500).progress, isNull);
     expect(meter.update(500, total: 1000).progress, .5);
-    expect(meter.update(1500, total: 1000).progress, .5);
+    expect(meter.update(1500, total: 1000).progress, 1.0);
   });
 
   test('throughput uses elapsed time across rapid small chunks', () {

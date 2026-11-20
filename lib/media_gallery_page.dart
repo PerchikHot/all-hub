@@ -43,6 +43,8 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   bool loading = false;
   bool hasMore = true;
   int page = 1;
+  int _defaultFeedResumePage = 1;
+  static const _feedResumeKey = 'media_default_feed_next_page_v1';
   int emptyPageRetries = 0;
   int fetchedPosts = 0;
   int filteredPosts = 0;
@@ -199,6 +201,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
+      _defaultFeedResumePage = (prefs.getInt(_feedResumeKey) ?? 1).clamp(1, 1000);
       setState(() {
         showFuta = prefs.getBool('media_show_futa_v1') ?? true;
         showTrans = prefs.getBool('media_show_trans_v1') ?? true;
@@ -294,7 +297,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       seenPostIds.clear();
       seenPostUrls.clear();
       exhaustedFeedTags.clear();
-      page = 1;
+      // Resume the default discovery feed on a new page after app restart.
+      // Explicit searches still start at page one; their queries stay private.
+      page = activeQuery.isEmpty && !bypassCache
+          ? _defaultFeedResumePage : 1;
       emptyPageRetries = 0;
       fetchedPosts = 0;
       filteredPosts = 0;
@@ -416,6 +422,17 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             nextAvailableMediaFeedPage(
                 page, enabledTags, exhaustedFeedTags) != null;
       });
+      // Persist only the default feed cursor, never search terms or post IDs.
+      // A failed request must not advance the saved cursor.
+      if (requestedQuery.isEmpty && !usedCachedPage && newPosts.isNotEmpty) {
+        _defaultFeedResumePage = page > 1000 ? 1 : page;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_feedResumeKey, _defaultFeedResumePage);
+        } catch (_) {
+          // Browsing remains available without persistent preferences.
+        }
+      }
     } catch (e) {
       if (mounted && generation == searchGeneration) {
         setState(() {

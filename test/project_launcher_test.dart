@@ -9,17 +9,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('Windows version receipt requires an intact registered PE file', () async {
+    const projectId = 'version-receipt-fixture';
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     final dir = await Directory.systemTemp.createTemp('allhub-version-');
     try {
       final exe = File('${dir.path}/app.exe');
-      await prefs.setString('exe_kopilka', exe.path);
-      await prefs.setString('installed_version_kopilka', '1.2.3');
-      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+      await prefs.setString('exe_$projectId', exe.path);
+      await prefs.setString('installed_version_$projectId', '1.2.3');
+      expect(await ProjectLauncher.installedWindowsVersion(projectId), isNull);
 
       await exe.writeAsBytes(List<int>.filled(2048, 0));
-      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+      expect(await ProjectLauncher.installedWindowsVersion(projectId), isNull);
 
       final bytes = List<int>.filled(2048, 0);
       bytes[0] = 0x4d; bytes[1] = 0x5a;
@@ -30,10 +31,10 @@ void main() {
       bytes[0x94] = 0xf0; // optional header length
       bytes[0x98] = 0x0b; bytes[0x99] = 0x02; // PE32+
       await exe.writeAsBytes(bytes, flush: true);
-      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), '1.2.3');
+      expect(await ProjectLauncher.installedWindowsVersion(projectId), '1.2.3');
 
       await exe.delete();
-      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+      expect(await ProjectLauncher.installedWindowsVersion(projectId), isNull);
     } finally {
       await dir.delete(recursive: true);
     }

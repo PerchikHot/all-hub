@@ -30,18 +30,19 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
   @override
   Widget build(BuildContext context) {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final safeValue = widget.value != null && widget.value!.isFinite
+        ? widget.value!.clamp(0.0, 1.0).toDouble() : null;
     return Semantics(
       label: 'Прогресс загрузки',
-      value: widget.value == null ? 'Выполняется'
-          : '${(widget.value!.clamp(0.0, 1.0) * 100).round()}%',
+      value: safeValue == null ? 'Выполняется'
+          : '${(safeValue * 100).round()}%',
       child: SizedBox(
         height: math.max(widget.height + 18, 42),
         width: double.infinity,
         child: AnimatedBuilder(
           animation: _flow,
           builder: (context, _) {
-            final completed = widget.value != null && widget.value!.isFinite
-                && widget.value! >= 1;
+            final completed = safeValue == 1.0;
             return Row(children: [
               SizedBox(width: 46, height: 42,
                 child: CustomPaint(painter: _GelNozzlePainter(
@@ -50,7 +51,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
               Expanded(child: SizedBox(height: widget.height,
                 child: CustomPaint(painter: _LiquidPainter(
                   phase: reducedMotion ? 0 : _flow.value,
-                  progress: widget.value,
+                  progress: safeValue,
                   style: widget.style,
                 )))),
               const SizedBox(width: 3),
@@ -95,6 +96,10 @@ class _LiquidPainter extends CustomPainter {
     final bounded = progress?.isFinite == true
         ? progress!.clamp(0.0, 1.0).toDouble() : null;
     final fill = bounded == null ? w * .32 : w * bounded;
+    if (bounded == 0) {
+      canvas.restore();
+      return;
+    }
     final start = bounded == null ? (w + fill) * phase - fill : 0.0;
     final end = start + fill;
 
@@ -155,6 +160,8 @@ class _LiquidPainter extends CustomPainter {
     // A rounded, slightly irregular meniscus and tiny suspended droplets.
     if (fill > h * .5 && (bounded == null || bounded < 1)) {
       final tip = end.clamp(0.0, w).toDouble();
+      canvas.save();
+      canvas.clipRect(Rect.fromLTWH(start, 0, fill, h));
       canvas.drawOval(
         Rect.fromCenter(center: Offset(tip - h * .10, h * .52),
           width: h * .40, height: h * .72),
@@ -167,6 +174,7 @@ class _LiquidPainter extends CustomPainter {
         canvas.drawCircle(Offset(dx, dy), h * (.045 + i * .012),
           Paint()..color = const Color(0xDDFBFCFF));
       }
+      canvas.restore();
     }
     if (style == HubLiquidStyle.segmented) {
       for (var x = h * 1.7; x < w; x += h * 2.1) {

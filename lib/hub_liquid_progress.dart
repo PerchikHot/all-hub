@@ -212,6 +212,34 @@ class _LiquidPainter extends CustomPainter {
       ..style = PaintingStyle.stroke);
     canvas.restore();
 
+    // Rounded hanging droplets add the reference's characteristic heavy
+    // drips without ever crossing the measured progress boundary.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 6; i++) {
+      final t = (i + .6) / 7;
+      final x = start + fill * t;
+      final wobble = math.sin(phase * math.pi * 2 + i * 1.9);
+      final dropLength = h * (.13 + .13 * (1 + wobble) / 2);
+      final neckWidth = h * (.075 + (i % 3) * .012);
+      final top = h * (.54 + .04 * math.sin(i * 2.1));
+      final drop = Path()
+        ..moveTo(x - neckWidth, top)
+        ..quadraticBezierTo(x - neckWidth * 1.3, top + dropLength * .7,
+          x - neckWidth * .7, top + dropLength)
+        ..quadraticBezierTo(x, top + dropLength + neckWidth * .65,
+          x + neckWidth * .7, top + dropLength)
+        ..quadraticBezierTo(x + neckWidth * 1.3, top + dropLength * .7,
+          x + neckWidth, top)
+        ..close();
+      canvas.drawPath(drop, Paint()..color = const Color(0xFFF9FCFF));
+      canvas.drawOval(Rect.fromCenter(
+        center: Offset(x - neckWidth * .3, top + dropLength * .72),
+        width: neckWidth * .5, height: neckWidth * .8),
+        Paint()..color = const Color(0x99FFFFFF));
+    }
+    canvas.restore();
+
     // Glossy streaks drift within the filled region.
     canvas.save();
     canvas.clipPath(body);

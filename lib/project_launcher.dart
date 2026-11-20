@@ -948,8 +948,9 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
           '-PreviousExe', Platform.resolvedExecutable,
           '-SupportRoot', (await getApplicationSupportDirectory()).path,
         ], mode: ProcessStartMode.detached);
-        // Do not claim the update succeeded before the new launcher starts.
-        // The caller must close the current Flutter process after success.
+        // The detached helper cannot start the staged launcher while this
+        // process remains alive: it waits for OldPid to exit. The caller
+        // returns only after the helper was successfully started.
       } catch (_) {
         if (previousExe == null) {
           await prefs.remove('exe_all-hub');
@@ -964,6 +965,12 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
         rethrow;
       }
     });
+    // A successful handoff MUST terminate the old launcher, otherwise the
+    // PowerShell helper waits forever and the user sees no update. Only exit
+    // after staging, integrity checks, receipt persistence and detached helper
+    // startup have all succeeded. Errors above keep the current app running.
+    // The helper owns startup confirmation, rollback and shortcut migration.
+    exit(0);
   }
 
   /// Check GitHub's published SHA-256 digest before activating an installer.

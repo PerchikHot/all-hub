@@ -92,9 +92,9 @@ class _LiquidPainter extends CustomPainter {
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
       final ripple = (style == HubLiquidStyle.capsule ? .10 :
-          style == HubLiquidStyle.segmented ? .012 : .035) * h *
+          style == HubLiquidStyle.segmented ? .012 : .12) * h *
           math.sin(x * .065 - phase * math.pi * 2)
-          + math.sin(x * .13 + phase * math.pi * 2) * h * .022;
+          + math.sin(x * .13 + phase * math.pi * 4) * h * .048;
       body.lineTo(x, h * .20 + ripple);
     }
     body..lineTo(end, h)..close();
@@ -124,6 +124,17 @@ class _LiquidPainter extends CustomPainter {
           width: math.max(3, fill * .12), height: h * .14),
         Paint()..color = const Color(0x77FFFFFF),
       );
+    }
+    canvas.restore();
+
+    // Gel-like bubbles stay inside the capsule; the real fill edge remains exact.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 7; i++) {
+      final dx = start + ((i * .173 + phase * .16) % 1.0) * fill;
+      final dy = h * (.30 + .36 * (1 + math.sin(i * 2.7 + phase * math.pi * 2)) / 2);
+      canvas.drawCircle(Offset(dx, dy), h * (.045 + (i % 3) * .022),
+        Paint()..color = const Color(0xB8FFFFFF));
     }
     canvas.restore();
 

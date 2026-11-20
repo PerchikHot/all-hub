@@ -317,8 +317,11 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       exhaustedFeedTags.clear();
       // Resume the default discovery feed on a new page after app restart.
       // Explicit searches still start at page one; their queries stay private.
+      // A stored cursor without remembered cards must not reopen the feed
+      // dozens of pages deep and leave a blank screen (seen on Android).
       page = activeQuery.isEmpty && !bypassCache &&
-              _savedResumeFilters == _currentResumeFilters
+              _savedResumeFilters == _currentResumeFilters &&
+              _savedSeenIds.isNotEmpty
           ? _defaultFeedResumePage : 1;
       emptyPageRetries = 0;
       fetchedPosts = 0;
@@ -774,6 +777,16 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     if (!favoritesOnly && !showFuta && !showTrans) const Padding(
       padding: EdgeInsets.all(8), child: Text('Включи «Футы» или «Трансы» для поиска.'),
     ),
+    if (!favoritesOnly && !loading && posts.isEmpty && error.isEmpty &&
+        (showFuta || showTrans) && (emptyPageRetries >= 3 || !hasMore))
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: OutlinedButton.icon(
+          onPressed: () => search(bypassCache: true),
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('Лента пуста — начать поиск заново'),
+        ),
+      ),
     if (!favoritesOnly && !loading && !hasMore && posts.isEmpty && error.isEmpty && (showFuta || showTrans)) Padding(
       padding: const EdgeInsets.all(12),
       child: Column(children: [

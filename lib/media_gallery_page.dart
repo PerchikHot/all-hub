@@ -338,6 +338,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
     setState(() => loading = true);
     final generation = searchGeneration;
     final requestedPage = page;
+    final bypassThisRequest = bypassPageCache;
     final requestedQuery = activeQuery;
     final requestedKind = kind;
     final requestedFuta = showFuta;
@@ -399,7 +400,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
       // For discovery only, filter IDs seen on earlier app launches too.
       // Explicit searches remain independent and do not expose search history.
-      final useDiscoveryHistory = requestedQuery.isEmpty && !bypassCache &&
+      final useDiscoveryHistory = requestedQuery.isEmpty && !bypassThisRequest &&
           _savedResumeFilters == _currentResumeFilters;
       final previouslySeen = useDiscoveryHistory
           ? <String>{...seenPostIds, ..._savedSeenIds}

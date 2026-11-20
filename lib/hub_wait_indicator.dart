@@ -29,7 +29,7 @@ class _HubWaitIndicatorState extends State<HubWaitIndicator>
     return Semantics(
       label: 'Загрузка страницы',
       child: SizedBox(
-        width: widget.size, height: widget.size * .78,
+        width: widget.size, height: widget.size,
         child: AnimatedBuilder(
           animation: controller,
           builder: (context, _) => CustomPaint(
@@ -46,8 +46,37 @@ class _WaitPainter extends CustomPainter {
   final double phase;
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final scale = size.width / 64;
+    if (size.isEmpty) return;
+    // Fit the entire silhouette inside the allocated indicator at every size.
+    final scale = math.min(size.width / 76, size.height / 82);
+    final center = Offset(size.width / 2, size.height * .48);
+    final skin = Paint()..color = const Color(0xFFE5AD94);
+    final hair = Paint()..color = const Color(0xFF171A2B);
+    final face = center + Offset(0, -22 * scale);
+    // Eyra's hair frames the face; this also distinguishes the indicator
+    // from a generic pair of circles.
+    canvas.drawOval(Rect.fromCenter(center: face + Offset(0, -4 * scale),
+      width: 31 * scale, height: 38 * scale), hair);
+    canvas.drawOval(Rect.fromCenter(center: face,
+      width: 23 * scale, height: 27 * scale), skin);
+    canvas.drawArc(Rect.fromCenter(center: face + Offset(0, -11 * scale),
+      width: 27 * scale, height: 20 * scale),
+      math.pi, math.pi, false,
+      Paint()..color = const Color(0xFF171A2B)
+        ..strokeWidth = 5 * scale..style = PaintingStyle.stroke);
+    for (final direction in [-1.0, 1.0]) {
+      final eye = face + Offset(direction * 5.5 * scale, 1 * scale);
+      canvas.drawOval(Rect.fromCenter(center: eye,
+        width: 3.2 * scale, height: 2.5 * scale),
+        Paint()..color = const Color(0xFF659C86));
+      canvas.drawCircle(face + Offset(direction * 6 * scale, 6 * scale),
+        .7 * scale, Paint()..color = const Color(0xFFAA6E62));
+    }
+    canvas.drawArc(Rect.fromCenter(center: face + Offset(0, 7 * scale),
+      width: 5 * scale, height: 2 * scale),
+      0, math.pi, false,
+      Paint()..color = const Color(0xFF9D5365)
+        ..strokeWidth = .8 * scale..style = PaintingStyle.stroke);
     final left = center + Offset(-13 * scale, 3 * scale);
     final right = center + Offset(13 * scale, 3 * scale);
     // A subtle upper-body silhouette makes the paired animated shapes

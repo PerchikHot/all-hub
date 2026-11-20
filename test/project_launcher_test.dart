@@ -131,10 +131,10 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('allhub-receipt-');
     try {
       final executable = File('${directory.path}/shadow-rp.exe');
-      SharedPreferences.setMockInitialValues({
-        'exe_shadow-rp': executable.path,
-        'installed_version_shadow-rp': '0.18.6',
-      });
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('exe_shadow-rp', executable.path);
+      await prefs.setString('installed_version_shadow-rp', '0.18.6');
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);
       // Registration is valid only for a sufficiently sized PE executable.
       final pe = List<int>.filled(2048, 0);

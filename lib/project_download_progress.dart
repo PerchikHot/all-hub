@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'project_launcher.dart';
-import 'hub_liquid_progress.dart';
+import 'hub_update_panel.dart';
 import 'hub_wait_indicator.dart';
 
 /// A single, platform-independent update surface. Installation is separate
@@ -29,53 +29,26 @@ class ProjectDownloadProgress extends StatelessWidget {
             builder: (context, value, child) {
               final safe = value != null && value.isFinite
                   ? value.clamp(0.0, 1.0).toDouble() : null;
-              return Semantics(
-                liveRegion: true,
-                label: safe == null
-                    ? 'Подготовка обновления'
-                    : 'Загрузка обновления ${(safe * 100).round()} процентов',
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF182F59), Color(0xFF111B34)],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFF3E69AC)),
+              if (safe != null) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: HubUpdatePanel(
+                    progress: safe,
+                    title: 'Загрузка обновления',
                   ),
+                );
+              }
+              return const Semantics(
+                liveRegion: true,
+                label: 'Подготовка обновления',
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(children: [
-                        const Icon(Icons.downloading_rounded,
-                            color: Color(0xFF7DCCFF), size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(value == null || safe == null
-                            ? 'Подготовка загрузки…'
-                            : 'Загрузка: ${(safe * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFEAF4FF),
-                          ),
-                        )),
-                      ]),
-                      const SizedBox(height: 10),
-                      // No known byte count means waiting, not fake progress.
-                      if (safe == null)
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: HubWaitIndicator(size: 66),
-                        )
-                      else
-                        HubLiquidProgress(value: safe, height: 12),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'После загрузки может потребоваться подтверждение установки.',
-                        style: TextStyle(
-                          color: Color(0xFFAAC1DE), fontSize: 11,
-                        ),
-                      ),
+                      Text('Подготовка загрузки…'),
+                      SizedBox(height: 8),
+                      HubWaitIndicator(size: 66),
                     ],
                   ),
                 ),

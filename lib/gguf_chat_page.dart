@@ -1,5 +1,6 @@
 import 'hub_liquid_progress.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'native_llama_runtime.dart';
@@ -15,6 +16,10 @@ class _GgufChatPageState extends State<GgufChatPage> {
   final input = TextEditingController();
   final messages = <(bool, String)>[];
   bool generating = false;
+  DateTime? generationStarted;
+  Timer? elapsedTimer;
+  int elapsedSeconds = 0;
+  String generationStatus = '';
   int maxTokens = 128;
 
   String get storageKey => 'gguf_chat_${base64Url.encode(utf8.encode(widget.modelPath))}';
@@ -57,13 +62,20 @@ class _GgufChatPageState extends State<GgufChatPage> {
 
 
   @override
-  void dispose() { input.dispose(); super.dispose(); }
+  void dispose() { elapsedTimer?.cancel(); input.dispose(); super.dispose(); }
 
   Future<void> send() async {
     final text = input.text.trim();
     if (text.isEmpty || generating) return;
     input.clear();
-    setState(() { messages.add((true, text)); generating = true; });
+    elapsedTimer?.cancel();
+    generationStarted = DateTime.now();
+    elapsedSeconds = 0;
+    setState(() { messages.add((true, text)); generating = true; generationStatus = 'Загрузка модели / генерация на CPU'; });
+    elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => elapsedSeconds = DateTime.now().difference(generationStarted!).inSeconds);
+    });
     await saveChat();
     // Limit conversation length to avoid exceeding the native 2048-token context.
     final recent = messages.takeLast(8).toList();
@@ -83,12 +95,17 @@ class _GgufChatPageState extends State<GgufChatPage> {
         '$history\n<|im_start|>assistant\n';
     try {
       final reply = await generateNativeGguf(widget.modelPath, prompt, maxTokens: maxTokens);
-      if (mounted) setState(() => messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply)));
+      final duration = DateTime.now().difference(generationStarted!).inMilliseconds / 1000;
+      if (mounted) setState(() {
+        messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply));
+        generationStatus = 'Ответ за ${duration.toStringAsFixed(1)} с';
+      });
     } catch (e) {
       if (mounted) {
         setState(() => messages.add((false, 'Ошибка генерации: $e')));
       }
     } finally {
+      elapsedTimer?.cancel();
       await saveChat();
       if (mounted) setState(() => generating = false);
     }
@@ -144,7 +161,18 @@ class _GgufChatPageState extends State<GgufChatPage> {
           )),
         ),
       )),
-      if (generating) const HubLiquidProgress(),
+      if (generating) ...[
+        const HubLiquidProgress(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(children: [
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+            Expanded(child: Text('$generationStatus · ${elapsedSeconds} с', style: Theme.of(context).textTheme.bodySmall)),
+          ]),
+        ),
+      ] else if (generationStatus.isNotEmpty)
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: Align(alignment: Alignment.centerLeft, child: Text(generationStatus, style: Theme.of(context).textTheme.bodySmall))),
       Padding(padding: const EdgeInsets.all(12), child: Row(children: [
         Expanded(child: TextField(
           controller: input,

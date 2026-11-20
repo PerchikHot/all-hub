@@ -429,7 +429,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       });
       // Persist only the default feed cursor, never search terms or post IDs.
       // A failed request must not advance the saved cursor.
-      if (requestedQuery.isEmpty && !usedCachedPage && newPosts.isNotEmpty) {
+      // Refreshing page one must not rewind the saved discovery cursor.
+      // Otherwise restarting the app replays images the user already saw.
+      if (requestedQuery.isEmpty && !bypassCache &&
+          !usedCachedPage && newPosts.isNotEmpty) {
         _defaultFeedResumePage = page > 1000 ? 1 : page;
         try {
           final prefs = await SharedPreferences.getInstance();

@@ -8,6 +8,37 @@ import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('Android APK preflight rejects truncated ZIP and accepts complete tail', () async {
+    final dir = await Directory.systemTemp.createTemp('allhub-apk-preflight-');
+    try {
+      final apk = File('${dir.path}/release.apk');
+      final bytes = List<int>.filled(1100, 0);
+      bytes.setRange(0, 4, [0x50, 0x4b, 0x03, 0x04]);
+      await apk.writeAsBytes(bytes);
+      await expectLater(ProjectLauncher.requireCompleteApkContainer(apk),
+          throwsA(isA<FormatException>()));
+      // One central-directory record of 46 bytes, followed by the EOCD.
+      bytes.addAll(List<int>.filled(46, 0));
+      final directoryOffset = bytes.length - 46;
+      bytes.setRange(directoryOffset, directoryOffset + 4,
+          [0x50, 0x4b, 0x01, 0x02]);
+      bytes.addAll([
+        0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0,
+        1, 0, 1, 0, 46, 0, 0, 0,
+        directoryOffset & 255, (directoryOffset >> 8) & 255,
+        (directoryOffset >> 16) & 255, (directoryOffset >> 24) & 255,
+        0, 0,
+      ]);
+      await apk.writeAsBytes(bytes);
+      await ProjectLauncher.requireCompleteApkContainer(apk);
+      await apk.writeAsBytes(bytes.sublist(0, bytes.length - 1));
+      await expectLater(ProjectLauncher.requireCompleteApkContainer(apk),
+          throwsA(isA<FormatException>()));
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   test('Windows version receipt requires an intact registered PE file', () async {
     const projectId = 'version-receipt-fixture';
     SharedPreferences.setMockInitialValues({});

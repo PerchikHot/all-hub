@@ -456,7 +456,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       // A failed request must not advance the saved cursor.
       // Refreshing page one must not rewind the saved discovery cursor.
       // Otherwise restarting the app replays images the user already saw.
-      if (requestedQuery.isEmpty && !bypassCache &&
+      if (requestedQuery.isEmpty && !bypassThisRequest &&
           !usedCachedPage && newPosts.isNotEmpty) {
         _defaultFeedResumePage = page > 1000 ? 1 : page;
         try {

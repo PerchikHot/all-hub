@@ -1,3 +1,4 @@
+import 'hub_transfer_meter.dart';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'external_repositories.dart';
@@ -296,6 +297,19 @@ class ProjectLauncher {
   }
 
   static final ValueNotifier<double?> downloadProgress = ValueNotifier<double?>(null);
+  static final ValueNotifier<HubTransferSnapshot?> downloadTelemetry =
+      ValueNotifier<HubTransferSnapshot?>(null);
+  static HubTransferMeter _transferMeter = HubTransferMeter();
+
+  static void resetTransferTelemetry() {
+    _transferMeter = HubTransferMeter();
+    downloadTelemetry.value = null;
+  }
+
+  static void reportTransferBytes(int received, {int? total}) {
+    downloadTelemetry.value = _transferMeter.update(received, total: total);
+  }
+
   static final ValueNotifier<String?> activeDownloadProject = ValueNotifier<String?>(null);
   static Future<void> recordInstalledVersion(String id, String? version) async {
     if (version == null || version.isEmpty) return;
@@ -371,6 +385,8 @@ class ProjectLauncher {
     final sink = file.openWrite();
     var received = 0;
     downloadProgress.value = 0;
+    resetTransferTelemetry();
+    reportTransferBytes(0, total: response.contentLength);
     try {
       await for (final bytes in response.stream) {
         if (maxBytes != null &&
@@ -379,6 +395,7 @@ class ProjectLauncher {
         }
         sink.add(bytes);
         received += bytes.length;
+        reportTransferBytes(received, total: response.contentLength);
         if (response.contentLength != null && response.contentLength! > 0) {
           downloadProgress.value =
               (received / response.contentLength!).clamp(0.0, 1.0);

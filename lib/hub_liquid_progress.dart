@@ -245,26 +245,43 @@ class _GelNozzlePainter extends CustomPainter {
   bool shouldRepaint(covariant _GelNozzlePainter old) => old.phase != phase;
 }
 
-/// A playful, abstract concentric target with a completion flash.
+/// The receiving target glows and fills as the real download advances.
 class _GelTargetPainter extends CustomPainter {
   const _GelTargetPainter({required this.completed, required this.phase});
   final bool completed;
   final double phase;
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.translate((size.width - 26) / 2, (size.height - 26) / 2);
-    const center = Offset(13, 13);
-    for (var i = 0; i < 3; i++) {
-      canvas.drawCircle(center, 11.5 - i * 3.5, Paint()
-        ..color = completed ? const Color(0xFFECF8FF) :
-          (i.isEven ? const Color(0xFF4A91E8) : const Color(0xFF13294D))
-        ..style = i == 0 ? PaintingStyle.stroke : PaintingStyle.fill
-        ..strokeWidth = 1.7);
+    if (size.isEmpty) return;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) * .40;
+    canvas.drawCircle(center, radius + 2, Paint()
+      ..color = const Color(0xFF10213C));
+    canvas.drawCircle(center, radius, Paint()
+      ..color = const Color(0xFF73B8FF)
+      ..strokeWidth = 2.2..style = PaintingStyle.stroke);
+    canvas.drawCircle(center, radius * .77, Paint()
+      ..color = const Color(0xFF243D68));
+    canvas.drawCircle(center, radius * .58, Paint()
+      ..color = const Color(0xFFE3F5FF));
+    canvas.drawCircle(center, radius * .36, Paint()
+      ..color = const Color(0xFF356AA7));
+    final pulse = completed ? 1 + .12 * math.sin(phase * math.pi * 2) : 1.0;
+    canvas.drawCircle(center, radius * .19 * pulse, Paint()
+      ..color = const Color(0xFFFFFFFF));
+    // Crosshair guides visually connect the gun's stream to the bullseye.
+    for (var i = 0; i < 4; i++) {
+      final angle = i * math.pi / 2;
+      final from = center + Offset(math.cos(angle), math.sin(angle)) * (radius * .84);
+      final to = center + Offset(math.cos(angle), math.sin(angle)) * (radius * 1.12);
+      canvas.drawLine(from, to, Paint()
+        ..color = const Color(0xFFB9DFFF)..strokeWidth = 1.4);
     }
-    canvas.drawCircle(center, completed ? 4.0 + math.sin(phase * math.pi * 2).abs() * 2 : 2.5,
-      Paint()..color = const Color(0xFFFFFFFF));
-    canvas.restore();
+    if (completed) {
+      canvas.drawCircle(center, radius * 1.17, Paint()
+        ..color = const Color(0x8878D6FF)
+        ..strokeWidth = 2..style = PaintingStyle.stroke);
+    }
   }
   @override
   bool shouldRepaint(covariant _GelTargetPainter old) =>

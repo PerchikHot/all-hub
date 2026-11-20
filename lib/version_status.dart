@@ -176,3 +176,14 @@ String windowsUpdateActionLabel(String? installed, String? published) {
   if (comparison == -1) return 'Обновить до $published';
   return 'Проверить и установить';
 }
+
+/// Single truthful action label for the project detail install flow.
+/// Never describe an unverified rolling release as a confirmed update.
+String projectInstallActionLabel(String? installed, String? published) {
+  if (installed == null || installed.trim().isEmpty) return 'Скачать / установить';
+  final comparison = published == null ? null : comparePublishedVersions(installed, published);
+  if (comparison == -1) return 'Обновить';
+  if (comparison == 0) return 'Переустановить';
+  if (comparison == 1) return 'Установлена более новая версия';
+  return 'Проверить и установить';
+}

@@ -536,6 +536,27 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   }
 
   // A failed next page should not discard images already loaded into the feed.
+  /// Explicitly start discovery over; normal refresh keeps browsing history.
+  Future<void> resetDiscoveryHistory() async {
+    if (loading) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_feedResumeKey);
+      await prefs.remove(_feedResumeFilterKey);
+      await prefs.remove(_feedSeenIdsKey);
+      await prefs.remove(_feedSeenUrlsKey);
+    } catch (_) {
+      // A storage failure must not prevent resetting the in-memory feed.
+    }
+    if (!mounted) return;
+    _savedSeenIds.clear();
+    _savedSeenUrls.clear();
+    _savedResumeFilters = '';
+    _defaultFeedResumePage = 1;
+    queryController.clear();
+    await search();
+  }
+
   Future<void> retryFailedPage() async {
     // A failed first page leaves an empty gallery: retry must still work.
     if (loading || favoritesOnly) return;
@@ -680,6 +701,26 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           const Text('HD'),
           Switch.adaptive(value: highQuality, onChanged: (value) { setState(() => highQuality = value); _saveFeedPreferences(); }),
           IconButton(tooltip: 'Обновить из сети', onPressed: () => search(bypassCache: true), icon: const Icon(Icons.refresh)),
+          IconButton(
+            tooltip: 'Начать ленту заново и очистить историю просмотров',
+            onPressed: loading ? null : () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Очистить историю ленты?'),
+                  content: const Text('Сохранённые просмотренные изображения и позиция будут сброшены. Избранное останется.'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Отмена')),
+                    FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('Очистить')),
+                  ],
+                ),
+              );
+              if (confirmed == true && mounted) await resetDiscoveryHistory();
+            },
+            icon: const Icon(Icons.restart_alt_rounded),
+          ),
         ]),
         ],
       ]),

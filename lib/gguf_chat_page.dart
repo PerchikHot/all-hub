@@ -1,6 +1,10 @@
 import 'hub_liquid_progress.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+import 'eyra_chat_backup.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'native_llama_runtime.dart';
@@ -18,6 +22,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
   final messages = <(bool, String)>[];
   bool generating = false;
   bool restoring = true;
+  bool transferring = false;
   String? generationError;
   DateTime? generationStarted;
   Timer? elapsedTimer;
@@ -63,7 +68,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
   }
 
   Future<void> clearChat() async {
-    if (generating || restoring) return;
+    if (generating || restoring || transferring) return;
     final approved = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
       title: const Text('Удалить переписку GGUF?'),
       content: const Text('Все сообщения этой модели на данном устройстве будут удалены. Отменить это действие нельзя.'),
@@ -79,12 +84,90 @@ class _GgufChatPageState extends State<GgufChatPage> {
   }
 
 
+  // The same portable text format is used by Ollama and GGUF. No model
+  // paths or private files are exported, and imports are always explicit.
+  Future<void> exportHistory() async {
+    if (generating || restoring || transferring) return;
+    setState(() => transferring = true);
+    try {
+      final data = EyraChatBackup.encode(messages.map((m) =>
+        <String, String>{'role': m.$1 ? 'user' : 'assistant',
+          'content': m.$2}).toList(), DateTime.now());
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Сохранить текстовую переписку GGUF',
+        fileName: 'eyra-gguf-chat.json', type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: Uint8List.fromList(utf8.encode(data)));
+      if (path != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Текстовая переписка экспортирована')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => generationError = 'Ошибка экспорта: $e');
+    } finally {
+      if (mounted) setState(() => transferring = false);
+    }
+  }
+
+  Future<void> importHistory() async {
+    if (generating || restoring || transferring) return;
+    setState(() => transferring = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['json'], withData: false);
+      if (picked == null || picked.files.isEmpty) return;
+      final path = picked.files.single.path;
+      if (path == null) throw const FormatException('Файл недоступен');
+      final file = File(path);
+      if (await file.length() > EyraChatBackup.maxBytes) {
+        throw const FormatException('Файл превышает лимит 2 МиБ');
+      }
+      final incoming = EyraChatBackup.decode(await file.readAsString());
+      if (!mounted) return;
+      final choice = await showDialog<String>(context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Импортировать переписку?'),
+          content: Text('Найдено ${incoming.length} сообщений. '
+            'Поддерживаются копии Ollama и GGUF. '
+            'Личные файлы и изображения не переносятся.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена')),
+            OutlinedButton(onPressed: () => Navigator.pop(ctx, 'replace'),
+              child: const Text('Заменить')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, 'merge'),
+              child: const Text('Объединить')),
+          ]));
+      if (choice == null || !mounted) return;
+      final imported = incoming.map((m) =>
+        (m['role'] == 'user', m['content']!)).toList();
+      final next = choice == 'merge'
+          ? <(bool, String)>[...messages, ...imported] : imported;
+      final trimmed = next.length > 100 ? next.sublist(next.length - 100) : next;
+      // Persist first; never erase the visible conversation on failed writes.
+      final prefs = await SharedPreferences.getInstance();
+      final rows = trimmed.map((m) => {'user': m.$1, 'text': m.$2}).toList();
+      if (!await prefs.setString(storageKey, jsonEncode(rows))) {
+        throw const FileSystemException('Не удалось сохранить импорт');
+      }
+      if (mounted) {
+        setState(() { messages..clear()..addAll(trimmed); generationError = null; });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Переписка импортирована')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => generationError = 'Ошибка импорта: $e');
+    } finally {
+      if (mounted) setState(() => transferring = false);
+    }
+  }
+
   @override
   void dispose() { elapsedTimer?.cancel(); input.dispose(); super.dispose(); }
 
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || generating || restoring) return;
+    if (text.isEmpty || generating || restoring || transferring) return;
     input.clear();
     elapsedTimer?.cancel();
     generationStarted = DateTime.now();
@@ -143,6 +226,12 @@ class _GgufChatPageState extends State<GgufChatPage> {
     appBar: AppBar(
       title: const Text('GGUF • офлайн-чат'),
       actions: [
+        IconButton(tooltip: 'Экспорт переписки (JSON)',
+          onPressed: generating || restoring || transferring ? null : exportHistory,
+          icon: const Icon(Icons.save_alt_outlined)),
+        IconButton(tooltip: 'Импорт переписки (JSON)',
+          onPressed: generating || restoring || transferring ? null : importHistory,
+          icon: const Icon(Icons.upload_file_outlined)),
         PopupMenuButton<int>(
           tooltip: 'Максимальная длина ответа',
           initialValue: maxTokens,
@@ -171,7 +260,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
         ),
         IconButton(
           tooltip: 'Очистить переписку',
-          onPressed: generating || restoring || messages.isEmpty ? null : clearChat,
+          onPressed: generating || restoring || transferring || messages.isEmpty ? null : clearChat,
           icon: const Icon(Icons.delete_outline),
         ),
       ],
@@ -214,7 +303,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
           decoration: const InputDecoration(hintText: 'Сообщение модели', border: OutlineInputBorder()),
           onSubmitted: (_) => send(),
         )),
-        IconButton(onPressed: generating || restoring ? null : send, icon: const Icon(Icons.send)),
+        IconButton(onPressed: generating || restoring || transferring ? null : send, icon: const Icon(Icons.send)),
       ])),
     ]),
   );

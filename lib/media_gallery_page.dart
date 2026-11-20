@@ -406,14 +406,12 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
         posts.addAll(newPosts);
         // Rank only the newly arrived batch. Re-ranking the whole masonry
         // grid makes visible cards jump when more pages arrive.
-        recommendedPosts.addAll(rankMediaByLikes(newPosts, favoritePosts));
+        appendStableMediaRecommendations(recommendedPosts, newPosts, favoritePosts);
         emptyPageRetries = newPosts.isEmpty ? emptyPageRetries + 1 : 0;
         // One sparse category must not stop another category's pagination.
         if (sourceCount < pageSize) exhaustedFeedTags.add(selectedTag);
         page = effectivePage + 1;
-        // A bounded, stable session feed is preferable to silently
-        // replacing the cards the user has already scrolled past.
-        // An explicit refresh starts a new selection.
+        // Continue loading without evicting previously viewed cards.
         hasMore = emptyPageRetries < 8 &&
             nextAvailableMediaFeedPage(
                 page, enabledTags, exhaustedFeedTags) != null;

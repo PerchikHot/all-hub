@@ -8,6 +8,37 @@ import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('Windows version receipt requires an intact registered PE file', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final dir = await Directory.systemTemp.createTemp('allhub-version-');
+    try {
+      final exe = File('${dir.path}/app.exe');
+      await prefs.setString('exe_kopilka', exe.path);
+      await prefs.setString('installed_version_kopilka', '1.2.3');
+      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+
+      await exe.writeAsBytes(List<int>.filled(2048, 0));
+      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+
+      final bytes = List<int>.filled(2048, 0);
+      bytes[0] = 0x4d; bytes[1] = 0x5a;
+      bytes[0x3c] = 0x80;
+      bytes[0x80] = 0x50; bytes[0x81] = 0x45;
+      bytes[0x84] = 0x64; bytes[0x85] = 0x86; // AMD64
+      bytes[0x86] = 1; // one section
+      bytes[0x94] = 0xf0; // optional header length
+      bytes[0x98] = 0x0b; bytes[0x99] = 0x02; // PE32+
+      await exe.writeAsBytes(bytes, flush: true);
+      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), '1.2.3');
+
+      await exe.delete();
+      expect(await ProjectLauncher.installedWindowsVersion('kopilka'), isNull);
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   test('Windows updates use distinct folders without touching running EXE', () {
     const release = 'https://github.com/PerchikHot/Shadow-rp/releases/download/v1/app.zip';
     final old = ProjectLauncher.windowsReleaseFolder('shadow-rp', release, 100);

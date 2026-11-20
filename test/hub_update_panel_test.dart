@@ -43,6 +43,30 @@ void main() {
     expect(cancelled, isTrue);
   });
 
+  testWidgets('stage tracker accepts real unpacking state', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body:
+      SingleChildScrollView(child: HubUpdatePanel(
+        progress: 1,
+        stage: HubUpdateStage.unpacking,
+      )),
+    )));
+    expect(find.text('Распаковка'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('absurd ETA does not overflow duration', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body:
+      SingleChildScrollView(child: HubUpdatePanel(
+        progress: .01,
+        downloadedBytes: 1,
+        totalBytes: 1000000000000,
+        bytesPerSecond: .000001,
+      )),
+    )));
+    expect(find.text('Осталось: —'), findsOneWidget);
+  });
+
   testWidgets('unknown transfer speed does not invent remaining time',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body:

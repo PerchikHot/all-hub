@@ -190,7 +190,9 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool showConnectionSettings = false;
   bool showAdvancedSettings = false;
   int connectionRevision = 0;
-  String historyKey(String model) => 'ollama_chat_history_model_$model';
+  String historyKey(String? model) => model == null
+      ? 'eyra_chat_history_offline'
+      : 'ollama_chat_history_model_$model';
   Future<void> selectModel(String? model) async {
     if (sending || model == null || model == selected) return;
     await saveMessages();
@@ -222,7 +224,6 @@ class _LocalAiChatState extends State<LocalAiChat> {
   Future<void> saveMessages() async {
     final prefs = await SharedPreferences.getInstance();
     final model = selected;
-    if (model == null) return;
     await prefs.setString(historyKey(model), jsonEncode(messages.length > 100
         ? messages.sublist(messages.length - 100) : messages));
   }
@@ -250,7 +251,24 @@ class _LocalAiChatState extends State<LocalAiChat> {
     memoryNotes..clear()..addAll(prefs.getStringList('eyra_memory_notes') ?? const []);
     importedExcerpts..clear()..addAll(prefs.getStringList('eyra_chatgpt_excerpts') ?? const []);
     final preferred = prefs.getString('ollama_selected_model');
-    if (preferred != null && preferred.isNotEmpty) await selectModel(preferred);
+    if (preferred != null && preferred.isNotEmpty) {
+      await selectModel(preferred);
+    } else {
+      // Forge works without Ollama: restore its independent offline history.
+      final offline = prefs.getString(historyKey(null));
+      if (offline != null) {
+        try {
+          final decoded = jsonDecode(offline) as List<dynamic>;
+          messages.addAll(decoded.whereType<Map>().map((m) => <String, String>{
+            'role': m['role']?.toString() ?? '',
+            'content': m['content']?.toString() ?? '',
+            if (m['imagePath'] is String) 'imagePath': m['imagePath'] as String,
+          }).where((m) => m['role'] == 'user' || m['role'] == 'assistant'));
+        } catch (_) {
+          // A malformed local cache must not prevent the chat from opening.
+        }
+      }
+    }
     if (mounted) setState(() => restoring = false);
     await fetchModels();
   }

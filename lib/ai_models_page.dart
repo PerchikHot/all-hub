@@ -105,6 +105,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     if (picked == null) return;
     if (mounted) setState(() { importing = true; importedCount = 0; invalidCount = 0; importProgress = 0; importingName = ''; });
     final next = [...paths];
+    final importedFiles = <String>[];
     try {
       final support = await getApplicationSupportDirectory();
       for (final f in picked.files) {
@@ -114,24 +115,28 @@ class _AiModelsPageState extends State<AiModelsPage> {
           final source = File(f.path!);
           if (await GgufHeader.read(source.path) == null) { invalidCount++; continue; }
           String path = source.path;
-          if (Platform.isAndroid) {
-            final dest = Directory('${support.path}/models');
-            await dest.create(recursive: true);
-            final filename = '${DateTime.now().microsecondsSinceEpoch}_${safeGgufFilename(f.name)}';
-            temp = File('${dest.path}/$filename.part');
-            await copyWithProgress(source, temp, f.name);
-            final sourceSize = await source.length();
-            if (await temp.length() != sourceSize ||
-                !await ggufCopiesMatch(source, temp) ||
-                await GgufHeader.read(temp.path) == null) {
-              invalidCount++;
-              continue;
-            }
-            final completed = await temp.rename('${dest.path}/$filename');
-            path = completed.path;
-            temp = null;
+          // Import into application-owned storage on both platforms. Keeping
+          // external picker paths would break when a USB drive is unplugged.
+          final dest = Directory('${support.path}/models');
+          await dest.create(recursive: true);
+          final filename = '${DateTime.now().microsecondsSinceEpoch}_${safeGgufFilename(f.name)}';
+          temp = File('${dest.path}/$filename.part');
+          await copyWithProgress(source, temp, f.name);
+          final sourceSize = await source.length();
+          if (await temp.length() != sourceSize ||
+              !await ggufCopiesMatch(source, temp) ||
+              await GgufHeader.read(temp.path) == null) {
+            invalidCount++;
+            continue;
           }
-          if (!next.contains(path)) { next.add(path); importedCount++; }
+          final completed = await temp.rename('${dest.path}/$filename');
+          path = completed.path;
+          temp = null;
+          if (!next.contains(path)) {
+            next.add(path);
+            importedFiles.add(path);
+            importedCount++;
+          }
         } catch (_) {
           invalidCount++;
         } finally {
@@ -141,9 +146,15 @@ class _AiModelsPageState extends State<AiModelsPage> {
         }
       }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('ai_model_paths', next);
+      final saved = await prefs.setStringList('ai_model_paths', next);
+      if (!saved) throw const FileSystemException('Не удалось сохранить список GGUF');
       if (mounted) setState(() { paths = next; inspections.clear(); });
     } catch (e) {
+      // Never leave unregistered multi-GB copies after a failed import.
+      for (final path in importedFiles) {
+        try { await File(path).delete(); } catch (_) {}
+      }
+      importedCount = 0;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка импорта моделей: $e')));
@@ -271,7 +282,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
     Expanded(child:mode == 0 ? const LocalAiChat() : mode == 1 ? const CodexPage() : ListView(padding: const EdgeInsets.all(20), children: [
     Text('Локальные ИИ-модели', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 12),
-    const Text('Добавь уже скачанные GGUF-модели. Они останутся локальными. Это список файлов, а не запущенный ИИ: для общения потребуется подключить совместимый движок инференса.'),
+    const Text('Импортируй GGUF в хранилище All Hub: копия останется доступной без флешки и исходной папки. Это не дообучение модели; для генерации нужен совместимый движок.'),
     const SizedBox(height: 12),
     ListTile(
       leading: const Icon(Icons.memory_outlined),

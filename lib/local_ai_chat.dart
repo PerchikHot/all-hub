@@ -1084,7 +1084,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
         ]);
       })),
       if (sending) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Align(alignment: Alignment.centerLeft, child: HubAiResponding())),
+        child: Align(alignment: Alignment.centerLeft, child: HubAiResponding(avatarPath: avatarPath))),
       if (attachedImage != null) Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [

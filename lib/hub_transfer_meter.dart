@@ -50,10 +50,13 @@ class HubTransferMeter {
       if (seconds >= .2 && delta >= 0) {
         final instant = delta / seconds;
         _speed = _speed == null ? instant : _speed! * .7 + instant * .3;
+        _lastSample = now;
+        _lastBytes = _received;
       }
+    } else {
+      _lastSample = now;
+      _lastBytes = _received;
     }
-    _lastSample = now;
-    _lastBytes = _received;
     return snapshot;
   }
 }

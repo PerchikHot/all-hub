@@ -83,8 +83,14 @@ class _LocalAiChatState extends State<LocalAiChat> {
       attachedName = null;
     });
     input.clear();
-    await saveMessages();
     try {
+      // Persisting a draft can fail (full disk, unavailable preferences).
+      // Keep generation usable and always release the busy state and client.
+      try {
+        await saveMessages();
+      } catch (e) {
+        if (mounted) setState(() => error = 'Не удалось сохранить запрос: $e');
+      }
       // A single natural-language instruction is enough. The photo determines
       // img2img vs txt2img; no separate Forge settings page is required.
       final description = request.isEmpty ? 'Сохрани композицию и улучши качество изображения' : request;

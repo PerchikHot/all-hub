@@ -96,11 +96,12 @@ class _WaitPainter extends CustomPainter {
   bool shouldRepaint(covariant _WaitPainter old) => old.phase != phase;
 }
 
-/// Response generation: an animated three-dot bubble, without pretending to
-/// expose the model's private reasoning or a fictitious completion percentage.
+/// Eyra's portrait-based response indicator. Uses the portrait selected in
+/// settings, not a generic loading circle. Motion is decorative, not progress.
 class HubAiResponding extends StatefulWidget {
   const HubAiResponding({super.key, this.avatarPath});
   final String? avatarPath;
+
   @override
   State<HubAiResponding> createState() => _HubAiRespondingState();
 }
@@ -108,54 +109,105 @@ class HubAiResponding extends StatefulWidget {
 class _HubAiRespondingState extends State<HubAiResponding>
     with SingleTickerProviderStateMixin {
   late final AnimationController controller = AnimationController(
-    vsync: this, duration: const Duration(milliseconds: 1200),
+    vsync: this, duration: const Duration(milliseconds: 1850),
   )..repeat();
+
   @override
   void dispose() {
     controller.dispose();
     super.dispose();
   }
+
   @override
-  Widget build(BuildContext context) => Semantics(
-    label: 'Эйра формирует ответ',
-    child: AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.avatarPath != null && File(widget.avatarPath!).existsSync()) ...[
-            Transform.translate(
-              offset: Offset(0, MediaQuery.disableAnimationsOf(context) ? 0 :
-                -2.5 * math.sin(controller.value * math.pi * 2)),
-              child: Transform.scale(
-                scale: MediaQuery.disableAnimationsOf(context) ? 1 :
-                  1 + .025 * math.sin(controller.value * math.pi * 2),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(File(widget.avatarPath!), width: 58, height: 68,
-                    fit: BoxFit.cover, errorBuilder: (_, __, ___) =>
-                      const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9CC9FF))),
-                ),
+  Widget build(BuildContext context) {
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    final file = widget.avatarPath == null ? null : File(widget.avatarPath!);
+    final hasPortrait = file != null && file.existsSync();
+    return Semantics(
+      label: 'Эйра формирует ответ, анимация ожидания',
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final phase = reduced ? 0.0 : controller.value * math.pi * 2;
+          final sway = math.sin(phase);
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 92, height: 106,
+                child: Stack(alignment: Alignment.center, children: [
+                  Container(
+                    width: 88, height: 102,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(color: const Color(0xFF4D86CD), width: 1.5),
+                      boxShadow: [BoxShadow(
+                        color: const Color(0x554C91FF),
+                        blurRadius: 9 + (reduced ? 0 : 5 * (sway + 1) / 2),
+                      )],
+                    ),
+                  ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: SizedBox(
+                      width: 82, height: 96,
+                      child: hasPortrait
+                        ? Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.identity()
+                              ..translate(2.0 * sway, -1.7 * math.cos(phase))
+                              ..scale(1.09 + .018 * sway),
+                            child: Image.file(file, fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.face_rounded, size: 48)),
+                          )
+                        : const ColoredBox(
+                            color: Color(0xFF152A48),
+                            child: Center(child: Icon(Icons.face_rounded,
+                              size: 48, color: Color(0xFF9CC9FF))),
+                          ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 2, bottom: 1,
+                    child: Container(
+                      width: 12, height: 12,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF79D9FC),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF10243D), width: 2),
+                      ),
+                    ),
+                  ),
+                ]),
               ),
-            ),
-            const SizedBox(width: 10),
-          ] else
-            const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9CC9FF), size: 18),
-          const SizedBox(width: 9),
-          const Text('Эйра отвечает', style: TextStyle(
-            color: Color(0xFFDCEBFF), fontWeight: FontWeight.w600)),
-          const SizedBox(width: 8),
-          for (var i = 0; i < 3; i++) Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Transform.translate(
-              offset: Offset(0, -3 * math.max(0,
-                math.sin(controller.value * 2 * math.pi - i * .8))),
-              child: const CircleAvatar(
-                radius: 3, backgroundColor: Color(0xFF9CC9FF)),
-            ),
-          ),
-        ],
+              const SizedBox(width: 12),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Эйра отвечает', style: TextStyle(
+                    color: Color(0xFFDCEBFF), fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    for (var i = 0; i < 3; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Transform.translate(
+                          offset: Offset(0, reduced ? 0 :
+                            -4 * math.max(0, math.sin(phase - i * .75))),
+                          child: const CircleAvatar(radius: 3.5,
+                            backgroundColor: Color(0xFF9CC9FF)),
+                        ),
+                      ),
+                  ]),
+                ],
+              ),
+            ],
+          );
+        },
       ),
-    ),
-  );
+    );
+  }
 }

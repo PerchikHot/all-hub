@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'project_launcher.dart';
 import 'hub_update_panel.dart';
+import 'hub_transfer_meter.dart';
 import 'hub_wait_indicator.dart';
 
 /// A single, platform-independent update surface. Installation is separate
@@ -30,11 +31,17 @@ class ProjectDownloadProgress extends StatelessWidget {
               final safe = value != null && value.isFinite
                   ? value.clamp(0.0, 1.0).toDouble() : null;
               if (safe != null) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: HubUpdatePanel(
-                    progress: safe,
-                    title: 'Загрузка обновления',
+                return ValueListenableBuilder<HubTransferSnapshot?>(
+                  valueListenable: ProjectLauncher.downloadTelemetry,
+                  builder: (context, transfer, _) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: HubUpdatePanel(
+                      progress: safe,
+                      title: 'Загрузка обновления',
+                      downloadedBytes: transfer?.receivedBytes,
+                      totalBytes: transfer?.totalBytes,
+                      bytesPerSecond: transfer?.bytesPerSecond,
+                    ),
                   ),
                 );
               }

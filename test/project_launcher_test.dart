@@ -12,7 +12,7 @@ void main() {
     final dir = await Directory.systemTemp.createTemp('allhub-apk-preflight-');
     try {
       final apk = File('${dir.path}/release.apk');
-      final bytes = List<int>.filled(1100, 0);
+      final bytes = List<int>.filled(1100, 0, growable: true);
       bytes.setRange(0, 4, [0x50, 0x4b, 0x03, 0x04]);
       await apk.writeAsBytes(bytes);
       await expectLater(ProjectLauncher.requireCompleteApkContainer(apk),

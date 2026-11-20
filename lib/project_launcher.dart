@@ -315,7 +315,17 @@ class ProjectLauncher {
       return null;
     }
     try {
-      return await File(executable).exists() ? version : null;
+      final file = File(executable);
+      if (!await file.exists() || await file.length() < 1024) return null;
+      // A stale registration or damaged binary is not a proven installed
+      // version. Check the same bounded PE signature as the installer.
+      final reader = await file.open();
+      try {
+        if (!hasWindowsExecutableHeader(await reader.read(8192))) return null;
+      } finally {
+        await reader.close();
+      }
+      return version;
     } on FileSystemException {
       return null;
     }

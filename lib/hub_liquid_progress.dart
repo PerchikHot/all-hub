@@ -195,30 +195,50 @@ class _LiquidPainter extends CustomPainter {
 }
 
  
-/// A stylized sci-fi dispenser, not a weapon or a functional control.
+/// A clearly readable toy-like sci-fi pistol silhouette pointing into the
+/// progress track. Decorative artwork, never a functional control.
 class _GelNozzlePainter extends CustomPainter {
   const _GelNozzlePainter({required this.phase});
   final double phase;
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
     canvas.save();
-    canvas.scale(size.width / 31, size.height / 26);
-    const y = 13.0;
-    final outline = Paint()..color = const Color(0xFF69B7FF)
-      ..style = PaintingStyle.stroke..strokeWidth = 1.6;
+    canvas.translate(0, (size.height - 36) / 2);
+    canvas.scale(size.width / 48, 36 / 36);
+    final glow = .55 + .45 * math.sin(phase * math.pi * 2).abs();
     final body = Path()
-      ..moveTo(2, y - 7)..lineTo(18, y - 7)
-      ..lineTo(18, y - 4)..lineTo(29, y - 4)
-      ..lineTo(29, y + 3)..lineTo(17, y + 3)
-      ..lineTo(14, y + 11)..lineTo(7, y + 11)
-      ..lineTo(10, y + 3)..lineTo(2, y + 3)..close();
-    canvas.drawPath(body, Paint()..color = const Color(0xFF17345D));
-    canvas.drawPath(body, outline);
-    canvas.drawLine(Offset(6, y - 3), Offset(17, y - 3),
-      Paint()..color = const Color(0xFFB8DFFF)..strokeWidth = 2);
-    final pulse = .65 + .35 * math.sin(phase * math.pi * 2).abs();
-    canvas.drawCircle(Offset(29, y), 1.6 * pulse,
-      Paint()..color = const Color(0xFFEAF9FF));
+      ..moveTo(3, 8)..lineTo(27, 8)
+      ..quadraticBezierTo(31, 8, 32, 12)
+      ..lineTo(42, 12)..lineTo(42, 20)
+      ..lineTo(28, 20)..lineTo(23, 31)
+      ..quadraticBezierTo(22, 34, 19, 34)
+      ..lineTo(11, 34)..lineTo(15, 20)
+      ..lineTo(4, 20)..quadraticBezierTo(2, 20, 2, 18)
+      ..lineTo(2, 11)..quadraticBezierTo(2, 8, 3, 8)
+      ..close();
+    canvas.drawPath(body, Paint()..color = const Color(0xFF132A4D));
+    canvas.drawPath(body, Paint()
+      ..color = const Color(0xFF70B7FF)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.6);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      const Rect.fromLTWH(7, 11, 21, 5), const Radius.circular(2)),
+      Paint()..color = const Color(0xFF3E78BC));
+    canvas.drawLine(const Offset(9, 12), const Offset(25, 12),
+      Paint()..color = const Color(0xFFBCE6FF)..strokeWidth = 1.4);
+    // Trigger guard and trigger make the pistol unmistakable at compact sizes.
+    final guard = Path()
+      ..moveTo(14, 21)..quadraticBezierTo(15, 27, 21, 26)
+      ..lineTo(24, 21);
+    canvas.drawPath(guard, Paint()..color = const Color(0xFF7DBEFF)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.6);
+    canvas.drawLine(const Offset(19, 21), const Offset(18, 24),
+      Paint()..color = const Color(0xFFE6F6FF)..strokeWidth = 1.4);
+    canvas.drawRRect(RRect.fromRectAndRadius(
+      const Rect.fromLTWH(39, 13, 7, 6), const Radius.circular(1)),
+      Paint()..color = const Color(0xFFB9DBFA));
+    canvas.drawCircle(const Offset(46, 16), 2.1 * glow,
+      Paint()..color = const Color(0xFFFFFFFF));
     canvas.restore();
   }
   @override

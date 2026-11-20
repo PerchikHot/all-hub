@@ -17,6 +17,8 @@ class _GgufChatPageState extends State<GgufChatPage> {
   final input = TextEditingController();
   final messages = <(bool, String)>[];
   bool generating = false;
+  bool restoring = true;
+  String? generationError;
   DateTime? generationStarted;
   Timer? elapsedTimer;
   int elapsedSeconds = 0;
@@ -34,16 +36,23 @@ class _GgufChatPageState extends State<GgufChatPage> {
   Future<void> restoreChat() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(storageKey);
-    if (raw == null) return;
+    if (raw == null) {
+      if (mounted) setState(() => restoring = false);
+      return;
+    }
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
       final restored = decoded.map((item) {
         final row = item as Map<String, dynamic>;
         return (row['user'] == true, row['text'] as String);
       }).toList();
-      if (mounted && messages.isEmpty) setState(() => messages.addAll(restored));
+      if (mounted) setState(() {
+        if (messages.isEmpty) messages.addAll(restored.takeLast(100));
+        restoring = false;
+      });
     } catch (_) {
       // Ignore malformed or outdated local chat data.
+      if (mounted) setState(() => restoring = false);
     }
   }
 
@@ -56,9 +65,19 @@ class _GgufChatPageState extends State<GgufChatPage> {
   }
 
   Future<void> clearChat() async {
+    if (generating || restoring) return;
+    final approved = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Удалить переписку GGUF?'),
+      content: const Text('Все сообщения этой модели на данном устройстве будут удалены. Отменить это действие нельзя.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Удалить')),
+      ],
+    ));
+    if (approved != true || !mounted) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(storageKey);
-    if (mounted) setState(messages.clear);
+    if (mounted) setState(() { messages.clear(); generationError = null; });
   }
 
 
@@ -67,12 +86,12 @@ class _GgufChatPageState extends State<GgufChatPage> {
 
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || generating) return;
+    if (text.isEmpty || generating || restoring) return;
     input.clear();
     elapsedTimer?.cancel();
     generationStarted = DateTime.now();
     elapsedSeconds = 0;
-    setState(() { messages.add((true, text)); generating = true; generationStatus = 'Загрузка модели / генерация на CPU'; });
+    setState(() { messages.add((true, text)); generating = true; generationError = null; generationStatus = 'Загрузка модели / генерация на CPU'; });
     elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => elapsedSeconds = DateTime.now().difference(generationStarted!).inSeconds);
@@ -91,7 +110,9 @@ class _GgufChatPageState extends State<GgufChatPage> {
       });
     } catch (e) {
       if (mounted) {
-        setState(() => messages.add((false, 'Ошибка генерации: $e')));
+        // An infrastructure error is not an AI reply and must never be fed
+        // into the next prompt or persisted as conversation history.
+        setState(() { generationError = 'Ошибка генерации: $e'; generationStatus = 'Не удалось получить ответ'; });
       }
     } finally {
       elapsedTimer?.cancel();
@@ -133,7 +154,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
         ),
         IconButton(
           tooltip: 'Очистить переписку',
-          onPressed: generating ? null : clearChat,
+          onPressed: generating || restoring || messages.isEmpty ? null : clearChat,
           icon: const Icon(Icons.delete_outline),
         ),
       ],
@@ -150,6 +171,13 @@ class _GgufChatPageState extends State<GgufChatPage> {
           )),
         ),
       )),
+      if (generationError != null) Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(children: [
+          Expanded(child: Text(generationError!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          TextButton(onPressed: generating ? null : () => setState(() => generationError = null), child: const Text('Закрыть')),
+        ]),
+      ),
       if (generating) ...[
         const HubLiquidProgress(),
         Padding(
@@ -169,7 +197,7 @@ class _GgufChatPageState extends State<GgufChatPage> {
           decoration: const InputDecoration(hintText: 'Сообщение модели', border: OutlineInputBorder()),
           onSubmitted: (_) => send(),
         )),
-        IconButton(onPressed: generating ? null : send, icon: const Icon(Icons.send)),
+        IconButton(onPressed: generating || restoring ? null : send, icon: const Icon(Icons.send)),
       ])),
     ]),
   );

@@ -45,10 +45,10 @@ class ProjectDownloadProgress extends StatelessWidget {
                   ),
                 );
               }
-              return const Semantics(
+              return Semantics(
                 liveRegion: true,
                 label: 'Подготовка обновления',
-                child: Padding(
+                child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

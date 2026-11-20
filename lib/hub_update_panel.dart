@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'hub_liquid_progress.dart';
 
+enum HubUpdateStage { checking, downloading, unpacking, installing, finished }
+
 /// Reference-inspired update panel. Only downloading is measured here;
 /// unpacking and installation must be reported by their actual controllers.
 class HubUpdatePanel extends StatelessWidget {
@@ -17,6 +19,7 @@ class HubUpdatePanel extends StatelessWidget {
     this.onPause,
     this.onCancel,
     this.paused = false,
+    this.stage = HubUpdateStage.downloading,
   });
 
   final double progress;
@@ -29,6 +32,7 @@ class HubUpdatePanel extends StatelessWidget {
   final VoidCallback? onPause;
   final VoidCallback? onCancel;
   final bool paused;
+  final HubUpdateStage stage;
 
   static String formatBytes(num bytes) {
     if (!bytes.isFinite || bytes < 0) return '—';
@@ -44,7 +48,9 @@ class HubUpdatePanel extends StatelessWidget {
     final done = downloadedBytes;
     if (speed == null || !speed.isFinite || speed <= 0 ||
         total == null || done == null || total < done) return '—';
-    final seconds = ((total - done) / speed).ceil();
+    final rawSeconds = (total - done) / speed;
+    if (!rawSeconds.isFinite || rawSeconds > 315360000) return '—';
+    final seconds = rawSeconds.ceil();
     final duration = Duration(seconds: seconds);
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -108,12 +114,17 @@ class HubUpdatePanel extends StatelessWidget {
           const SizedBox(height: 16),
           const Divider(color: Color(0xFF33517F)),
           const SizedBox(height: 8),
-          const Wrap(spacing: 14, runSpacing: 12, children: [
-            _Stage(icon: Icons.verified_outlined, text: 'Проверка', done: true),
-            _Stage(icon: Icons.download_rounded, text: 'Загрузка', active: true),
-            _Stage(icon: Icons.inventory_2_outlined, text: 'Распаковка'),
-            _Stage(icon: Icons.settings_outlined, text: 'Установка'),
-            _Stage(icon: Icons.flag_outlined, text: 'Завершение'),
+          Wrap(spacing: 14, runSpacing: 12, children: [
+            _Stage(icon: Icons.verified_outlined, text: 'Проверка',
+              done: stage.index > 0, active: stage == HubUpdateStage.checking),
+            _Stage(icon: Icons.download_rounded, text: 'Загрузка',
+              done: stage.index > 1, active: stage == HubUpdateStage.downloading),
+            _Stage(icon: Icons.inventory_2_outlined, text: 'Распаковка',
+              done: stage.index > 2, active: stage == HubUpdateStage.unpacking),
+            _Stage(icon: Icons.settings_outlined, text: 'Установка',
+              done: stage.index > 3, active: stage == HubUpdateStage.installing),
+            _Stage(icon: Icons.flag_outlined, text: 'Завершение',
+              active: stage == HubUpdateStage.finished),
           ]),
           if (onPause != null || onCancel != null) ...[
             const SizedBox(height: 18),

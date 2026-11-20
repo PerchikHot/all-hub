@@ -64,6 +64,21 @@ class _WaitPainter extends CustomPainter {
       ..color = const Color(0xFF8C5B72)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.2 * scale);
+    // Anchor the paired motion to a recognizable, clothed upper-body figure
+    // rather than two disconnected circles.
+    final torso = Path()
+      ..moveTo(center.dx - 23 * scale, center.dy + 7 * scale)
+      ..quadraticBezierTo(center.dx - 30 * scale, center.dy + 26 * scale,
+          center.dx - 25 * scale, center.dy + 31 * scale)
+      ..lineTo(center.dx + 25 * scale, center.dy + 31 * scale)
+      ..quadraticBezierTo(center.dx + 30 * scale, center.dy + 26 * scale,
+          center.dx + 23 * scale, center.dy + 7 * scale)
+      ..close();
+    canvas.drawPath(torso, Paint()..color = const Color(0xFF27395C));
+    canvas.drawPath(torso, Paint()
+      ..color = const Color(0xFF74A7E9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 * scale);
     final lobePaint = Paint()..color = const Color(0xFFE9B79F);
     final outline = Paint()
       ..color = const Color(0xFFB97E73)

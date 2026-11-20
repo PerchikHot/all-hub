@@ -157,7 +157,7 @@ class _HubAiRespondingState extends State<HubAiResponding>
                             transform: Matrix4.identity()
                               ..translate(2.0 * sway, -1.7 * math.cos(phase))
                               ..scale(1.09 + .018 * sway),
-                            child: Image.file(file, fit: BoxFit.cover,
+                            child: Image.file(file!, fit: BoxFit.cover,
                               gaplessPlayback: true,
                               errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.face_rounded, size: 48)),

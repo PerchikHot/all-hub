@@ -118,6 +118,42 @@ class _LiquidPainter extends CustomPainter {
           Color(0xFFCDD7E4)],
       ).createShader(Offset.zero & size));
 
+    // Large rolling crests, based on the update-screen reference: the
+    // surface bulges in broad, irregular waves rather than tiny ripples.
+    // Everything is clipped to the true fill and capsule.
+    canvas.save();
+    canvas.clipPath(body);
+    final crest = Path()..moveTo(start, h * .48);
+    for (var i = 0; i <= 120; i++) {
+      final t = i / 120;
+      final x = start + fill * t;
+      final envelope = math.sin(t * math.pi).abs();
+      final rolling = math.sin(t * math.pi * 5 - phase * math.pi * 2);
+      final secondary = math.sin(t * math.pi * 9 + phase * math.pi * 1.4);
+      crest.lineTo(x, h * (.40 - envelope * (.15 * rolling + .05 * secondary)));
+    }
+    crest..lineTo(end, h)..lineTo(start, h)..close();
+    canvas.drawPath(crest, Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Color(0xFFFEFFFF), Color(0xFFF1F6FD), Color(0xFFB8D4F4)],
+      ).createShader(Offset.zero & size));
+    canvas.restore();
+
+    // Slow translucent surface sheets simulate heavy folds of liquid.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 4; i++) {
+      final t = ((i * .31 + phase * .13) % 1.0);
+      final x = start + fill * t;
+      final radius = h * (.32 + i * .035);
+      canvas.drawOval(Rect.fromCenter(
+        center: Offset(x, h * (.42 + .08 * math.sin(phase * 6 + i))),
+        width: radius * 2.4, height: radius * 1.1,
+      ), Paint()..color = const Color(0x77FFFFFF));
+    }
+    canvas.restore();
+
     // Bright soft foam and reflections move independently of real progress.
     canvas.save();
     canvas.clipPath(body);

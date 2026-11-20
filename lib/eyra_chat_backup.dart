@@ -8,7 +8,9 @@ class EyraChatBackup {
   static const maxMessages = 100;
 
   static String encode(List<Map<String, String>> messages, DateTime exportedAt) {
-    final safe = messages.take(maxMessages).map((m) => {
+    final recent = messages.length > maxMessages
+        ? messages.sublist(messages.length - maxMessages) : messages;
+    final safe = recent.map((m) => {
       'role': m['role'],
       'content': m['content'] ?? '',
     }).where((m) => (m['role'] == 'user' || m['role'] == 'assistant') &&

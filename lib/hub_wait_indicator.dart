@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 /// Waiting / refreshing: a looping figure-eight with two rounded lobes and
@@ -98,7 +99,8 @@ class _WaitPainter extends CustomPainter {
 /// Response generation: an animated three-dot bubble, without pretending to
 /// expose the model's private reasoning or a fictitious completion percentage.
 class HubAiResponding extends StatefulWidget {
-  const HubAiResponding({super.key});
+  const HubAiResponding({super.key, this.avatarPath});
+  final String? avatarPath;
   @override
   State<HubAiResponding> createState() => _HubAiRespondingState();
 }
@@ -121,7 +123,24 @@ class _HubAiRespondingState extends State<HubAiResponding>
       builder: (context, _) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9CC9FF), size: 18),
+          if (widget.avatarPath != null && File(widget.avatarPath!).existsSync()) ...[
+            Transform.translate(
+              offset: Offset(0, MediaQuery.disableAnimationsOf(context) ? 0 :
+                -2.5 * math.sin(controller.value * math.pi * 2)),
+              child: Transform.scale(
+                scale: MediaQuery.disableAnimationsOf(context) ? 1 :
+                  1 + .025 * math.sin(controller.value * math.pi * 2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(File(widget.avatarPath!), width: 58, height: 68,
+                    fit: BoxFit.cover, errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9CC9FF))),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ] else
+            const Icon(Icons.auto_awesome_rounded, color: Color(0xFF9CC9FF), size: 18),
           const SizedBox(width: 9),
           const Text('Эйра отвечает', style: TextStyle(
             color: Color(0xFFDCEBFF), fontWeight: FontWeight.w600)),

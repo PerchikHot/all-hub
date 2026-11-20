@@ -156,9 +156,11 @@ class _LocalAiChatState extends State<LocalAiChat> {
   bool memoryEnabled = true;
   // Remote Ollama hosts must never receive local memory without opt-in.
   bool allowRemoteContext = false;
+  String? approvedRemoteEndpoint;
   bool get isLoopbackEndpoint => isLocalOllamaEndpoint(address.text);
   bool get maySendPersonalContext => maySendOllamaPersonalContext(
-      address.text, remoteOptIn: allowRemoteContext);
+      address.text, remoteOptIn: allowRemoteContext &&
+        remoteOllamaContextApproved(address.text, approvedRemoteEndpoint));
   final List<String> importedExcerpts = [];
   bool importBusy = false;
   final excerptSearch = TextEditingController();
@@ -239,7 +241,10 @@ class _LocalAiChatState extends State<LocalAiChat> {
     personalityEnabled = prefs.getBool('eyra_personality_enabled') ?? true;
     personalityNotes.text = prefs.getString('eyra_personality_notes') ?? '';
     memoryEnabled = prefs.getBool('eyra_memory_enabled') ?? true;
-    allowRemoteContext = prefs.getBool('eyra_allow_remote_context') ?? false;
+    // Previous global consent was not bound to a server and is not trusted.
+    approvedRemoteEndpoint = prefs.getString('eyra_approved_ollama_endpoint');
+    allowRemoteContext = remoteOllamaContextApproved(
+        address.text, approvedRemoteEndpoint);
     memoryNotes..clear()..addAll(prefs.getStringList('eyra_memory_notes') ?? const []);
     importedExcerpts..clear()..addAll(prefs.getStringList('eyra_chatgpt_excerpts') ?? const []);
     final preferred = prefs.getString('ollama_selected_model');
@@ -975,7 +980,20 @@ class _LocalAiChatState extends State<LocalAiChat> {
               child: Text('Удалённый Ollama: локальная память и импортированные переписки не передаются. Для разрешения открой настройки подключения.')),
           if (showConnectionSettings) ...[
             const SizedBox(height: 12),
-            TextField(controller: address, decoration: const InputDecoration(
+            TextField(controller: address,
+              onChanged: (value) async {
+                if (!remoteOllamaContextApproved(value, approvedRemoteEndpoint)) {
+                  if (allowRemoteContext && mounted) {
+                    setState(() => allowRemoteContext = false);
+                  }
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('eyra_approved_ollama_endpoint');
+                  approvedRemoteEndpoint = null;
+                } else if (mounted) {
+                  setState(() {});
+                }
+              },
+              decoration: const InputDecoration(
               labelText: 'Адрес Ollama', hintText: 'http://127.0.0.1:11434',
               border: OutlineInputBorder(), isDense: true)),
             const SizedBox(height: 8),
@@ -986,14 +1004,144 @@ class _LocalAiChatState extends State<LocalAiChat> {
               subtitle: Text(isLoopbackEndpoint
                 ? 'Локальный адрес: контекст доступен без отдельного разрешения.'
                 : allowRemoteContext
-                  ? 'Разрешено: заметки, совпадения из импорта и настройки характера могут отправляться на указанный сервер.'
+                  ? 'Разрешено только для указанного адреса: заметки, импорт и характер могут отправляться на этот сервер.'
                   : 'Запрещено по умолчанию: на удалённый сервер отправляется только текст текущей переписки.'),
               value: allowRemoteContext,
               onChanged: (enabled) async {
                 final prefs = await SharedPreferences.getInstance();
-                if (await prefs.setBool('eyra_allow_remote_context', enabled) && mounted) {
-                  setState(() => allowRemoteContext = enabled);
+                final endpoint = address.text.trim().replaceAll(RegExp(r'/+
+              },
+            ),
+            Align(alignment: Alignment.centerRight, child: TextButton.icon(
+              onPressed: checkingConnection ? null : fetchModels,
+              icon: const Icon(Icons.link), label: const Text('Подключиться'))),
+          ],
+          if (checkingConnection) const HubWaitIndicator(size: 44),
+          ],
+        ]))),
+      ),
+      if (error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Text(error!, style: TextStyle(color: theme.colorScheme.error))),
+      Expanded(child: LayoutBuilder(builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 1000;
+        return Row(children: [
+          if (wide) SizedBox(width: 258, child: Card(
+            margin: const EdgeInsets.fromLTRB(12, 6, 0, 8),
+            child: Padding(padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: avatarPath == null
+                    ? Container(color: const Color(0xFF18283F),
+                        child: const Center(child: Icon(Icons.face_rounded, size: 90)))
+                    : Image.file(File(avatarPath!), fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) =>
+                          const Center(child: Icon(Icons.broken_image_outlined, size: 56))))),
+                const SizedBox(height: 12),
+                Text('Эйра', style: theme.textTheme.titleLarge,
+                  textAlign: TextAlign.center),
+                Text(selected ?? 'Модель не выбрана', textAlign: TextAlign.center,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(onPressed: chooseAvatar,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('Изменить внешность')),
+                const SizedBox(height: 8),
+                Text(connected ? 'Ollama подключена' : 'Ollama недоступна',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: connected ? Colors.green : theme.colorScheme.error)),
+              ])))),
+          Expanded(child: messages.isEmpty ? Center(child: Padding(
+        padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          avatar(size: 76),
+          const SizedBox(height: 12),
+          Text(connected ? 'О чём поговорим?' : 'Эйра ждёт подключения', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800), textAlign: TextAlign.center),
+          const SizedBox(height: 6),
+          Text(connected ? 'Пиши как обычно — Эйра на связи.' :
+            'Подключи Ollama и выбери модель, чтобы начать.', textAlign: TextAlign.center),
+           if (!connected) ...[const SizedBox(height: 14), FilledButton.tonalIcon(onPressed: () => setState(() { showAdvancedSettings = true; showConnectionSettings = true; }), icon: const Icon(Icons.settings_ethernet_rounded), label: const Text('Настроить подключение'))],
+        ]))) : ListView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+          itemCount: messages.length,
+          itemBuilder: (context, index) {
+            final m = messages[index];
+            final mine = m['role'] == 'user';
+            return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 680),
+                child: Padding(padding: const EdgeInsets.only(bottom: 8), child: Card(
+                  color: mine ? const Color(0xFF244A83) : const Color(0xFF18283F),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18), bottomLeft: Radius.circular(mine ? 18 : 5), bottomRight: Radius.circular(mine ? 5 : 18))),
+                  child: Padding(padding: const EdgeInsets.all(14), child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(mine ? 'Ты' : 'Эйра', style: theme.textTheme.labelMedium?.copyWith(color: const Color(0xFFB5D4FF), fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      SelectableText(m['content'] ?? ''),
+                      if (m['imagePath'] != null &&
+                          File(m['imagePath']!).existsSync()) ...[
+                        const SizedBox(height: 8),
+                        Image.file(File(m['imagePath']!), fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Text('Изображение недоступно')),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final bytes = await File(m['imagePath']!).readAsBytes();
+                            await FilePicker.platform.saveFile(
+                              dialogTitle: 'Сохранить результат Эйры',
+                              fileName: 'eyra-forge-${DateTime.now().millisecondsSinceEpoch}.png',
+                              type: FileType.custom,
+                              allowedExtensions: ['png'], bytes: bytes);
+                          },
+                          icon: const Icon(Icons.save_alt_rounded),
+                          label: const Text('Сохранить изображение')),
+                      ],
+                    ])),
+                ))));
+          },
+        )),
+        ]);
+      })),
+      if (sending) Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Align(alignment: Alignment.centerLeft, child: HubAiResponding(avatarPath: avatarPath))),
+      if (attachedImage != null) Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(children: [
+          const Icon(Icons.image_rounded), const SizedBox(width: 8),
+          Expanded(child: Text(attachedName ?? 'Фото прикреплено',
+            maxLines: 1, overflow: TextOverflow.ellipsis)),
+          IconButton(tooltip: 'Убрать фото', onPressed: () => setState(() {
+            attachedImage = null; attachedName = null;
+          }), icon: const Icon(Icons.close_rounded)),
+        ])),
+      SafeArea(top: false, child: Padding(padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          IconButton(tooltip: 'Прикрепить фото для Forge',
+            onPressed: sending ? null : attachPhoto,
+            icon: const Icon(Icons.add_photo_alternate_outlined)),
+          Expanded(child: TextField(controller: input, maxLines: 5, minLines: 1,
+            textCapitalization: TextCapitalization.sentences,
+            onSubmitted: (_) => send(),
+            decoration: InputDecoration(hintText: 'Сообщение Эйре…',
+              filled: true, border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20))))),
+          const SizedBox(width: 8),
+          IconButton.filled(tooltip: 'Отправить',
+            onPressed: sending || (!connected && !wantsImage) ? null : send,
+            icon: const Icon(Icons.arrow_upward)),
+        ]))),
+    ]);
+  }
+}
+), '');
+                if (enabled && !isLoopbackEndpoint) {
+                  await prefs.setString('eyra_approved_ollama_endpoint', endpoint);
+                  approvedRemoteEndpoint = endpoint;
+                } else {
+                  await prefs.remove('eyra_approved_ollama_endpoint');
+                  approvedRemoteEndpoint = null;
                 }
+                await prefs.setBool('eyra_allow_remote_context', enabled);
+                if (mounted) setState(() => allowRemoteContext =
+                    enabled && remoteOllamaContextApproved(
+                        address.text, approvedRemoteEndpoint));
               },
             ),
             Align(alignment: Alignment.centerRight, child: TextButton.icon(

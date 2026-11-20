@@ -79,9 +79,21 @@ class _WaitPainter extends CustomPainter {
       ..color = const Color(0xFF74A7E9)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5 * scale);
-    final lobePaint = Paint()..color = const Color(0xFFE9B79F);
+    // A fitted, opaque bodice keeps the bust motif recognizable as a clothed
+    // character rather than two isolated loading circles.
+    final neckline = Path()
+      ..moveTo(center.dx - 23 * scale, center.dy - 2 * scale)
+      ..quadraticBezierTo(center.dx - 8 * scale, center.dy - 12 * scale,
+          center.dx, center.dy - 1 * scale)
+      ..quadraticBezierTo(center.dx + 8 * scale, center.dy - 12 * scale,
+          center.dx + 23 * scale, center.dy - 2 * scale);
+    canvas.drawPath(neckline, Paint()
+      ..color = const Color(0xFFB9D6F8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 * scale);
+    final lobePaint = Paint()..color = const Color(0xFF3E5C8D);
     final outline = Paint()
-      ..color = const Color(0xFFB97E73)
+      ..color = const Color(0xFF6EA5E8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2 * scale;
     // Both clearly visible rounded forms move alternately; no progress
@@ -102,8 +114,18 @@ class _WaitPainter extends CustomPainter {
         width: 25 * scale, height: 27 * scale), lobePaint);
       canvas.drawOval(Rect.fromCenter(center: Offset.zero,
         width: 25 * scale, height: 27 * scale), outline);
-      canvas.drawCircle(Offset(0, 3 * scale), 2.4 * scale,
-        Paint()..color = const Color(0xFFB86B79));
+      // Curved fabric panels and moving specular highlights.
+      canvas.drawArc(
+        Rect.fromCenter(center: Offset(0, 1 * scale),
+          width: 19 * scale, height: 20 * scale),
+        math.pi * .18, math.pi * .64, false,
+        Paint()..color = const Color(0xFF8EB6E8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.7 * scale);
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(-4 * scale, -6 * scale),
+          width: 7 * scale, height: 3 * scale),
+        Paint()..color = const Color(0x667BD9FF));
       canvas.restore();
     }
   }

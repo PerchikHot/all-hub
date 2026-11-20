@@ -134,10 +134,10 @@ class _HubAiRespondingState extends State<HubAiResponding>
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                width: 92, height: 106,
+                width: 118, height: 142,
                 child: Stack(alignment: Alignment.center, children: [
                   Container(
-                    width: 88, height: 102,
+                    width: 114, height: 138,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(17),
                       border: Border.all(color: const Color(0xFF4D86CD), width: 1.5),
@@ -150,13 +150,13 @@ class _HubAiRespondingState extends State<HubAiResponding>
                   ClipRRect(
                     borderRadius: BorderRadius.circular(15),
                     child: SizedBox(
-                      width: 82, height: 96,
+                      width: 108, height: 132,
                       child: hasPortrait
                         ? Transform(
                             alignment: Alignment.center,
                             transform: Matrix4.identity()
                               ..translate(2.0 * sway, -1.7 * math.cos(phase))
-                              ..scale(1.09 + .018 * sway),
+                              ..scale(1.05 + .016 * sway),
                             child: Image.file(file!, fit: BoxFit.cover,
                               gaplessPlayback: true,
                               errorBuilder: (_, __, ___) =>
@@ -187,7 +187,7 @@ class _HubAiRespondingState extends State<HubAiResponding>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Эйра отвечает', style: TextStyle(
+                  const Text('Эйра думает и отвечает', style: TextStyle(
                     color: Color(0xFFDCEBFF), fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Row(mainAxisSize: MainAxisSize.min, children: [

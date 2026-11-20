@@ -15,7 +15,7 @@ void main() {
     expect(() => EyraChatBackup.decode('{"messages":[]}'), throwsFormatException);
     expect(() => EyraChatBackup.decode('x' * (EyraChatBackup.maxBytes + 1)),
       throwsFormatException);
-    expect(() => EyraChatBackup.decode(EyraChatBackup.encode([
+    expect(EyraChatBackup.decode(EyraChatBackup.encode([
       {'role': 'user', 'content': 'ok'}
     ], DateTime.utc(2026))), isNotEmpty);
   });

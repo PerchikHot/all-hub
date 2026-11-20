@@ -464,6 +464,8 @@ class ProjectLauncher {
           mode: isPartial ? FileMode.append : FileMode.write,
         );
         var received = isPartial ? existing : 0;
+        resetTransferTelemetry();
+        reportTransferBytes(received, total: totalLength);
         try {
           await for (final chunk in response.stream.timeout(
             const Duration(seconds: 45),
@@ -473,6 +475,7 @@ class ProjectLauncher {
             }
             sink.add(chunk);
             received += chunk.length;
+            reportTransferBytes(received, total: totalLength);
             if (totalLength != null && totalLength > 0) {
               downloadProgress.value =
                   (received / totalLength).clamp(0.0, 1.0);

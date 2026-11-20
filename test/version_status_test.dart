@@ -166,4 +166,18 @@ void main() {
     expect(windowsUpdateActionLabel('1.0.0', null), 'Проверить и установить');
   });
 
+  test('project detail never promises an unverified update', () {
+    expect(projectInstallActionLabel(null, '1.0.0'), 'Скачать / установить');
+    expect(projectInstallActionLabel('1.0.0', '1.1.0'), 'Обновить');
+    expect(projectInstallActionLabel('1.1.0', '1.1.0'), 'Переустановить');
+    expect(projectInstallActionLabel('2.0.0', '1.0.0'),
+      'Установлена более новая версия');
+    expect(projectInstallActionLabel('1.0.0', 'all-hub-latest'),
+      'Проверить и установить');
+    expect(projectInstallActionLabel('1.0.0', null),
+      'Проверить и установить');
+    expect(projectInstallActionLabel('1.0.0', '1.0.0+42'),
+      'Проверить и установить');
+  });
+
 }

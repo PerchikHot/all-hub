@@ -1,12 +1,15 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+enum HubLiquidStyle { wave, capsule, segmented, reservoir }
+
 /// A compact white flowing-liquid progress bar. Determinate mode fills to
 /// [value]; null shows a moving stream without inventing a percentage.
 class HubLiquidProgress extends StatefulWidget {
-  const HubLiquidProgress({super.key, this.value, this.height = 8});
+  const HubLiquidProgress({super.key, this.value, this.height = 8, this.style = HubLiquidStyle.wave});
   final double? value;
   final double height;
+  final HubLiquidStyle style;
 
   @override
   State<HubLiquidProgress> createState() => _HubLiquidProgressState();
@@ -40,6 +43,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
             painter: _LiquidPainter(
               phase: reducedMotion ? 0 : _flow.value,
               progress: widget.value,
+              style: widget.style,
             ),
           ),
         ),
@@ -49,9 +53,10 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
 }
 
 class _LiquidPainter extends CustomPainter {
-  const _LiquidPainter({required this.phase, required this.progress});
+  const _LiquidPainter({required this.phase, required this.progress, required this.style});
   final double phase;
   final double? progress;
+  final HubLiquidStyle style;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -62,6 +67,10 @@ class _LiquidPainter extends CustomPainter {
       Offset.zero & size, Radius.circular(h / 2),
     );
     canvas.drawRRect(track, Paint()..color = const Color(0xFF1C2941));
+    canvas.drawRRect(track, Paint()
+      ..color = const Color(0xFF4D8DD7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.min(1.6, h * .12));
     canvas.save();
     canvas.clipRRect(track);
 
@@ -78,7 +87,9 @@ class _LiquidPainter extends CustomPainter {
     const steps = 64;
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
-      final ripple = math.sin(x * .065 - phase * math.pi * 2) * h * .035
+      final ripple = (style == HubLiquidStyle.capsule ? .10 :
+          style == HubLiquidStyle.segmented ? .012 : .035) * h *
+          math.sin(x * .065 - phase * math.pi * 2)
           + math.sin(x * .13 + phase * math.pi * 2) * h * .022;
       body.lineTo(x, h * .20 + ripple);
     }
@@ -120,10 +131,20 @@ class _LiquidPainter extends CustomPainter {
           Paint()..color = const Color(0xDDFBFCFF));
       }
     }
+    if (style == HubLiquidStyle.segmented) {
+      for (var x = h * 1.7; x < w; x += h * 2.1) {
+        canvas.drawLine(Offset(x, 1), Offset(x - h * .35, h - 1),
+          Paint()..color = const Color(0xAA091A35)..strokeWidth = math.max(1, h * .12));
+      }
+    } else if (style == HubLiquidStyle.reservoir) {
+      canvas.drawCircle(Offset(h * .5, h * .5), h * .43,
+        Paint()..color = const Color(0xAAE8F6FF)..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1, h * .1));
+    }
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _LiquidPainter old) =>
-      phase != old.phase || progress != old.progress;
+      phase != old.phase || progress != old.progress || style != old.style;
 }

@@ -97,18 +97,20 @@ class _LiquidPainter extends CustomPainter {
 
     final bounded = progress?.isFinite == true
         ? progress!.clamp(0.0, 1.0).toDouble() : null;
-    final fill = bounded == null ? w * .32 : w * bounded;
+    // Unknown-duration work is a gently breathing reservoir, not a white
+    // slug racing from left to right and impersonating a download percentage.
+    final fill = bounded == null ? w : w * bounded;
     if (bounded == 0) {
       canvas.restore();
       return;
     }
-    final start = bounded == null ? (w + fill) * phase - fill : 0.0;
+    final start = 0.0;
     final end = start + fill;
 
     // The actual downloaded fraction determines the fill boundary.
     // Surface motion, viscosity and droplets are purely decorative.
     final body = Path()..moveTo(start, h);
-    body.lineTo(start, h * .20);
+    body.lineTo(start, bounded == null ? h * .40 : h * .20);
     const steps = 96;
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
@@ -117,7 +119,7 @@ class _LiquidPainter extends CustomPainter {
           math.sin(x * .065 - phase * math.pi * 2)
           + math.sin(x * .13 + phase * math.pi * 4) * h * .048
           + math.sin(x * .23 - phase * math.pi * 6) * h * .024;
-      body.lineTo(x, h * .20 + ripple);
+      body.lineTo(x, (bounded == null ? h * .40 : h * .20) + ripple);
     }
     body..lineTo(end, h)..close();
     canvas.drawPath(body, Paint()

@@ -1,4 +1,5 @@
 import 'hub_liquid_progress.dart';
+import 'hub_wait_indicator.dart';
 import 'eyra_forge_page.dart';
 import 'eyra_access_page.dart';
 import 'gguf_chat_page.dart';
@@ -284,7 +285,7 @@ class _AiModelsPageState extends State<AiModelsPage> {
       if (importingName.isNotEmpty) Text('$importingName — ${(importProgress * 100).toStringAsFixed(0)}%'),
     ],
     const SizedBox(height: 16),
-    if (busy) const Center(child: CircularProgressIndicator()),
+    if (busy) const Center(child: HubWaitIndicator(size: 68)),
     if (!busy && paths.isEmpty) const Text('Модели пока не добавлены'),
     if (selectedGguf != null && Platform.isAndroid) FilledButton.icon(
       onPressed: testingNativeModel ? null : testSelectedModel,

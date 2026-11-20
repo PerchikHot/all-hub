@@ -26,6 +26,39 @@ void main() {
       ['4', '5']);
   });
 
+  test('pagination never reorders or evicts previously displayed tiles', () {
+    final likes = <Map<String, dynamic>>[{'tag_string': 'character_alpha'}];
+    final visible = <Map<String, dynamic>>[
+      {'id': 'old-1', 'tag_string': 'unrelated'},
+      {'id': 'old-2', 'tag_string': 'character_alpha'},
+    ];
+    appendStableMediaRecommendations(visible, [
+      {'id': 'new-low', 'tag_string': 'unrelated'},
+      {'id': 'new-high', 'tag_string': 'character_alpha'},
+    ], likes);
+    expect(visible.map((p) => p['id']).toList(),
+        ['old-1', 'old-2', 'new-high', 'new-low']);
+    appendStableMediaRecommendations(visible, [
+      {'id': 'newest', 'tag_string': 'character_alpha'},
+    ], likes);
+    expect(visible.map((p) => p['id']).toList(),
+        ['old-1', 'old-2', 'new-high', 'new-low', 'newest']);
+  });
+
+  test('changing likes cannot reorder an already displayed batch', () {
+    final visible = <Map<String, dynamic>>[
+      {'id': 'first', 'tag_string': 'alpha'},
+    ];
+    appendStableMediaRecommendations(visible, [
+      {'id': 'second', 'tag_string': 'beta'},
+    ], [{'tag_string': 'beta'}]);
+    appendStableMediaRecommendations(visible, [
+      {'id': 'third', 'tag_string': 'alpha'},
+    ], [{'tag_string': 'alpha'}]);
+    expect(visible.map((p) => p['id']).toList(),
+        ['first', 'second', 'third']);
+  });
+
   test('missing or oversized tags do not break ranking', () {
     expect(mediaLikedTagWeights([
       {'tag_string': 'x' * 5000}, {'tag_string': null},

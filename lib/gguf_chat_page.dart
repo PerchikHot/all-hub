@@ -34,13 +34,10 @@ class _GgufChatPageState extends State<GgufChatPage> {
   }
 
   Future<void> restoreChat() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(storageKey);
-    if (raw == null) {
-      if (mounted) setState(() => restoring = false);
-      return;
-    }
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(storageKey);
+      if (raw == null) return;
       final decoded = jsonDecode(raw) as List<dynamic>;
       final restored = decoded.map((item) {
         final row = item as Map<String, dynamic>;
@@ -51,8 +48,9 @@ class _GgufChatPageState extends State<GgufChatPage> {
         restoring = false;
       });
     } catch (_) {
-      // Ignore malformed or outdated local chat data.
-      if (mounted) setState(() => restoring = false);
+      // A storage failure must not permanently disable the chat input.
+    } finally {
+      if (mounted && restoring) setState(() => restoring = false);
     }
   }
 
@@ -91,33 +89,52 @@ class _GgufChatPageState extends State<GgufChatPage> {
     elapsedTimer?.cancel();
     generationStarted = DateTime.now();
     elapsedSeconds = 0;
-    setState(() { messages.add((true, text)); generating = true; generationError = null; generationStatus = 'Загрузка модели / генерация на CPU'; });
+    setState(() {
+      messages.add((true, text));
+      generating = true;
+      generationError = null;
+      generationStatus = 'Загрузка модели / генерация на CPU';
+    });
     elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       setState(() => elapsedSeconds = DateTime.now().difference(generationStarted!).inSeconds);
     });
-    await saveChat();
-    // Keep ChatML role delimiters out of untrusted conversation text.
-    // Limit input for the native 2048-token context (approximate budget).
-    final prompt = buildGgufChatPrompt(messages
-        .map((m) => (user: m.$1, text: m.$2)).toList());
     try {
-      final reply = await generateNativeGguf(widget.modelPath, prompt, maxTokens: maxTokens);
+      // Saving is best-effort: disabled/full storage must never prevent
+      // inference or leave the send button stuck in a busy state.
+      try {
+        await saveChat();
+      } catch (_) {
+        if (mounted) setState(() =>
+          generationStatus = 'Генерация (историю пока не удалось сохранить)');
+      }
+      final prompt = buildGgufChatPrompt(messages
+          .map((m) => (user: m.$1, text: m.$2)).toList());
+      final reply = await generateNativeGguf(
+          widget.modelPath, prompt, maxTokens: maxTokens);
       final duration = DateTime.now().difference(generationStarted!).inMilliseconds / 1000;
       if (mounted) setState(() {
         messages.add((false, reply.isEmpty ? '(Пустой ответ)' : reply));
         generationStatus = 'Ответ за ${duration.toStringAsFixed(1)} с';
       });
     } catch (e) {
-      if (mounted) {
-        // An infrastructure error is not an AI reply and must never be fed
-        // into the next prompt or persisted as conversation history.
-        setState(() { generationError = 'Ошибка генерации: $e'; generationStatus = 'Не удалось получить ответ'; });
-      }
+      if (mounted) setState(() {
+        generationError = 'Ошибка генерации: $e';
+        generationStatus = 'Не удалось получить ответ';
+      });
     } finally {
       elapsedTimer?.cancel();
-      await saveChat();
-      if (mounted) setState(() => generating = false);
+      try {
+        await saveChat();
+      } catch (_) {
+        if (mounted) setState(() {
+          generationError = generationError == null
+              ? 'Не удалось сохранить переписку на устройстве. Сообщения пока доступны только в открытом чате.'
+              : '$generationError\\nНе удалось сохранить переписку на устройстве.';
+        });
+      } finally {
+        if (mounted) setState(() => generating = false);
+      }
     }
   }
 

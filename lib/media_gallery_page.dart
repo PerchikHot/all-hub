@@ -59,6 +59,9 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
   // Keep lightweight post metadata for the duration of the browsing session
   // instead of silently dropping the first cards after 180 results.
   static const _feedSeenIdsKey = 'media_default_feed_seen_ids_v1';
+  static const _feedSeenUrlsKey = 'media_default_feed_seen_urls_v1';
+  static const _maxSavedSeenUrls = 3000;
+  final _savedSeenUrls = <String>[];
   static const _maxSavedSeenIds = 1500;
   final _savedSeenIds = <String>[];
   final seenPostIds = <String>{};
@@ -209,6 +212,10 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (!mounted) return;
       _defaultFeedResumePage = (prefs.getInt(_feedResumeKey) ?? 1).clamp(1, 1000);
       _savedResumeFilters = prefs.getString(_feedResumeFilterKey) ?? '';
+      _savedSeenUrls
+        ..clear()
+        ..addAll((prefs.getStringList(_feedSeenUrlsKey) ?? const <String>[])
+            .take(_maxSavedSeenUrls));
       _savedSeenIds
         ..clear()
         ..addAll((prefs.getStringList(_feedSeenIdsKey) ?? const <String>[])
@@ -392,16 +399,20 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
       if (!mounted || generation != searchGeneration || requestedQuery != activeQuery || requestedKind != kind || requestedFuta != showFuta || requestedTrans != showTrans) return;
       // For discovery only, filter IDs seen on earlier app launches too.
       // Explicit searches remain independent and do not expose search history.
-      final previouslySeen = requestedQuery.isEmpty && !bypassCache &&
-              _savedResumeFilters == _currentResumeFilters
+      final useDiscoveryHistory = requestedQuery.isEmpty && !bypassCache &&
+          _savedResumeFilters == _currentResumeFilters;
+      final previouslySeen = useDiscoveryHistory
           ? <String>{...seenPostIds, ..._savedSeenIds}
           : seenPostIds;
+      final previouslySeenUrls = useDiscoveryHistory
+          ? <String>{...seenPostUrls, ..._savedSeenUrls}
+          : seenPostUrls;
       // The API can repeat an ID inside one response. De-duplicate before
       // rendering, not only after merging the page into seenPostIds.
       final newPosts = filterNewMediaFeedPosts(
         data.whereType<Map<String, dynamic>>(),
         selectedTag: selectedTag, kind: requestedKind,
-        seenIds: previouslySeen, seenUrls: seenPostUrls,
+        seenIds: previouslySeen, seenUrls: previouslySeenUrls,
         query: requestedQuery,
       );
       // Cache deduplicates repeated media before rendering. Its length must
@@ -440,7 +451,7 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
             nextAvailableMediaFeedPage(
                 page, enabledTags, exhaustedFeedTags) != null;
       });
-      // Persist only the default feed cursor, never search terms or post IDs.
+      // Persist bounded discovery identities and cursor, never search terms.
       // A failed request must not advance the saved cursor.
       // Refreshing page one must not rewind the saved discovery cursor.
       // Otherwise restarting the app replays images the user already saw.
@@ -453,18 +464,29 @@ class _MediaGalleryPageState extends State<MediaGalleryPage> {
           await prefs.setString(_feedResumeFilterKey, _currentResumeFilters);
           if (_savedResumeFilters != _currentResumeFilters) {
             _savedSeenIds.clear();
+            _savedSeenUrls.clear();
           }
           for (final post in newPosts) {
             final id = (post['id'] ?? '').toString();
             if (id.isEmpty) continue;
             _savedSeenIds.remove(id);
             _savedSeenIds.add(id);
+            for (final key in mediaFeedIdentityKeys(post)) {
+              if (key.isEmpty) continue;
+              _savedSeenUrls.remove(key);
+              _savedSeenUrls.add(key);
+            }
           }
           if (_savedSeenIds.length > _maxSavedSeenIds) {
             _savedSeenIds.removeRange(0,
                 _savedSeenIds.length - _maxSavedSeenIds);
           }
+          if (_savedSeenUrls.length > _maxSavedSeenUrls) {
+            _savedSeenUrls.removeRange(0,
+                _savedSeenUrls.length - _maxSavedSeenUrls);
+          }
           await prefs.setStringList(_feedSeenIdsKey, _savedSeenIds);
+          await prefs.setStringList(_feedSeenUrlsKey, _savedSeenUrls);
           _savedResumeFilters = _currentResumeFilters;
         } catch (_) {
           // Browsing remains available without persistent preferences.

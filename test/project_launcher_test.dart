@@ -136,7 +136,16 @@ void main() {
         'installed_version_shadow-rp': '0.18.6',
       });
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);
-      await executable.writeAsBytes([0x4d, 0x5a, 0, 0]);
+      // Registration is valid only for a sufficiently sized PE executable.
+      final pe = List<int>.filled(2048, 0);
+      pe[0] = 0x4d; pe[1] = 0x5a; // MZ
+      pe[0x3c] = 0x80; // PE header offset
+      pe[0x80] = 0x50; pe[0x81] = 0x45; // PE\\0\\0
+      pe[0x84] = 0x64; pe[0x85] = 0x86; // AMD64
+      pe[0x86] = 1; // section count
+      pe[0x94] = 0xf0; // optional header size
+      pe[0x98] = 0x0b; pe[0x99] = 0x02; // PE32+
+      await executable.writeAsBytes(pe, flush: true);
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), '0.18.6');
       await executable.delete();
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);

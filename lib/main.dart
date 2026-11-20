@@ -104,8 +104,27 @@ class _AllHubState extends State<AllHub> {
   Widget build(BuildContext context) => MaterialApp(
     title: 'All Hub', debugShowCheckedModeBanner: false,
     themeMode: mode,
-    builder: (context, child) => _ThemeControls(
-      mode: mode, onChanged: setMode, child: child!),
+    builder: (context, child) => DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: Theme.of(context).brightness == Brightness.dark
+          ? const LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF08162F),
+                Color(0xFF101B40),
+                Color(0xFF15102C),
+                Color(0xFF070E20),
+              ],
+              stops: [0, .36, .68, 1],
+            )
+          : const LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [Color(0xFFF0F4FC), Color(0xFFE5EDFC)],
+            ),
+      ),
+      child: _ThemeControls(
+        mode: mode, onChanged: setMode, child: child!),
+    ),
     theme: ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
@@ -124,7 +143,7 @@ class _AllHubState extends State<AllHub> {
     ),
     darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF739EFF), brightness: Brightness.dark),
-      scaffoldBackgroundColor: const Color(0xFF080F21)),
+      scaffoldBackgroundColor: Colors.transparent),
     home: const HomePage());
 }
 

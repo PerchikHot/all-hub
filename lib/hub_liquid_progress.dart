@@ -76,11 +76,21 @@ class _LiquidPainter extends CustomPainter {
     final track = RRect.fromRectAndRadius(
       Offset.zero & size, Radius.circular(h / 2),
     );
-    canvas.drawRRect(track, Paint()..color = const Color(0xFF111D35));
+    canvas.drawRRect(track, Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Color(0xFF071021), Color(0xFF1B3657),
+          Color(0xFF0A142A)],
+      ).createShader(Offset.zero & size));
     canvas.drawRRect(track, Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.min(1.5, h * .12)
-      ..color = const Color(0xFF5F9FEF));
+      ..strokeWidth = math.min(2.2, h * .10)
+      ..color = const Color(0xFF70C5FF));
+    canvas.drawRRect(track, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.min(5, h * .22)
+      ..color = const Color(0x4458B7FF)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
 
     canvas.save();
     canvas.clipRRect(track);
@@ -117,6 +127,26 @@ class _LiquidPainter extends CustomPainter {
         colors: const [Color(0xFFFFFFFF), Color(0xFFF0F2F6),
           Color(0xFFCDD7E4)],
       ).createShader(Offset.zero & size));
+
+    // The reference uses thick, sculpted white liquid, not a flat fill.
+    // Broad glossy folds are layered beneath the animated crests.
+    canvas.save();
+    canvas.clipPath(body);
+    for (var i = 0; i < 5; i++) {
+      final t = (i * .24 + phase * .09) % 1.0;
+      final x = start + fill * t;
+      final swell = h * (.28 + .09 * math.sin(i * 1.7 + phase * 5));
+      canvas.drawOval(Rect.fromCenter(
+        center: Offset(x, h * .56),
+        width: h * (1.2 + (i % 3) * .3),
+        height: swell * 1.5,
+      ), Paint()
+        ..shader = RadialGradient(colors: const [
+          Color(0xEEFFFFFF), Color(0x99EDF6FF), Color(0x00D7EBFF),
+        ]).createShader(Rect.fromCircle(
+          center: Offset(x, h * .56), radius: h)));
+    }
+    canvas.restore();
 
     // Large rolling crests, based on the update-screen reference: the
     // surface bulges in broad, irregular waves rather than tiny ripples.

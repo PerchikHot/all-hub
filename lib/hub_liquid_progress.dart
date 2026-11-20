@@ -39,7 +39,9 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
       child: SizedBox(
         height: math.max(widget.height + 12, 28),
         width: double.infinity,
-        child: AnimatedBuilder(
+        child: TickerMode(
+          enabled: !reducedMotion,
+          child: AnimatedBuilder(
           animation: _flow,
           builder: (context, _) {
             return SizedBox(
@@ -52,6 +54,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
               )),
             );
           },
+        ),
         ),
       ),
     );
@@ -69,6 +72,7 @@ class _LiquidPainter extends CustomPainter {
     if (size.isEmpty) return;
     final h = size.height;
     final w = size.width;
+    if (h <= 0 || w <= 0) return;
     final track = RRect.fromRectAndRadius(
       Offset.zero & size, Radius.circular(h / 2),
     );

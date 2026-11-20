@@ -1,3 +1,4 @@
+import 'eyra_connection_header.dart';
 import 'eyra_chat_history_codec.dart';
 import 'eyra_chat_backup.dart';
 import 'eyra_chat_image_store.dart';
@@ -707,21 +708,12 @@ class _LocalAiChatState extends State<LocalAiChat> {
     return Column(children: [
       Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 6), child: Card(
         child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-          // Keep the connection status full-width. Six icon buttons beside
-          // it squeezed the title to one character per line on phones.
-          Row(children: [
-            avatar(),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Локальная модель', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              Text(checkingConnection ? 'Подключаюсь…' : connected ? 'Ollama подключена' : 'Нет подключения',
-                style: TextStyle(color: connected ? Colors.green : theme.colorScheme.onSurfaceVariant)),
-            ])),
-          ]),
-          const SizedBox(height: 8),
-          Align(alignment: Alignment.centerLeft, child: Wrap(
-            spacing: 2, runSpacing: 2,
-            children: [
+          EyraConnectionHeader(
+            avatar: avatar(),
+            status: checkingConnection ? 'Подключаюсь…'
+                : connected ? 'Ollama подключена' : 'Нет подключения',
+            connected: connected,
+            actions: [
             IconButton(
               key: const Key('eyra-avatar-picker'),
               tooltip: 'Выбрать внешность Эйры (PNG/JPEG)',
@@ -750,7 +742,7 @@ class _LocalAiChatState extends State<LocalAiChat> {
               onPressed: () => setState(() => showAdvancedSettings = !showAdvancedSettings),
               icon: Icon(showAdvancedSettings ? Icons.close_rounded : Icons.tune_rounded)),
             ],
-          )),
+          ),
           const SizedBox(height: 8),
           Row(children: [
             Expanded(child: models.isEmpty

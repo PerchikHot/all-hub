@@ -35,17 +35,31 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
       value: widget.value == null ? 'Выполняется'
           : '${(widget.value!.clamp(0.0, 1.0) * 100).round()}%',
       child: SizedBox(
-        height: widget.height,
+        height: math.max(widget.height, 26),
         width: double.infinity,
         child: AnimatedBuilder(
           animation: _flow,
-          builder: (context, _) => CustomPaint(
-            painter: _LiquidPainter(
-              phase: reducedMotion ? 0 : _flow.value,
-              progress: widget.value,
-              style: widget.style,
-            ),
-          ),
+          builder: (context, _) {
+            final completed = widget.value != null && widget.value!.isFinite
+                && widget.value! >= 1;
+            return Row(children: [
+              SizedBox(width: 31, height: 26,
+                child: CustomPaint(painter: _GelNozzlePainter(
+                  phase: reducedMotion ? 0 : _flow.value))),
+              const SizedBox(width: 2),
+              Expanded(child: SizedBox(height: widget.height,
+                child: CustomPaint(painter: _LiquidPainter(
+                  phase: reducedMotion ? 0 : _flow.value,
+                  progress: widget.value,
+                  style: widget.style,
+                )))),
+              const SizedBox(width: 3),
+              SizedBox(width: 26, height: 26,
+                child: CustomPaint(painter: _GelTargetPainter(
+                  completed: completed,
+                  phase: reducedMotion ? 0 : _flow.value))),
+            ]);
+          },
         ),
       ),
     );
@@ -170,4 +184,55 @@ class _LiquidPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _LiquidPainter old) =>
       phase != old.phase || progress != old.progress || style != old.style;
+}
+
+ 
+/// A stylized sci-fi dispenser, not a weapon or a functional control.
+class _GelNozzlePainter extends CustomPainter {
+  const _GelNozzlePainter({required this.phase});
+  final double phase;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    final outline = Paint()..color = const Color(0xFF69B7FF)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.6;
+    final body = Path()
+      ..moveTo(2, y - 7)..lineTo(18, y - 7)
+      ..lineTo(18, y - 4)..lineTo(29, y - 4)
+      ..lineTo(29, y + 3)..lineTo(17, y + 3)
+      ..lineTo(14, y + 11)..lineTo(7, y + 11)
+      ..lineTo(10, y + 3)..lineTo(2, y + 3)..close();
+    canvas.drawPath(body, Paint()..color = const Color(0xFF17345D));
+    canvas.drawPath(body, outline);
+    canvas.drawLine(Offset(6, y - 3), Offset(17, y - 3),
+      Paint()..color = const Color(0xFFB8DFFF)..strokeWidth = 2);
+    final pulse = .65 + .35 * math.sin(phase * math.pi * 2).abs();
+    canvas.drawCircle(Offset(29, y), 1.6 * pulse,
+      Paint()..color = const Color(0xFFEAF9FF));
+  }
+  @override
+  bool shouldRepaint(covariant _GelNozzlePainter old) => old.phase != phase;
+}
+
+/// A playful, abstract concentric target with a completion flash.
+class _GelTargetPainter extends CustomPainter {
+  const _GelTargetPainter({required this.completed, required this.phase});
+  final bool completed;
+  final double phase;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    for (var i = 0; i < 3; i++) {
+      canvas.drawCircle(center, 11.5 - i * 3.5, Paint()
+        ..color = completed ? const Color(0xFFECF8FF) :
+          (i.isEven ? const Color(0xFF4A91E8) : const Color(0xFF13294D))
+        ..style = i == 0 ? PaintingStyle.stroke : PaintingStyle.fill
+        ..strokeWidth = 1.7);
+    }
+    canvas.drawCircle(center, completed ? 4.0 + math.sin(phase * math.pi * 2).abs() * 2 : 2.5,
+      Paint()..color = const Color(0xFFFFFFFF));
+  }
+  @override
+  bool shouldRepaint(covariant _GelTargetPainter old) =>
+      old.phase != phase || old.completed != completed;
 }

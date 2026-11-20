@@ -1,4 +1,5 @@
 import 'eyra_chat_history_codec.dart';
+import 'eyra_chat_backup.dart';
 import 'eyra_chat_image_store.dart';
 import 'eyra_forge_client.dart';
 import 'eyra_forge_privacy.dart';
@@ -611,6 +612,79 @@ class _LocalAiChatState extends State<LocalAiChat> {
       if (mounted) { setState(() => sending = false); }
     }
   }
+  Future<void> exportChatBackup() async {
+    if (sending || restoring) return;
+    try {
+      final data = EyraChatBackup.encode(messages, DateTime.now());
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Сохранить переписку Эйры (без файлов изображений)',
+        fileName: 'eyra-chat-text.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: Uint8List.fromList(utf8.encode(data)),
+      );
+      if (path != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Текстовая копия переписки сохранена')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = 'Ошибка экспорта переписки: $e');
+    }
+  }
+
+  Future<void> importChatBackup() async {
+    if (sending || restoring || importBusy) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['json'], withData: false);
+    if (picked == null || picked.files.isEmpty || picked.files.single.path == null) return;
+    setState(() => importBusy = true);
+    try {
+      final file = File(picked.files.single.path!);
+      if (await file.length() > EyraChatBackup.maxBytes) {
+        throw const FormatException('Копия переписки больше 2 МиБ');
+      }
+      final incoming = EyraChatBackup.decode(await file.readAsString());
+      if (!mounted) return;
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Восстановить переписку?'),
+          content: Text('Найдено ${incoming.length} текстовых сообщений. '
+            'Изображения и пути к файлам не переносятся. '
+            'Объединить — добавить сообщения в текущую историю; '
+            'Заменить — перезаписать историю выбранной модели.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Отмена')),
+            OutlinedButton(onPressed: () => Navigator.pop(dialogContext, 'replace'),
+              child: const Text('Заменить')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, 'merge'),
+              child: const Text('Объединить')),
+          ],
+        ),
+      );
+      if (choice == null || !mounted) return;
+      final next = choice == 'merge'
+          ? <Map<String, String>>[...messages, ...incoming]
+          : incoming;
+      final trimmed = next.length > 100 ? next.sublist(next.length - 100) : next;
+      final prefs = await SharedPreferences.getInstance();
+      final key = historyKey(selected);
+      if (!await prefs.setString(key, EyraChatHistoryCodec.encode(trimmed))) {
+        throw const FileSystemException('Не удалось записать историю');
+      }
+      if (mounted) {
+        setState(() { messages..clear()..addAll(trimmed); error = null; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Текстовая переписка восстановлена')));
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = 'Ошибка импорта переписки: $e');
+    } finally {
+      if (mounted) setState(() => importBusy = false);
+    }
+  }
+
   Future<void> confirmClear() async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Очистить переписку?'),
@@ -651,6 +725,16 @@ class _LocalAiChatState extends State<LocalAiChat> {
               tooltip: 'Экспорт памяти Эйры (JSON)',
               onPressed: importBusy ? null : exportMemoryBackup,
               icon: const Icon(Icons.save_alt_outlined)),
+            IconButton(
+              key: const Key('eyra-export-chat'),
+              tooltip: 'Сохранить текстовую переписку',
+              onPressed: sending || restoring ? null : exportChatBackup,
+              icon: const Icon(Icons.download_outlined)),
+            IconButton(
+              key: const Key('eyra-import-chat'),
+              tooltip: 'Импортировать текстовую переписку',
+              onPressed: sending || restoring || importBusy ? null : importChatBackup,
+              icon: const Icon(Icons.upload_file_outlined)),
             IconButton(tooltip: 'Обновить модели', onPressed: checkingConnection ? null : fetchModels,
               icon: const Icon(Icons.refresh)),
             IconButton(

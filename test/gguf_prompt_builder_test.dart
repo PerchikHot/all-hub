@@ -33,7 +33,7 @@ void main() {
 
   test('clips oversized content without exceeding budget', () {
     final prompt = buildGgufChatPrompt([
-      (user: true, text: 'x' * 5000),
+      (user: true, text: List.filled(5000, 'x').join()),
     ], maxCharacters: 100);
     expect('x'.allMatches(prompt).length, 100);
   });

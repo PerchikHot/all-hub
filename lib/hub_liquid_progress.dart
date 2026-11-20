@@ -6,7 +6,7 @@ enum HubLiquidStyle { wave, capsule, segmented, reservoir }
 /// A compact white flowing-liquid progress bar. Determinate mode fills to
 /// [value]; null shows a moving stream without inventing a percentage.
 class HubLiquidProgress extends StatefulWidget {
-  const HubLiquidProgress({super.key, this.value, this.height = 8, this.style = HubLiquidStyle.wave});
+  const HubLiquidProgress({super.key, this.value, this.height = 12, this.style = HubLiquidStyle.wave});
   final double? value;
   final double height;
   final HubLiquidStyle style;
@@ -66,7 +66,11 @@ class _LiquidPainter extends CustomPainter {
     final track = RRect.fromRectAndRadius(
       Offset.zero & size, Radius.circular(h / 2),
     );
-    canvas.drawRRect(track, Paint()..color = const Color(0xFF1C2941));
+    canvas.drawRRect(track, Paint()..color = const Color(0xFF111D35));
+    canvas.drawRRect(track, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.min(1.5, h * .12)
+      ..color = const Color(0xFF5F9FEF));
     canvas.drawRRect(track, Paint()
       ..color = const Color(0xFF4D8DD7)
       ..style = PaintingStyle.stroke
@@ -83,7 +87,7 @@ class _LiquidPainter extends CustomPainter {
     // The actual downloaded fraction determines the fill boundary.
     // Surface motion, viscosity and droplets are purely decorative.
     final body = Path()..moveTo(start, h);
-    body.lineTo(start, h * .22);
+    body.lineTo(start, h * .20);
     const steps = 64;
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
@@ -101,6 +105,14 @@ class _LiquidPainter extends CustomPainter {
         colors: const [Color(0xFFFFFFFF), Color(0xFFF0F2F6),
           Color(0xFFCDD7E4)],
       ).createShader(Offset.zero & size));
+
+    // Bright soft foam and reflections move independently of real progress.
+    canvas.save();
+    canvas.clipPath(body);
+    canvas.drawRect(Offset(start, h * .12) & Size(fill, h * .18), Paint()
+      ..color = const Color(0x99FFFFFF)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * .14));
+    canvas.restore();
 
     // Glossy streaks drift within the filled region.
     canvas.save();

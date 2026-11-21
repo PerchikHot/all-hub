@@ -410,7 +410,11 @@ class ProjectLauncher {
     resetTransferTelemetry();
     reportTransferBytes(0, total: response.contentLength);
     try {
-      await for (final bytes in response.stream) {
+      // A stalled CDN stream must not keep the launcher stuck forever.
+      // Timeout is per incoming chunk, so large but active downloads continue.
+      await for (final bytes in response.stream.timeout(
+        const Duration(seconds: 45),
+      )) {
         if (maxBytes != null &&
             !isSafeWindowsDownloadBudget(received, bytes.length, maxBytes: maxBytes)) {
           throw const FormatException('Windows ZIP слишком большой');

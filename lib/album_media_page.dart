@@ -24,6 +24,8 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
   final _images = <String>[];
   final _seen = <String>{};
   bool _picking = false;
+  bool _cancelImport = false;
+  int _processed = 0;
   String? _message;
 
   @override
@@ -85,7 +87,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
 
   Future<void> _addFiles(Iterable<File> files) async {
     if (_picking) return;
-    setState(() => _picking = true);
+    setState(() { _picking = true; _cancelImport = false; _processed = 0; });
     var added = 0;
     var skipped = 0;
     var failed = 0;
@@ -99,6 +101,8 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
             'Импортировано: $added · Пропущено: $skipped · Ошибок: $failed');
       }
       for (final file in files) {
+        if (_cancelImport) break;
+        _processed++;
         try {
           if (!await file.exists()) { skipped++; continue; }
           final name = file.path.toLowerCase();
@@ -122,14 +126,14 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
           _seen.add(target.path);
           _images.add(target.path);
           added++;
-          if (added % 50 == 0) await checkpoint();
+          if (_processed % 50 == 0) await checkpoint();
         } on FileSystemException {
           failed++;
         }
       }
       await checkpoint();
       if (mounted) setState(() => _message =
-          'Сохранено: $added · Пропущено: $skipped · Ошибок: $failed · Всего: ${_images.length}');
+          '${_cancelImport ? 'Остановлено' : 'Сохранено'}: $added · Пропущено: $skipped · Ошибок: $failed · Всего: ${_images.length}');
     } catch (error) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -167,13 +171,11 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
       final path = await FilePicker.platform.getDirectoryPath(
         dialogTitle: 'Выбрать папку — импортировать все фото');
       if (path == null) return;
-      setState(() => _picking = true);
-      final files = <File>[];
-      await for (final item in Directory(path).list(recursive: true, followLinks: false)) {
-        if (item is File) files.add(item);
-      }
-      if (mounted) setState(() => _picking = false);
-      await _addFiles(files);
+      // Directory.list is lazy; avoid collecting thousands of File objects.
+      // The importer checkpoints every 50 items and supports cancellation.
+      await _addFiles(Directory(path)
+          .listSync(recursive: true, followLinks: false)
+          .whereType<File>());
     } catch (error) {
       if (mounted) setState(() {
         _picking = false;
@@ -221,6 +223,15 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
           ]),
           const SizedBox(height: 6),
           const Text('Google Фото не предоставляет по публичной ссылке стабильный список прямых адресов всех снимков. Выбери файлы или всю папку: изображения копируются в хранилище All Hub и остаются после перезапуска. Это импорт, не автоматическая синхронизация.'),
+          if (_picking) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+            Text('Обработано: $_processed'),
+            TextButton.icon(
+              onPressed: () => setState(() => _cancelImport = true),
+              icon: const Icon(Icons.stop_circle_outlined),
+              label: const Text('Остановить импорт')),
+          ],
           if (_message != null) Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(_message!, style: Theme.of(context).textTheme.bodySmall)),

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +18,7 @@ class AlbumMediaPage extends StatefulWidget {
 class _AlbumMediaPageState extends State<AlbumMediaPage>
     with AutomaticKeepAliveClientMixin {
   static const _key = 'media_google_album_url_v1';
+  static const _filesKey = 'media_album_imported_files_v2';
   final _link = TextEditingController();
   final _scroll = ScrollController();
   final _images = <String>[];
@@ -29,9 +32,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
   @override
   void initState() {
     super.initState();
-    SharedPreferences.getInstance().then((prefs) {
-      if (mounted) setState(() => _link.text = prefs.getString(_key) ?? '');
-    });
+    _restore();
   }
 
   Uri? get _albumUri {
@@ -64,30 +65,108 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
     }
   }
 
-  Future<void> _importImages() async {
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_filesKey) ?? <String>[];
+    final existing = <String>[];
+    for (final path in saved) {
+      if (await File(path).exists()) existing.add(path);
+    }
+    if (!mounted) return;
+    setState(() {
+      _link.text = prefs.getString(_key) ?? '';
+      _images.addAll(existing);
+      _seen.addAll(existing);
+    });
+    if (existing.length != saved.length) {
+      await prefs.setStringList(_filesKey, existing);
+    }
+  }
+
+  Future<void> _addFiles(List<File> files) async {
     if (_picking) return;
     setState(() => _picking = true);
+    var added = 0;
+    var skipped = 0;
+    try {
+      final root = Directory('${(await getApplicationSupportDirectory()).path}/album_media');
+      await root.create(recursive: true);
+      final prefs = await SharedPreferences.getInstance();
+      for (final file in files) {
+        if (!await file.exists()) { skipped++; continue; }
+        final name = file.path.toLowerCase();
+        if (!RegExp(r'\\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$').hasMatch(name)) {
+          skipped++;
+          continue;
+        }
+        // Use a content digest to prevent duplicate imports from different paths.
+        final bytes = await file.readAsBytes();
+        final digest = base64Url.encode(utf8.encode(
+          '${bytes.length}:${_hashBytes(bytes)}')).replaceAll('=', '');
+        final ext = name.substring(name.lastIndexOf('.'));
+        final target = File('${root.path}/$digest$ext');
+        if (_seen.contains(target.path)) { skipped++; continue; }
+        if (!await target.exists()) await target.writeAsBytes(bytes, flush: true);
+        _seen.add(target.path);
+        _images.add(target.path);
+        added++;
+        // Persist each successful import, so a partial batch is not lost.
+        await prefs.setStringList(_filesKey, _images);
+        if (mounted && added % 25 == 0) {
+          setState(() => _message = 'Импортировано: $added. Пропущено: $skipped.');
+        }
+      }
+      if (mounted) setState(() => _message =
+        'Реально сохранено: $added. Пропущено: $skipped. Всего: ${_images.length}.');
+    } catch (error) {
+      if (mounted) setState(() => _message =
+        'Импорт прерван: $error. Уже добавленные файлы сохранены.');
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  // Lightweight deterministic fingerprint; equality is also checked by file size.
+  String _hashBytes(List<int> bytes) {
+    var hash = 0xcbf29ce484222325;
+    for (final byte in bytes) {
+      hash = ((hash ^ byte) * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+    }
+    return hash.toRadixString(16);
+  }
+
+  Future<void> _importImages() async {
+    if (_picking) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image, allowMultiple: true, withData: false);
       if (result == null) return;
-      var added = 0;
-      for (final file in result.files) {
-        final path = file.path;
-        if (path == null || !_seen.add(path)) continue;
-        if (!await File(path).exists()) {
-          _seen.remove(path);
-          continue;
-        }
-        _images.add(path);
-        added++;
-      }
-      if (mounted) setState(() => _message =
-          'Добавлено: $added. Всего в ленте: ${_images.length}. Порядок сохранён.');
+      await _addFiles(result.files.where((f) => f.path != null)
+          .map((f) => File(f.path!)).toList());
     } catch (error) {
-      if (mounted) setState(() => _message = 'Не удалось импортировать изображения: $error');
-    } finally {
+      if (mounted) setState(() => _message = 'Ошибка выбора файлов: $error');
+    }
+  }
+
+  Future<void> _importFolder() async {
+    if (_picking) return;
+    try {
+      final path = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Выбрать папку — импортировать все фото');
+      if (path == null) return;
+      setState(() => _picking = true);
+      final files = <File>[];
+      await for (final item in Directory(path).list(recursive: true, followLinks: false)) {
+        if (item is File && RegExp(r'\\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$',
+            caseSensitive: false).hasMatch(item.path)) files.add(item);
+      }
       if (mounted) setState(() => _picking = false);
+      await _addFiles(files);
+    } catch (error) {
+      if (mounted) setState(() {
+        _picking = false;
+        _message = 'Не удалось прочитать папку: $error';
+      });
     }
   }
 
@@ -122,9 +201,12 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
             FilledButton.icon(onPressed: _picking ? null : _importImages,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               label: Text(_picking ? 'Импорт...' : 'Добавить фото в ленту')),
+            FilledButton.icon(onPressed: _picking ? null : _importFolder,
+              icon: const Icon(Icons.select_all),
+              label: const Text('Выделить всё в папке и добавить')),
           ]),
           const SizedBox(height: 6),
-          const Text('Google Фото не предоставляет по публичной ссылке стабильный список прямых адресов всех снимков. Выбери фотографии через системный проводник: они появятся ниже без самопроизвольной перестановки. Это импорт, не автоматическая синхронизация.'),
+          const Text('Google Фото не предоставляет по публичной ссылке стабильный список прямых адресов всех снимков. Выбери файлы или всю папку: изображения копируются в хранилище All Hub и остаются после перезапуска. Это импорт, не автоматическая синхронизация.'),
           if (_message != null) Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(_message!, style: Theme.of(context).textTheme.bodySmall)),

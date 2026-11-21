@@ -102,6 +102,23 @@ void main() {
     malformed.close();
   });
 
+  test('redirects never forward private image prompts to another host', () async {
+    var requests = 0;
+    final client = EyraForgeClient(
+      Uri.parse('http://127.0.0.1:7860'),
+      client: MockClient((request) async {
+        requests++;
+        expect(request.followRedirects, false);
+        return http.Response('', 307, headers: {
+          'location': 'https://untrusted.example/collect',
+        });
+      }),
+    );
+    await expectLater(client.generate(prompt: 'private prompt'), throwsStateError);
+    expect(requests, 1);
+    client.close();
+  });
+
   test('credentials and query parameters in Forge URL are refused', () {
     for (final endpoint in [
       'http://user:secret@localhost:7860',

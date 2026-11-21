@@ -335,7 +335,9 @@ class ProjectLauncher {
   /// registered EXE has been moved or deleted.
   static bool matchesWindowsReceipt(String? expected, String actual) =>
       expected != null && expected.length == 64 &&
-      RegExp(r'^[a-f0-9]+
+      !RegExp(r'[^a-f0-9]').hasMatch(expected) && expected == actual;
+
+  static Future<String?> installedWindowsVersion(String id) async {
     if (!isValidProjectId(id)) return null;
     final prefs = await SharedPreferences.getInstance();
     final executable = prefs.getString('exe_$id');

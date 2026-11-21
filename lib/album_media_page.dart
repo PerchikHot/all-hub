@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -83,56 +83,63 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
     }
   }
 
-  Future<void> _addFiles(List<File> files) async {
+  Future<void> _addFiles(Iterable<File> files) async {
     if (_picking) return;
     setState(() => _picking = true);
     var added = 0;
     var skipped = 0;
+    var failed = 0;
     try {
       final root = Directory('${(await getApplicationSupportDirectory()).path}/album_media');
       await root.create(recursive: true);
       final prefs = await SharedPreferences.getInstance();
-      for (final file in files) {
-        if (!await file.exists()) { skipped++; continue; }
-        final name = file.path.toLowerCase();
-        if (!RegExp(r'\\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$').hasMatch(name)) {
-          skipped++;
-          continue;
-        }
-        // Use a content digest to prevent duplicate imports from different paths.
-        final bytes = await file.readAsBytes();
-        final digest = base64Url.encode(utf8.encode(
-          '${bytes.length}:${_hashBytes(bytes)}')).replaceAll('=', '');
-        final ext = name.substring(name.lastIndexOf('.'));
-        final target = File('${root.path}/$digest$ext');
-        if (_seen.contains(target.path)) { skipped++; continue; }
-        if (!await target.exists()) await target.writeAsBytes(bytes, flush: true);
-        _seen.add(target.path);
-        _images.add(target.path);
-        added++;
-        // Persist each successful import, so a partial batch is not lost.
+      Future<void> checkpoint() async {
         await prefs.setStringList(_filesKey, _images);
-        if (mounted && added % 25 == 0) {
-          setState(() => _message = 'Импортировано: $added. Пропущено: $skipped.');
+        if (mounted) setState(() => _message =
+            'Импортировано: $added · Пропущено: $skipped · Ошибок: $failed');
+      }
+      for (final file in files) {
+        try {
+          if (!await file.exists()) { skipped++; continue; }
+          final name = file.path.toLowerCase();
+          if (!RegExp(r'\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$').hasMatch(name)) {
+            skipped++;
+            continue;
+          }
+          final digest = (await sha256.bind(file.openRead()).first).toString();
+          final ext = name.substring(name.lastIndexOf('.'));
+          final target = File('${root.path}/$digest$ext');
+          if (_seen.contains(target.path)) { skipped++; continue; }
+          if (!await target.exists()) {
+            final temporary = File('${target.path}.partial');
+            try {
+              await file.openRead().pipe(temporary.openWrite());
+              await temporary.rename(target.path);
+            } finally {
+              if (await temporary.exists()) await temporary.delete();
+            }
+          }
+          _seen.add(target.path);
+          _images.add(target.path);
+          added++;
+          if (added % 50 == 0) await checkpoint();
+        } on FileSystemException {
+          failed++;
         }
       }
+      await checkpoint();
       if (mounted) setState(() => _message =
-        'Реально сохранено: $added. Пропущено: $skipped. Всего: ${_images.length}.');
+          'Сохранено: $added · Пропущено: $skipped · Ошибок: $failed · Всего: ${_images.length}');
     } catch (error) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_filesKey, _images);
+      } catch (_) {}
       if (mounted) setState(() => _message =
-        'Импорт прерван: $error. Уже добавленные файлы сохранены.');
+          'Импорт прерван: $error. Уже импортированные файлы сохранены.');
     } finally {
       if (mounted) setState(() => _picking = false);
     }
-  }
-
-  // Lightweight deterministic fingerprint; equality is also checked by file size.
-  String _hashBytes(List<int> bytes) {
-    var hash = 0xcbf29ce484222325;
-    for (final byte in bytes) {
-      hash = ((hash ^ byte) * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
-    }
-    return hash.toRadixString(16);
   }
 
   Future<void> _importImages() async {
@@ -163,8 +170,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
       setState(() => _picking = true);
       final files = <File>[];
       await for (final item in Directory(path).list(recursive: true, followLinks: false)) {
-        if (item is File && RegExp(r'\\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$',
-            caseSensitive: false).hasMatch(item.path)) files.add(item);
+        if (item is File) files.add(item);
       }
       if (mounted) setState(() => _picking = false);
       await _addFiles(files);

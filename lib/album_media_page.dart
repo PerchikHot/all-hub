@@ -85,7 +85,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
     }
   }
 
-  Future<void> _addFiles(Iterable<File> files) async {
+  Future<void> _addFiles(Stream<File> files) async {
     if (_picking) return;
     setState(() { _picking = true; _cancelImport = false; _processed = 0; });
     var added = 0;
@@ -100,7 +100,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
         if (mounted) setState(() => _message =
             'Импортировано: $added · Пропущено: $skipped · Ошибок: $failed');
       }
-      for (final file in files) {
+      await for (final file in files) {
         if (_cancelImport) break;
         _processed++;
         try {
@@ -153,7 +153,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
         type: FileType.image, allowMultiple: true, withData: false);
       if (result == null) return;
       await _addFiles(result.files.where((f) => f.path != null)
-          .map((f) => File(f.path!)).toList());
+          .map((f) => File(f.path!)).toList().asStream());
     } catch (error) {
       if (mounted) setState(() => _message = 'Ошибка выбора файлов: $error');
     }
@@ -174,8 +174,9 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
       // Directory.list is lazy; avoid collecting thousands of File objects.
       // The importer checkpoints every 50 items and supports cancellation.
       await _addFiles(Directory(path)
-          .listSync(recursive: true, followLinks: false)
-          .whereType<File>());
+          .list(recursive: true, followLinks: false)
+          .where((entity) => entity is File)
+          .cast<File>());
     } catch (error) {
       if (mounted) setState(() {
         _picking = false;

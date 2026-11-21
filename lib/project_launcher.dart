@@ -348,7 +348,7 @@ class ProjectLauncher {
     if (separator <= 0) return null;
     final version = receipt.substring(0, separator);
     final digest = receipt.substring(separator + 1);
-    if (version.isEmpty || version.contains('|')) return null;
+    if (comparePublishedVersions(version, version) == null) return null;
     return matchesWindowsReceipt(digest, actualDigest) ? version : null;
   }
 

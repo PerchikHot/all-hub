@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'eyra_file_inspector.dart';
+import 'eyra_duplicate_scan.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,6 +62,8 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
   String? diagnosticResult;
   bool inspectingFile = false;
   String? fileResult;
+  bool scanningDuplicates = false;
+  String? duplicateResult;
   @override
   void initState() { super.initState(); refresh(); }
 
@@ -88,7 +91,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
       }
       if (mounted && !enabled) setState(() {
         if (id == 'diagnostics') diagnosticResult = null;
-        if (id == 'files') fileResult = null;
+        if (id == 'files') { fileResult = null; duplicateResult = null; }
       });
       await refresh();
     } catch (e) {
@@ -118,7 +121,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
       for (final id in EyraAccessPolicy.capabilities.keys) {
         if (await EyraAccessPolicy.enabled(id)) await EyraAccessPolicy.set(id, false);
       }
-      if (mounted) setState(() { diagnosticResult = null; fileResult = null; });
+      if (mounted) setState(() { diagnosticResult = null; fileResult = null; duplicateResult = null; });
       await refresh();
     } finally {
       if (mounted) setState(() => saving = false);
@@ -205,6 +208,60 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
     }
   }
 
+
+  /// Only user-selected files are read; nothing is deleted or uploaded.
+  Future<void> findSelectedDuplicates() async {
+    if (saving || scanningDuplicates ||
+        !await EyraAccessPolicy.enabled('files')) return;
+    if (!mounted) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.any, allowMultiple: true, withData: false);
+    if (picked == null || !mounted) return;
+    if (picked.files.length < 2 || picked.files.length > EyraDuplicateScan.maxFiles ||
+        picked.files.any((file) => file.path == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Выбери от 2 до 30 доступных файлов')));
+      return;
+    }
+    final confirmed = await showDialog<bool>(context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Найти одинаковые файлы?'),
+        content: Text('Будут прочитаны только выбранные ${picked.files.length} файлов '
+          '(до 256 МиБ каждый) и вычислены SHA-256. Ничего не удаляется, '
+          'не отправляется в сеть и не сохраняется.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Проверить')),
+        ],
+      ));
+    if (confirmed != true || !mounted ||
+        !await EyraAccessPolicy.enabled('files')) return;
+    setState(() { scanningDuplicates = true; duplicateResult = null; });
+    try {
+      final matches = await EyraDuplicateScan.scan(
+        picked.files.map((file) => File(file.path!)).toList(),
+        stillAllowed: () => EyraAccessPolicy.enabled('files'));
+      if (!await EyraAccessPolicy.enabled('files')) return;
+      final result = matches.isEmpty
+        ? 'Совпадающих файлов среди выбранных нет.'
+        : matches.map((group) =>
+            '${group.names.length} совпадения (${group.bytes} байт): '
+            '${group.names.join(", ")}').join('\\n');
+      await EyraAccessPolicy.appendLog(
+        'Ручной поиск дубликатов среди ${picked.files.length} файлов; '
+        'групп: ${matches.length} (без сохранения путей)');
+      if (mounted) setState(() => duplicateResult = result);
+      await refresh();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Поиск дубликатов не выполнен: $e')));
+    } finally {
+      if (mounted) setState(() => scanningDuplicates = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const explanations = <String, String>{
@@ -273,6 +330,23 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
                 icon: const Icon(Icons.file_present_outlined),
                 label: Text(inspectingFile ? 'Проверяем…' : 'Выбрать и проверить файл'),
               ),
+              const SizedBox(height: 12),
+              const Text('Поиск дубликатов: выбери 2–30 файлов. '
+                'Сравнивается содержимое, не только имена. Удаления нет.'),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('eyra-find-duplicates'),
+                onPressed: saving || scanningDuplicates ||
+                    !(choices['files'] ?? false) ? null : findSelectedDuplicates,
+                icon: const Icon(Icons.content_copy_outlined),
+                label: Text(scanningDuplicates ? 'Сравниваем…' : 'Найти дубликаты'),
+              ),
+              if (duplicateResult != null) ...[
+                const SizedBox(height: 8),
+                SelectableText(duplicateResult!),
+                TextButton(onPressed: () => setState(() => duplicateResult = null),
+                  child: const Text('Скрыть результат')),
+              ],
               if (fileResult != null) ...[
                 const SizedBox(height: 8),
                 SelectableText(fileResult!),

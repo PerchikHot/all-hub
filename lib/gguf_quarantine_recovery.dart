@@ -9,7 +9,12 @@ import 'dart:io';
 Future<int> recoverQuarantinedGguf(
     Directory managedDirectory, List<String> registeredPaths) async {
   if (!await managedDirectory.exists()) return 0;
-  final registered = registeredPaths.map((p) => File(p).absolute.path).toSet();
+  // Windows paths are case-insensitive; temp-directory paths may differ in case.
+  String pathKey(String path) {
+    final absolute = File(path).absolute.path;
+    return Platform.isWindows ? absolute.toLowerCase() : absolute;
+  }
+  final registered = registeredPaths.map(pathKey).toSet();
   var restored = 0;
   await for (final entity in managedDirectory.list(followLinks: false)) {
     if (entity is! File) continue;
@@ -18,7 +23,7 @@ Future<int> recoverQuarantinedGguf(
     if (marker == null) continue;
     final originalPath = path.substring(0, marker.start);
     if (!originalPath.toLowerCase().endsWith('.gguf')) continue;
-    if (!registered.contains(originalPath)) continue;
+    if (!registered.contains(pathKey(originalPath))) continue;
     if (await File(originalPath).exists()) continue;
     await entity.rename(originalPath);
     restored++;

@@ -279,6 +279,9 @@ class ProjectLauncher {
 
   /// Serialize installs so repeated taps cannot race on staging/backup files.
   static String? _installationInProgress;
+  static DateTime? _installationStartedAt;
+  static final ValueNotifier<String?> installingProject = ValueNotifier<String?>(null);
+  static String? get installationInProgress => _installationInProgress;
 
   static Future<T> runInstallExclusive<T>(
       String projectId, Future<T> Function() operation) async {
@@ -286,13 +289,20 @@ class ProjectLauncher {
       throw ArgumentError('Некорректный идентификатор проекта');
     }
     if (_installationInProgress != null) {
-      throw StateError('Другая установка уже выполняется: $_installationInProgress');
+      final elapsed = _installationStartedAt == null ? '' :
+          ' (${DateTime.now().difference(_installationStartedAt!).inSeconds} с)';
+      throw StateError('All Hub уже обрабатывает проект "$_installationInProgress"$elapsed. '
+          'Дождись завершения или перезапусти лаунчер, если операция зависла.');
     }
     _installationInProgress = projectId;
+    _installationStartedAt = DateTime.now();
+    installingProject.value = projectId;
     try {
       return await operation();
     } finally {
       _installationInProgress = null;
+      _installationStartedAt = null;
+      installingProject.value = null;
     }
   }
 

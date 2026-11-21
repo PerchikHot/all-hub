@@ -8,6 +8,38 @@ import 'package:all_hub/external_repositories.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('install lock rejects overlapping projects and releases after success', () async {
+    final entered = Completer<void>();
+    final finish = Completer<void>();
+    final first = ProjectLauncher.runInstallExclusive('all-hub', () async {
+      entered.complete();
+      await finish.future;
+      return 42;
+    });
+    await entered.future;
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('kopilka', () async => 0),
+      throwsA(isA<StateError>()),
+    );
+    finish.complete();
+    expect(await first, 42);
+    expect(await ProjectLauncher.runInstallExclusive('kopilka', () async => 7), 7);
+  });
+
+  test('install lock releases after failure and rejects invalid project ids', () async {
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('all-hub', () async {
+        throw const FormatException('invalid APK');
+      }),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await ProjectLauncher.runInstallExclusive('all-hub', () async => true), isTrue);
+    await expectLater(
+      ProjectLauncher.runInstallExclusive('../other', () async => true),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('Android APK preflight rejects truncated ZIP and accepts complete tail', () async {
     final dir = await Directory.systemTemp.createTemp('allhub-apk-preflight-');
     try {

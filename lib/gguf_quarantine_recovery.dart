@@ -12,7 +12,9 @@ Future<int> recoverQuarantinedGguf(
   // Windows paths are case-insensitive; temp-directory paths may differ in case.
   String pathKey(String path) {
     final absolute = File(path).absolute.path;
-    return Platform.isWindows ? absolute.toLowerCase() : absolute;
+    return Platform.isWindows
+        ? absolute.replaceAll('\\', '/').toLowerCase()
+        : absolute;
   }
   final registered = registeredPaths.map(pathKey).toSet();
   var restored = 0;

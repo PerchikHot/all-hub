@@ -322,8 +322,11 @@ class ProjectLauncher {
         throw StateError('Не найден установленный Windows EXE');
       }
       final digest = (await sha256.bind(File(executable).openRead()).first).toString();
-      if (!await prefs.setString('installed_sha256_$id', digest)) {
-        throw StateError('Не удалось сохранить контрольную сумму EXE');
+      // A single receipt avoids a crash between writing the digest and version.
+      // Keep legacy keys only for compatibility with older installations.
+      final receipt = '$version|$digest';
+      if (!await prefs.setString('installed_receipt_$id', receipt)) {
+        throw StateError('Не удалось сохранить подтверждение установки');
       }
     }
     if (!await prefs.setString('installed_version_$id', version)) {
@@ -357,11 +360,18 @@ class ProjectLauncher {
       } finally {
         await reader.close();
       }
-      final expectedDigest = prefs.getString('installed_sha256_$id');
+      final receipt = prefs.getString('installed_receipt_$id');
+      final separator = receipt?.lastIndexOf('|') ?? -1;
+      final receiptVersion = separator > 0 ? receipt!.substring(0, separator) : null;
+      final expectedDigest = separator > 0
+          ? receipt!.substring(separator + 1)
+          : prefs.getString('installed_sha256_$id');
       if (expectedDigest == null) return null;
       final actualDigest = (await sha256.bind(file.openRead()).first).toString();
       if (!matchesWindowsReceipt(expectedDigest, actualDigest)) return null;
-      return version;
+      // The receipt version is committed with its digest; the old separate
+      // version key may be stale after a process crash.
+      return receiptVersion ?? version;
     } on FileSystemException {
       return null;
     }
@@ -608,6 +618,7 @@ class ProjectLauncher {
       final previousExe = prefs.getString('exe_$id');
       final previousVersion = prefs.getString('installed_version_$id');
       final previousDigest = prefs.getString('installed_sha256_$id');
+      final previousReceipt = prefs.getString('installed_receipt_$id');
       var installed = false;
       try {
         final path = Uri.parse(url).path.toLowerCase();
@@ -641,6 +652,11 @@ class ProjectLauncher {
             await prefs.remove('installed_sha256_$id');
           } else {
             await prefs.setString('installed_sha256_$id', previousDigest);
+          }
+          if (previousReceipt == null) {
+            await prefs.remove('installed_receipt_$id');
+          } else {
+            await prefs.setString('installed_receipt_$id', previousReceipt);
           }
         }
         rethrow;

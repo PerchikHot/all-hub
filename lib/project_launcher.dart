@@ -635,7 +635,9 @@ class ProjectLauncher {
     if (!isValidProjectId(id) || id == 'all-hub') {
       throw ArgumentError('Самообновление All Hub требует отдельного установщика');
     }
-    await runInstallExclusive(id, () async {
+    // The underlying installer acquires the exclusive lock itself.
+    // Wrapping it here would always reject our own nested installation.
+    {
       final prefs = await SharedPreferences.getInstance();
       final previousExe = prefs.getString('exe_$id');
       final previousVersion = prefs.getString('installed_version_$id');
@@ -683,7 +685,7 @@ class ProjectLauncher {
         }
         rethrow;
       }
-    });
+    }
   }
 
   /// Reconcile a pending handoff on startup. The new launcher confirms the
@@ -765,7 +767,8 @@ class ProjectLauncher {
     String url, {String? version, String? sha256Digest}
   ) async {
     if (!Platform.isWindows) throw UnsupportedError('Windows only');
-    await runInstallExclusive('all-hub', () async {
+    // installWindowsZip owns the install lock; do not nest the same lock.
+    {
       final prefs = await SharedPreferences.getInstance();
       final previousExe = prefs.getString('exe_all-hub');
       final previousVersion = prefs.getString('installed_version_all-hub');
@@ -1034,7 +1037,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
         }
         rethrow;
       }
-    });
+    }
     // A successful handoff MUST terminate the old launcher, otherwise the
     // PowerShell helper waits forever and the user sees no update. Only exit
     // after staging, integrity checks, receipt persistence and detached helper

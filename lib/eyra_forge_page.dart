@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'eyra_forge_client.dart';
+import 'eyra_forge_privacy.dart';
 
 /// Manual-only Forge workflow; no background jobs or automatic file writes.
 class EyraForgePage extends StatefulWidget {
@@ -22,6 +23,7 @@ class _EyraForgePageState extends State<EyraForgePage> {
   List<String> models = [];
   String? selectedCheckpoint;
   String? checkedEndpoint;
+  String? consentedRemoteEndpoint;
   Uint8List? image;
   Uint8List? sourceImage;
   double strength = 0.5;
@@ -61,12 +63,48 @@ class _EyraForgePageState extends State<EyraForgePage> {
     }
   }
 
+  /// Remote calls need explicit consent, scoped to endpoint and this session.
+  Future<bool> confirmRemoteForge(String target, {required bool generate}) async {
+    if (!forgeRequiresRemoteConsent(target)) return true;
+    if (consentedRemoteEndpoint == target) return true;
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Подключение к удалённому Forge'),
+        content: Text(generate
+          ? 'Адрес: $target\n\nОписание и выбранное фото при редактировании будут отправлены на этот сервер. Разрешение действует только в этом сеансе для данного адреса.'
+          : 'Адрес: $target\n\nПриложение запросит список моделей с этого сервера. Разрешение действует только в этом сеансе для данного адреса.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Отмена')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Разрешить подключение')),
+        ],
+      ),
+    );
+    if (!mounted || allowed != true) return false;
+    consentedRemoteEndpoint = target;
+    return true;
+  }
+
   Future<void> run({required bool generate}) async {
     if (busy) return;
-    setState(() { busy = true; status = 'Подключаемся…'; });
+    setState(() { busy = true; status = 'Проверяем подключение…'; });
     EyraForgeClient? client;
     try {
-      client = EyraForgeClient(Uri.parse(endpoint.text.trim()));
+      final target = endpoint.text.trim();
+      final parsed = Uri.parse(target);
+      if (!['http', 'https'].contains(parsed.scheme) || parsed.host.isEmpty ||
+          parsed.userInfo.isNotEmpty || parsed.query.isNotEmpty ||
+          parsed.fragment.isNotEmpty) {
+        throw const FormatException('Укажите корректный адрес Forge http(s)');
+      }
+      if (!await confirmRemoteForge(target, generate: generate)) {
+        if (mounted) setState(() => status = 'Подключение отменено. Данные не отправлены.');
+        return;
+      }
+      if (!mounted) return;
+      client = EyraForgeClient(parsed);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('eyra_forge_endpoint', endpoint.text.trim());
       if (generate) {

@@ -348,7 +348,11 @@ class ProjectLauncher {
     if (separator <= 0) return null;
     final version = receipt.substring(0, separator);
     final digest = receipt.substring(separator + 1);
-    if (!RegExp(r'^\\d+\\.\\d+\\.\\d+(?:\\+\\d+)?
+    if (version.isEmpty || version.contains('|')) return null;
+    return matchesWindowsReceipt(digest, actualDigest) ? version : null;
+  }
+
+  static Future<String?> installedWindowsVersion(String id) async {
     if (!isValidProjectId(id)) return null;
     final prefs = await SharedPreferences.getInstance();
     final executable = prefs.getString('exe_$id');

@@ -22,9 +22,32 @@ class EyraForgeClient {
     return endpoint.replace(path: path, query: null, fragment: null);
   }
 
+  // Do not forward private prompts or selected photos through HTTP redirects.
+  Future<http.Response> _request(String path, {Map<String, Object?>? payload}) async {
+    final request = http.Request(payload == null ? 'GET' : 'POST', url(path))
+      ..followRedirects = false;
+    if (payload != null) {
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode(payload);
+    }
+    final streamed = await _client.send(request).timeout(
+      payload == null ? const Duration(seconds: 12) : const Duration(minutes: 8));
+    if (streamed.statusCode >= 300 && streamed.statusCode < 400) {
+      throw StateError('Forge redirect HTTP ${streamed.statusCode} blocked');
+    }
+    final bytes = <int>[];
+    await for (final chunk in streamed.stream) {
+      bytes.addAll(chunk);
+      if (bytes.length > 24 * 1024 * 1024) {
+        throw const FormatException('Ответ Forge превышает 24 МиБ');
+      }
+    }
+    return http.Response.bytes(bytes, streamed.statusCode,
+      headers: streamed.headers, request: request);
+  }
+
   Future<List<String>> models() async {
-    final response = await _client.get(url('/sdapi/v1/sd-models'))
-        .timeout(const Duration(seconds: 12));
+    final response = await _request('/sdapi/v1/sd-models');
     if (response.statusCode != 200) {
       throw StateError('Forge: HTTP ${response.statusCode}');
     }
@@ -44,16 +67,13 @@ class EyraForgeClient {
   }) async {
     _validateParameters(prompt, negativePrompt, width, height, steps);
     _validateCheckpoint(checkpoint);
-    final response = await _client.post(url('/sdapi/v1/txt2img'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
+    final response = await _request('/sdapi/v1/txt2img', payload: {
         'prompt': prompt.trim(),
         'negative_prompt': negativePrompt,
         'width': width, 'height': height, 'steps': steps,
         'batch_size': 1, 'n_iter': 1, 'save_images': false,
         if (checkpoint != null) 'override_settings': {'sd_model_checkpoint': checkpoint},
-      }),
-    ).timeout(const Duration(minutes: 8));
+      });
     return _decodeImageResponse(response);
   }
 
@@ -78,17 +98,14 @@ class EyraForgeClient {
     }
     _validateParameters(prompt, negativePrompt, width, height, steps);
     _validateCheckpoint(checkpoint);
-    final response = await _client.post(url('/sdapi/v1/img2img'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
+    final response = await _request('/sdapi/v1/img2img', payload: {
         'init_images': [base64Encode(source)],
         'prompt': prompt.trim(), 'negative_prompt': negativePrompt,
         'width': width, 'height': height, 'steps': steps,
         'denoising_strength': denoisingStrength,
         'batch_size': 1, 'n_iter': 1, 'save_images': false,
         if (checkpoint != null) 'override_settings': {'sd_model_checkpoint': checkpoint},
-      }),
-    ).timeout(const Duration(minutes: 8));
+      });
     return _decodeImageResponse(response);
   }
 

@@ -145,7 +145,7 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
               child: Image.file(File(_images[index]),
                 fit: BoxFit.contain,
                 gaplessPlayback: true,
-                errorBuilder: (_, _, _) => const Center(
+                errorBuilder: (context, error, stackTrace) => const Center(
                   child: Icon(Icons.broken_image_outlined))),
             ),
           )),

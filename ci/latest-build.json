@@ -1,43 +1,30 @@
 {
-  "run_id": 44907007517,
-  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/44907007517",
-  "conclusion": "success",
-  "head_sha": "07246e98e732252543c31c1e91386ac32e44ab10",
+  "run_id": 44908361785,
+  "run_url": "https://github.com/PerchikHot/all-hub/actions/runs/44908361785",
+  "conclusion": "cancelled",
+  "head_sha": "154e8c53f8939048d02780f4f3aad3a671bc5564",
   "jobs": [
-    {
-      "name": "android",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44907007517/job/136854661235",
-      "id": 136854661235
-    },
     {
       "name": "windows",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44907007517/job/136854661448",
-      "id": 136854661448
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44908361785/job/136858687711",
+      "id": 136858687711
+    },
+    {
+      "name": "android",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44908361785/job/136858687810",
+      "id": 136858687810
     },
     {
       "name": "Publish verified Android and Windows pair",
       "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44907007517/job/136856569342",
-      "id": 136856569342
+      "conclusion": "cancelled",
+      "html_url": "https://github.com/PerchikHot/all-hub/actions/runs/44908361785/job/136858692511",
+      "id": 136858692511
     }
   ],
-  "artifacts": [
-    {
-      "name": "AllHub-Android-release",
-      "size_in_bytes": 33020571,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/14708905582/zip"
-    },
-    {
-      "name": "AllHub-Windows",
-      "size_in_bytes": 13991267,
-      "expired": false,
-      "archive_download_url": "https://api.github.com/repos/PerchikHot/all-hub/actions/artifacts/14708416147/zip"
-    }
-  ]
+  "artifacts": []
 }

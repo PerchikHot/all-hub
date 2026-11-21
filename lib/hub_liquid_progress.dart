@@ -16,13 +16,41 @@ class HubLiquidProgress extends StatefulWidget {
 }
 
 class _HubLiquidProgressState extends State<HubLiquidProgress>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
+  late final AnimationController _splash = AnimationController(
+    vsync: this, duration: const Duration(milliseconds: 850),
+  );
+  double? _previousProgress;
+
   late final AnimationController _flow = AnimationController(
     vsync: this, duration: const Duration(milliseconds: 1700),
   )..repeat();
 
   @override
+  void initState() {
+    super.initState();
+    _previousProgress = _safeProgress(widget.value);
+  }
+
+  static double? _safeProgress(double? value) =>
+      value != null && value.isFinite ? value.clamp(0.0, 1.0).toDouble() : null;
+
+  @override
+  void didUpdateWidget(covariant HubLiquidProgress oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = _safeProgress(widget.value);
+    if (next != null && next >= 1 &&
+        (_previousProgress == null || _previousProgress! < 1)) {
+      _splash.forward(from: 0);
+    } else if (next == null || next < 1) {
+      _splash.reset();
+    }
+    _previousProgress = next;
+  }
+
+  @override
   void dispose() {
+    _splash.dispose();
     _flow.dispose();
     super.dispose();
   }
@@ -30,8 +58,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
   @override
   Widget build(BuildContext context) {
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    final safeValue = widget.value != null && widget.value!.isFinite
-        ? widget.value!.clamp(0.0, 1.0).toDouble() : null;
+    final safeValue = _safeProgress(widget.value);
     return Semantics(
       label: 'Прогресс загрузки',
       value: safeValue == null ? 'Выполняется'
@@ -42,7 +69,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
         child: TickerMode(
           enabled: !reducedMotion,
           child: AnimatedBuilder(
-          animation: _flow,
+          animation: Listenable.merge([_flow, _splash]),
           builder: (context, _) {
             return SizedBox(
               height: math.max(widget.height, 12),
@@ -51,6 +78,7 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
                 phase: reducedMotion ? 0 : _flow.value,
                 progress: safeValue,
                 style: widget.style,
+                splash: reducedMotion ? 1 : _splash.value,
               )),
             );
           },
@@ -62,7 +90,8 @@ class _HubLiquidProgressState extends State<HubLiquidProgress>
 }
 
 class _LiquidPainter extends CustomPainter {
-  const _LiquidPainter({required this.phase, required this.progress, required this.style});
+  const _LiquidPainter({required this.phase, required this.progress, required this.style, required this.splash});
+  final double splash;
   final double phase;
   final double? progress;
   final HubLiquidStyle style;
@@ -353,11 +382,51 @@ class _LiquidPainter extends CustomPainter {
           ..strokeWidth = math.max(1, h * .1));
     }
     canvas.restore();
+
+    // Small surface spills live outside the glass clip but inside the
+    // widget's reserved vertical gutter. Never change the progress edge.
+    if (bounded > .08 && bounded < 1) {
+      for (var i = 0; i < 4; i++) {
+        final t = (i + .65) / 5;
+        final x = math.min(fill - h * .16, math.max(h * .16, fill * t));
+        final sway = math.sin(phase * math.pi * 2 + i * 2.3);
+        final length = h * (.12 + .09 * (1 + sway) / 2);
+        final y = i.isEven ? -h * .04 : h * .96;
+        final drop = Path()
+          ..moveTo(x - h * .075, y)
+          ..quadraticBezierTo(x - h * .10, y + (i.isEven ? -length : length) * .55,
+              x, y + (i.isEven ? -length : length))
+          ..quadraticBezierTo(x + h * .10, y + (i.isEven ? -length : length) * .55,
+              x + h * .075, y)
+          ..close();
+        canvas.drawPath(drop, Paint()..color = const Color(0xCFF5FAFF));
+      }
+    }
+
+    // One-shot completion splash, fired only on transition to 100%.
+    if (bounded >= 1 && splash > 0 && splash < 1) {
+      final fade = (1 - splash) * (1 - splash);
+      final paint = Paint()
+        ..color = Color.fromRGBO(239, 249, 255, fade.clamp(0.0, 1.0));
+      final origin = Offset(w * .94, h * .5);
+      for (var i = 0; i < 9; i++) {
+        final angle = -math.pi + i * math.pi / 8;
+        final distance = h * (.15 + 1.1 * Curves.easeOutCubic.transform(splash));
+        final center = origin + Offset(math.cos(angle), math.sin(angle)) * distance;
+        canvas.drawCircle(center, h * (.035 + (i % 3) * .018) * (1 - splash * .6), paint);
+      }
+      final ring = Paint()
+        ..color = Color.fromRGBO(185, 229, 255, fade.clamp(0.0, 1.0))
+        ..strokeWidth = math.max(.8, h * .045) * (1 - splash)
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(origin, h * (.25 + splash * .95), ring);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _LiquidPainter old) =>
-      phase != old.phase || progress != old.progress || style != old.style;
+      phase != old.phase || progress != old.progress ||
+      style != old.style || splash != old.splash;
 }
 
  

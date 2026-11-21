@@ -563,14 +563,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   Navigator.pop(sheetContext);
                                   try {
                                     if (!await confirmExternalInstall(project)) return;
-                                    await ProjectLauncher.runInstallExclusive(
-                                      project.id,
-                                      () => ProjectLauncher.installAndroidApk(
+                                    await ProjectLauncher.installAndroidApk(
                                         data.downloadUrl!,
                                         projectId: project.id,
                                         externalRepo: project.id.startsWith('external-')
                                           ? project.repo : null,
-                                        sha256Digest: data.sha256Digest));
+                                        sha256Digest: data.sha256Digest);
                                     if (mounted) setState(() {});
                                   } catch (error) {
                                     if (mounted) {
@@ -1117,11 +1115,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 throw StateError('Понижение версии заблокировано');
                               }
                               if (!await confirmExternalInstall(project)) return;
-                              await ProjectLauncher.runInstallExclusive(project.id,
-                                () => ProjectLauncher.installAndroidApk(i.downloadUrl!,
+                              await ProjectLauncher.installAndroidApk(i.downloadUrl!,
                                   projectId: project.id,
                                   externalRepo: project.id.startsWith('external-') ? project.repo : null,
-                                  sha256Digest: i.sha256Digest));
+                                  sha256Digest: i.sha256Digest);
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(

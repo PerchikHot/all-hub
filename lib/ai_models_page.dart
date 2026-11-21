@@ -12,6 +12,7 @@ import 'local_ai_chat.dart';
 import 'codex_page.dart';
 import 'gguf_header.dart';
 import 'gguf_import_integrity.dart';
+import 'gguf_quarantine_recovery.dart';
 import 'native_llama_runtime.dart';
 
 class AiModelsPage extends StatefulWidget {
@@ -38,8 +39,22 @@ class _AiModelsPageState extends State<AiModelsPage> {
   void initState() { super.initState(); load(); }
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedPaths = prefs.getStringList('ai_model_paths') ?? <String>[];
+    // Recover an interrupted removal before exposing the model list.
+    // A crash between quarantine rename and preference commit must not
+    // silently lose a multi-gigabyte model.
+    try {
+      final support = await getApplicationSupportDirectory();
+      await recoverQuarantinedGguf(
+        Directory('${support.path}/models'), savedPaths);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось восстановить GGUF: $e')));
+      }
+    }
     if (mounted) { setState(() {
-      paths = prefs.getStringList('ai_model_paths') ?? [];
+      paths = savedPaths;
       final saved = prefs.getString('ai_selected_gguf');
       selectedGguf = paths.contains(saved) ? saved : null;
       busy = false;

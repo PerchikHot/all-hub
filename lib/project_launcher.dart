@@ -1069,9 +1069,10 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
             : isTrustedExternalDownload(projectId, externalRepo, url, 'apk'))) {
       throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
     }
-    activeDownloadProject.value = projectId;
-    downloadProgress.value = null;
-    final client = http.Client();
+    return runInstallExclusive(projectId, () async {
+      activeDownloadProject.value = projectId;
+      downloadProgress.value = null;
+      final client = http.Client();
     try {
       final cache = await getTemporaryDirectory();
       final cacheName = externalRepo == null
@@ -1103,6 +1104,7 @@ if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
       downloadProgress.value = null;
       activeDownloadProject.value = null;
     }
+    });
   }
 
   static void requireWindowsInstallRegistered(bool saved) {

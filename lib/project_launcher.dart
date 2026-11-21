@@ -354,8 +354,12 @@ class ProjectLauncher {
         await reader.close();
       }
       final expectedDigest = prefs.getString('installed_sha256_$id');
-      // Legacy receipts without a digest cannot prove which release is on disk.
-      if (expectedDigest == null || !RegExp(r'^[0-9a-f]{64}
+      if (expectedDigest == null || expectedDigest.length != 64 ||
+          !RegExp(r'^[a-f0-9]+$').hasMatch(expectedDigest)) return null;
+      final actualDigest = (await sha256.bind(file.openRead()).first).toString();
+      if (actualDigest != expectedDigest) return null;
+      return version;
+    } on FileSystemException {
       return null;
     }
   }

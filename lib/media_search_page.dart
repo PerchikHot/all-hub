@@ -1,3 +1,4 @@
+import 'album_media_page.dart';
 import 'media_characters.dart';
 import 'multi_engine_search_page.dart';
 import 'media_gallery_page.dart';
@@ -18,6 +19,7 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
   String media = 'images';
   bool adultConfirmed = false;
   bool galleryMode = true;
+  bool albumMode = false;
   String character = '';
 
 
@@ -47,7 +49,16 @@ class _MediaSearchPageState extends State<MediaSearchPage> {
       selected: {galleryMode},
       onSelectionChanged: (v) => setState(() => galleryMode = v.first),
     )),
-    Expanded(child: galleryMode ? (adultConfirmed ? const MediaGalleryPage() : Center(child: Padding(
+    if (galleryMode) Padding(padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: SegmentedButton<bool>(
+        segments: const [
+          ButtonSegment(value: false, icon: Icon(Icons.public), label: Text('Поиск')),
+          ButtonSegment(value: true, icon: Icon(Icons.photo_album_outlined), label: Text('Google Фото')),
+        ],
+        selected: {albumMode},
+        onSelectionChanged: (v) => setState(() => albumMode = v.first),
+      )),
+    Expanded(child: galleryMode ? (albumMode ? const AlbumMediaPage() : adultConfirmed ? const MediaGalleryPage() : Center(child: Padding(
       padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.visibility_outlined, size: 44),
         const SizedBox(height: 16),

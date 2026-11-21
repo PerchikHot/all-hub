@@ -166,7 +166,7 @@ class _LiquidPainter extends CustomPainter {
     // The actual downloaded fraction determines the fill boundary.
     // Surface motion, viscosity and droplets are purely decorative.
     final body = Path()..moveTo(start, h);
-    body.lineTo(start, bounded == null ? h * .40 : h * .20);
+    body.lineTo(start, h * .20);
     const steps = 96;
     for (var i = 0; i <= steps; i++) {
       final x = start + fill * i / steps;
@@ -175,7 +175,7 @@ class _LiquidPainter extends CustomPainter {
           math.sin(x * .065 - phase * math.pi * 2)
           + math.sin(x * .13 + phase * math.pi * 4) * h * .048
           + math.sin(x * .23 - phase * math.pi * 6) * h * .024;
-      body.lineTo(x, (bounded == null ? h * .40 : h * .20) + ripple);
+      body.lineTo(x, (h * .20) + ripple);
     }
     body..lineTo(end, h)..close();
     canvas.drawPath(body, Paint()
@@ -353,7 +353,7 @@ class _LiquidPainter extends CustomPainter {
     canvas.restore();
 
     // A rounded, slightly irregular meniscus and tiny suspended droplets.
-    if (fill > h * .5 && (bounded == null || bounded < 1)) {
+    if (fill > h * .5 && (bounded < 1)) {
       final tip = end.clamp(0.0, w).toDouble();
       canvas.save();
       canvas.clipRect(Rect.fromLTWH(start, 0, fill, h));

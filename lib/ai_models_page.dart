@@ -168,32 +168,71 @@ class _AiModelsPageState extends State<AiModelsPage> {
     }
   }
   Future<void> remove(String path) async {
+    if (importing || testingNativeModel || !paths.contains(path)) return;
     final support = await getApplicationSupportDirectory();
     final managedDir = Directory('${support.path}/models').absolute.path;
     final file = File(path);
-    if (file.absolute.path.startsWith('$managedDir${Platform.pathSeparator}') && await file.exists()) {
-      try {
-        await file.delete();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Не удалось удалить файл модели: $e')));
-        }
-        return;
-      }
-    }
-    final next = paths.where((p) => p != path).toList();
+    final managed = file.absolute.path.startsWith(
+        '$managedDir${Platform.pathSeparator}');
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('ai_model_paths', next);
-    if (selectedGguf == path) {
-      await prefs.remove('ai_selected_gguf');
-    }
-    if (mounted) {
-      setState(() {
-        paths = next;
-        inspections.remove(path);
-        if (selectedGguf == path) selectedGguf = null;
-      });
+    final next = paths.where((p) => p != path).toList();
+    final previousSelection = prefs.getString('ai_selected_gguf');
+    File? quarantined;
+    try {
+      // Move an owned model aside first. If preferences cannot be saved,
+      // restore it instead of leaving a broken model entry.
+      if (managed && await file.exists()) {
+        quarantined = await file.rename(
+            '$path.deleting-${DateTime.now().microsecondsSinceEpoch}');
+      }
+      if (!await prefs.setStringList('ai_model_paths', next)) {
+        throw const FileSystemException('Не удалось сохранить список моделей');
+      }
+      if (selectedGguf == path &&
+          !await prefs.remove('ai_selected_gguf')) {
+        throw const FileSystemException('Не удалось очистить выбор модели');
+      }
+      if (mounted) {
+        setState(() {
+          paths = next;
+          inspections.remove(path);
+          if (selectedGguf == path) selectedGguf = null;
+        });
+      }
+      // The model is no longer referenced. Failure to delete the quarantine
+      // must not resurrect the model or delete the original source file.
+      if (quarantined != null) {
+        try {
+          await quarantined.delete();
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Модель убрана из списка, но не удалось освободить место: $e')));
+          }
+        }
+      }
+    } catch (e) {
+      // Roll back both preference keys and the owned file on failure.
+      try {
+        await prefs.setStringList('ai_model_paths', paths);
+        if (previousSelection == null) {
+          await prefs.remove('ai_selected_gguf');
+        } else {
+          await prefs.setString('ai_selected_gguf', previousSelection);
+        }
+        if (quarantined != null && await quarantined.exists()) {
+          await quarantined.rename(path);
+        }
+      } catch (rollbackError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Ошибка отката удаления GGUF: $rollbackError')));
+        }
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Не удалось убрать GGUF: $e')));
+      }
     }
   }
   Future<void> confirmRemove(String path) async {

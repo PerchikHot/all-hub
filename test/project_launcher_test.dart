@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -94,6 +95,8 @@ void main() {
       bytes[0x94] = 0xf0; // optional header length
       bytes[0x98] = 0x0b; bytes[0x99] = 0x02; // PE32+
       await exe.writeAsBytes(bytes, flush: true);
+      await prefs.setString('installed_sha256_$projectId',
+          (await sha256.bind(exe.openRead()).first).toString());
       expect(await ProjectLauncher.installedWindowsVersion(projectId), '1.2.3');
 
       await exe.delete();
@@ -209,6 +212,8 @@ void main() {
       pe[0x94] = 0xf0; // optional header size
       pe[0x98] = 0x0b; pe[0x99] = 0x02; // PE32+
       await executable.writeAsBytes(pe, flush: true);
+      await prefs.setString('installed_sha256_shadow-rp',
+          (await sha256.bind(executable.openRead()).first).toString());
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), '0.18.6');
       await executable.delete();
       expect(await ProjectLauncher.installedWindowsVersion('shadow-rp'), isNull);

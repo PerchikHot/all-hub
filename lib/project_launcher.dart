@@ -333,6 +333,2067 @@ class ProjectLauncher {
   /// An old version receipt alone does not prove the Windows executable
   /// still exists. Keep the receipt for recovery, but show "Install" if the
   /// registered EXE has been moved or deleted.
+  static bool matchesWindowsReceipt(String? expected, String actual) =>
+      expected != null && expected.length == 64 &&
+      RegExp(r'^[a-f0-9]+
+    if (!isValidProjectId(id)) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final executable = prefs.getString('exe_$id');
+    final version = prefs.getString('installed_version_$id');
+    if (executable == null || executable.isEmpty ||
+        version == null || version.isEmpty) {
+      return null;
+    }
+    try {
+      final file = File(executable);
+      if (!await file.exists() || await file.length() < 1024) return null;
+      // A stale registration or damaged binary is not a proven installed
+      // version. Check the same bounded PE signature as the installer.
+      final reader = await file.open();
+      try {
+        if (!hasWindowsExecutableHeader(await reader.read(8192))) return null;
+      } finally {
+        await reader.close();
+      }
+      final expectedDigest = prefs.getString('installed_sha256_$id');
+      if (expectedDigest == null) return null;
+      final actualDigest = (await sha256.bind(file.openRead()).first).toString();
+      if (!matchesWindowsReceipt(expectedDigest, actualDigest)) return null;
+      return version;
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  static Future<String?> installedVersion(String id) async {
+    if (Platform.isAndroid) {
+      // The launcher itself is not an external launchable project, but its
+      // installed Android version must still be shown in the update catalog.
+      final packageName = id == 'all-hub' ? 'com.example.all_hub' :
+          (packages[id] ?? await externalPackageName(id));
+      if (packageName == null) return null;
+      try {
+        return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
+      } catch (_) { return null; }
+    }
+    if (Platform.isWindows) {
+      // All Hub is the running executable, not a child app under projects/.
+      // Never require exe_all-hub to be manually bound to detect its version.
+      if (id == 'all-hub') {
+        final info = await PackageInfo.fromPlatform();
+        return info.buildNumber.isEmpty ? info.version : '${info.version}+${info.buildNumber}';
+      }
+      return installedWindowsVersion(id);
+    }
+    return null;
+  }
+  /// Never activate a Windows EXE/ZIP after a short HTTP response. A file
+  /// may still have an MZ header even when its body is truncated.
+  static void requireCompleteWindowsDownload(int received, int? expected) {
+    if (received < 0 || expected != null &&
+        (expected < 0 || received != expected)) {
+      throw const FormatException('Загрузка Windows-файла завершилась не полностью');
+    }
+  }
+
+  /// Stream a response to disk for Windows installers and archives.
+  static Future<void> _download(http.StreamedResponse response, File file, {int? maxBytes}) async {
+    if (maxBytes != null && response.contentLength != null &&
+        !isSafeWindowsDownloadBudget(0, response.contentLength!, maxBytes: maxBytes)) {
+      throw const FormatException('Windows ZIP слишком большой');
+    }
+    final sink = file.openWrite();
+    var received = 0;
+    downloadProgress.value = 0;
+    resetTransferTelemetry();
+    reportTransferBytes(0, total: response.contentLength);
+    try {
+      await for (final bytes in response.stream) {
+        if (maxBytes != null &&
+            !isSafeWindowsDownloadBudget(received, bytes.length, maxBytes: maxBytes)) {
+          throw const FormatException('Windows ZIP слишком большой');
+        }
+        sink.add(bytes);
+        received += bytes.length;
+        reportTransferBytes(received, total: response.contentLength);
+        if (response.contentLength != null && response.contentLength! > 0) {
+          downloadProgress.value =
+              (received / response.contentLength!).clamp(0.0, 1.0);
+        }
+      }
+      await sink.flush();
+      requireCompleteWindowsDownload(received, response.contentLength);
+      downloadProgress.value = 1;
+    } finally {
+      await sink.close();
+    }
+  }
+
+  /// Download with resumable HTTP Range requests. GitHub release asset links
+  /// redirect to short-lived URLs, so each retry starts at the public URL.
+  @visibleForTesting
+  static Future<void> downloadResumableApk(
+    http.Client client, Uri uri, File temporary,
+  ) async {
+    const maxAttempts = 5;
+    int? totalLength;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final existing = await temporary.exists() ? await temporary.length() : 0;
+      final request = http.Request('GET', uri);
+      if (existing > 0) request.headers['Range'] = 'bytes=$existing-';
+      try {
+        final response = await client.send(request)
+            .timeout(const Duration(seconds: 40));
+        if (response.statusCode == 416 && existing > 0) {
+          // GitHub rolling releases can replace an APK at the same URL.
+          // An old partial file may then be longer than the new asset.
+          // HTTP 416 means our saved Range cannot be resumed. Restart from
+          // byte zero rather than retrying the same invalid Range five times.
+          await response.stream.drain<void>();
+          await temporary.delete();
+          downloadProgress.value = 0;
+          continue;
+        }
+        if (response.statusCode != 200 && response.statusCode != 206) {
+          throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+        }
+        final isPartial = response.statusCode == 206;
+        int? expectedResponseBytes;
+        if (isPartial) {
+          final range = response.headers['content-range'];
+          if (!isSafeApkContentRange(range, existing)) {
+            throw const FormatException('Сервер вернул неверный диапазон APK');
+          }
+          final bounds = RegExp(r'bytes (\d+)-(\d+)/(\d+)')
+              .firstMatch(range!.trim())!;
+          final start = int.parse(bounds.group(1)!);
+          final end = int.parse(bounds.group(2)!);
+          expectedResponseBytes = end - start + 1;
+          totalLength = int.parse(bounds.group(3)!);
+          if (response.contentLength != null &&
+              response.contentLength != expectedResponseBytes) {
+            throw const FormatException('Размер HTTP-диапазона APK не совпадает с заголовком');
+          }
+        } else {
+          totalLength = response.contentLength;
+        }
+        if (totalLength != null && totalLength > 256 * 1024 * 1024) {
+          throw const FormatException('APK превышает ограничение 256 МиБ');
+        }
+        final sink = temporary.openWrite(
+          mode: isPartial ? FileMode.append : FileMode.write,
+        );
+        var received = isPartial ? existing : 0;
+        resetTransferTelemetry();
+        reportTransferBytes(received, total: totalLength);
+        try {
+          await for (final chunk in response.stream.timeout(
+            const Duration(seconds: 45),
+          )) {
+            if (!isSafeWindowsDownloadBudget(received, chunk.length)) {
+              throw const FormatException('APK превышает ограничение 256 МиБ');
+            }
+            sink.add(chunk);
+            received += chunk.length;
+            reportTransferBytes(received, total: totalLength);
+            if (totalLength != null && totalLength > 0) {
+              downloadProgress.value =
+                  (received / totalLength).clamp(0.0, 1.0);
+            }
+          }
+          await sink.flush();
+        } finally {
+          await sink.close();
+        }
+        final actual = await temporary.length();
+        // A 206 response may cover only part of the remaining APK. Never
+        // accept missing/extra bytes from that declared range, even when the
+        // final file size happens to equal the expected total.
+        if (expectedResponseBytes != null &&
+            actual - existing != expectedResponseBytes) {
+          throw const HttpException('HTTP-диапазон APK загружен не полностью');
+        }
+        if (totalLength != null && actual < totalLength) {
+          throw const HttpException('Соединение оборвалось до конца APK');
+        }
+        if (totalLength != null && actual > totalLength) {
+          throw const FormatException('Размер APK превышает ожидаемый');
+        }
+        downloadProgress.value = 1;
+        return;
+      } catch (_) {
+        if (attempt == maxAttempts - 1) rethrow;
+        await Future<void>.delayed(Duration(seconds: attempt + 1));
+      }
+    }
+  }
+
+  static const _channel = MethodChannel('allhub/launcher');
+  static const packages = <String, String>{
+    'shadow-rp': 'com.shadowrp.app',
+    'kopilka': 'com.veyrion.kopilka_app',
+    'eclipse-arena': 'org.eclipsearena.prototype',
+    'nova-game': 'com.perchikhot.novagame',
+  };
+
+  static Future<bool> isAvailable(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id] ?? await externalPackageName(id);
+      if (packageName == null) return false;
+      try {
+        return await _channel.invokeMethod<bool>(
+          'isPackageInstalled', {'packageName': packageName}) ?? false;
+      } catch (_) {
+        return false;
+      }
+    }
+    if (Platform.isWindows) {
+      final prefs = await SharedPreferences.getInstance();
+      final executable = prefs.getString('exe_$id');
+      return executable != null && await File(executable).exists();
+    }
+    return false;
+  }
+
+  static Future<bool> launch(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id] ?? await externalPackageName(id);
+      if (packageName == null) return false;
+      return await _channel.invokeMethod<bool>('launchPackage', {'packageName': packageName}) ?? false;
+    }
+    if (Platform.isWindows) {
+      final prefs = await SharedPreferences.getInstance();
+      final executable = prefs.getString('exe_$id');
+      if (executable == null || !await File(executable).exists()) return false;
+      // A successful CreateProcess call is not proof that the new release
+      // actually starts. Detect immediate crashes (missing DLLs, invalid
+      // bundled assets, etc.) before committing the version receipt.
+      final process = await Process.start(executable, [],
+          mode: ProcessStartMode.normal,
+          workingDirectory: File(executable).parent.path);
+      final earlyExit = await Future.any<bool>([
+        process.exitCode.then((code) => true),
+        Future<bool>.delayed(const Duration(seconds: 3), () => false),
+      ]);
+      if (earlyExit) {
+        throw StateError('Windows-приложение завершилось сразу после запуска; обновление отменено');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Install and launch a Windows release as one transaction. If Windows
+  /// rejects the new executable, restore the previous launch target and
+  /// version receipt so the user can still open the working installation.
+  /// Old release files are intentionally retained for rollback.
+  static Future<void> updateAndLaunchWindows(
+    String id, String url, {
+    String? version,
+    String? externalRepo,
+    String? sha256Digest,
+  }) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id) || id == 'all-hub') {
+      throw ArgumentError('Самообновление All Hub требует отдельного установщика');
+    }
+    await runInstallExclusive(id, () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_$id');
+      final previousVersion = prefs.getString('installed_version_$id');
+      final previousDigest = prefs.getString('installed_sha256_$id');
+      var installed = false;
+      try {
+        final path = Uri.parse(url).path.toLowerCase();
+        if (path.endsWith('.zip')) {
+          await installWindowsZip(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else if (path.endsWith('.exe')) {
+          await installWindowsExe(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else {
+          throw StateError('Формат обновления Windows не поддерживается');
+        }
+        installed = true;
+        if (!await launch(id)) {
+          throw StateError('Windows не удалось запустить обновлённое приложение');
+        }
+        await recordInstalledVersion(id, version);
+      } catch (_) {
+        if (installed) {
+          if (previousExe == null) {
+            await prefs.remove('exe_$id');
+          } else {
+            await prefs.setString('exe_$id', previousExe);
+          }
+          if (previousVersion == null) {
+            await prefs.remove('installed_version_$id');
+          } else {
+            await prefs.setString('installed_version_$id', previousVersion);
+          }
+          if (previousDigest == null) {
+            await prefs.remove('installed_sha256_$id');
+          } else {
+            await prefs.setString('installed_sha256_$id', previousDigest);
+          }
+        }
+        rethrow;
+      }
+    });
+  }
+
+  /// Reconcile a pending handoff on startup. The new launcher confirms the
+  /// receipt only after Flutter has initialized; a fallback to the previous
+  /// executable restores the old receipt instead of claiming an update.
+  static Future<void> reconcileAllHubWindowsHandoff() async {
+    if (!Platform.isWindows) return;
+    final prefs = await SharedPreferences.getInstance();
+    final next = prefs.getString('allhub_pending_exe');
+    if (next == null) return;
+    final current = File(Platform.resolvedExecutable).absolute.path.toLowerCase();
+    final expected = File(next).absolute.path.toLowerCase();
+    final previous = prefs.getString('allhub_previous_exe');
+    final previousVersion = prefs.getString('allhub_previous_version');
+    // The external updater writes a failure receipt before launching the old
+    // binary. A previous app must never leave the failed new version registered.
+    final failed = File('$next.failed');
+    if (await failed.exists() && previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+      await prefs.setString('allhub_last_update_error',
+          (await failed.readAsString()).trim());
+      await failed.delete();
+      for (final key in [
+        'allhub_pending_exe', 'allhub_pending_version',
+        'allhub_previous_exe', 'allhub_previous_version',
+      ]) {
+        await prefs.remove(key);
+      }
+      return;
+    }
+    if (current == expected) {
+      await prefs.setString('exe_all-hub', next);
+      final version = prefs.getString('allhub_pending_version');
+      if (version != null && version.isNotEmpty) {
+        await prefs.setString('installed_version_all-hub', version);
+      }
+    } else if (previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+    } else {
+      // Do not clear a pending transaction for an unrelated executable.
+      return;
+    }
+    // Keep the rollback receipt until the external updater has observed a
+    // stable process. Otherwise an early crash leaves the old launcher unable
+    // to restore the previous registered version.
+    final committed = File('$next.committed');
+    if (current == expected && !await committed.exists()) {
+      await File('$next.confirmed').writeAsString('ready', flush: true);
+      return;
+    }
+    for (final key in [
+      'allhub_pending_exe', 'allhub_pending_version',
+      'allhub_previous_exe', 'allhub_previous_version',
+    ]) {
+      await prefs.remove(key);
+    }
+    if (current == expected && await committed.exists()) {
+      await committed.delete();
+    }
+  }
+
+  /// Stage the launcher side-by-side, then hand off activation to a separate
+  /// Windows process. The old running EXE is never overwritten or deleted.
+  /// This is intentionally not a shortcut migration: existing shortcuts may
+  /// still point at the previous launcher until a stable bootstrapper is added.
+  static Future<void> updateAllHubWindows(
+    String url, {String? version, String? sha256Digest}
+  ) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    await runInstallExclusive('all-hub', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_all-hub');
+      final previousVersion = prefs.getString('installed_version_all-hub');
+      try {
+        final extension = Uri.parse(url).path.toLowerCase();
+        // Flutter Windows applications are not standalone EXEs: they require
+        // flutter_windows.dll, data/flutter_assets and plugin DLLs. Never
+        // replace the running launcher with a bare EXE from a release.
+        if (!extension.endsWith('.zip')) {
+          throw StateError(
+              'Для самообновления All Hub нужен полный Windows ZIP с DLL и ресурсами');
+        }
+        await installWindowsZip('all-hub', url, sha256Digest: sha256Digest);
+        final nextExe = prefs.getString('exe_all-hub');
+        if (nextExe == null || !await File(nextExe).exists()) {
+          throw StateError('Новая версия лаунчера не найдена');
+        }
+        // Check the complete Flutter runtime before asking the old process
+        // to exit. A valid PE header alone cannot detect missing dependencies.
+        final bundle = File(nextExe).parent;
+        final runtime = File('${bundle.path}${Platform.pathSeparator}flutter_windows.dll');
+        final assets = Directory(
+            '${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}flutter_assets');
+        final icu = File('${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}icudtl.dat');
+        if (!await runtime.exists() || !await assets.exists() ||
+            !await icu.exists()) {
+          throw StateError(
+              'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
+        }
+        // The installer stages a release by writing exe_all-hub. That is not
+        // activation: keep the current launcher registered until the new
+        // process confirms startup in reconcileAllHubWindowsHandoff().
+        // A failed or never-started helper must not leave a phantom install.
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
+        // Process.start is independent of the running Flutter application.
+        // Validate the executable before requesting the current process exit.
+        final handle = await File(nextExe).open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
+            throw const FormatException('Новая версия All Hub не является Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+        // Remove any stale receipt from a previous attempted launch before
+        // starting the helper; otherwise it could accept a false success.
+        final confirmation = File('$nextExe.confirmed');
+        if (await confirmation.exists()) await confirmation.delete();
+        final committed = File('$nextExe.committed');
+        if (await committed.exists()) await committed.delete();
+        final failed = File('$nextExe.failed');
+        if (await failed.exists()) await failed.delete();
+        await prefs.remove('allhub_last_update_error');
+        // PowerShell's argument list is passed as individual arguments, never
+        // through a shell command assembled from an untrusted release URL.
+        // The helper waits for the current process to finish, then starts the
+        // staged launcher in its own working directory.
+        final script = r'''
+param([int]$OldPid, [string]$NextExe, [string]$PreviousExe, [string]$SupportRoot)
+$ErrorActionPreference = 'Stop'
+try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
+if (-not (Test-Path -LiteralPath $NextExe -PathType Leaf)) { exit 2 }
+try {
+  $newProcess = Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe) -PassThru
+  # Do not migrate shortcuts until Flutter confirms its installed-version
+  # receipt has been persisted. Timeout or early exit triggers rollback.
+  $confirmed = "$NextExe.confirmed"
+  $deadline = (Get-Date).AddSeconds(60)
+  while (-not (Test-Path -LiteralPath $confirmed -PathType Leaf)) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited before confirming startup' }
+    if ((Get-Date) -ge $deadline) { throw 'New launcher did not confirm startup' }
+    Start-Sleep -Milliseconds 500
+  }
+  # A receipt written during startup is not enough if the UI immediately
+  # crashes. Observe a short post-confirmation window before moving shortcuts.
+  $stableUntil = (Get-Date).AddSeconds(8)
+  while ((Get-Date) -lt $stableUntil) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited after startup confirmation' }
+    Start-Sleep -Milliseconds 500
+  }
+  # The update is not committed until the stable launcher pointer has
+  # been installed. Otherwise a shortcut/pointer failure can roll back the
+  # old executable while the new process later accepts a false commit.
+  # Stable entry point: shortcuts must never point at an immutable release EXE.
+  # Store the pointer outside version folders so future updates only change
+  # this pointer. A failed handoff leaves the previous pointer untouched.
+  $supportRoot = $SupportRoot
+  $entry = Join-Path $supportRoot 'AllHub-Launch.cmd'
+  $pointer = Join-Path $supportRoot 'AllHub-Current.txt'
+  $entryContent = @'
+@echo off
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0AllHub-Launch.ps1"
+'@
+  $launchScript = @'
+$ErrorActionPreference = 'Stop'
+$pointer = Join-Path $PSScriptRoot 'AllHub-Current.txt'
+$backup = Join-Path $PSScriptRoot 'AllHub-Previous.txt'
+# A broken or deleted release must not strand the user behind a dead shortcut.
+# Never execute arbitrary command lines: both pointer files contain only paths
+# to previously installed EXEs, and Start-Process receives a literal path.
+foreach ($file in @($pointer, $backup)) {
+  if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+  $target = (Get-Content -LiteralPath $file -Encoding UTF8 -TotalCount 1).Trim()
+  if (-not $target -or -not [IO.Path]::IsPathRooted($target) -or
+      -not $target.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase) -or
+      -not (Test-Path -LiteralPath $target -PathType Leaf)) { continue }
+  # A Flutter Windows build needs its runtime beside the EXE. A valid
+  # executable alone is not enough: missing DLL/assets cause a dead shortcut.
+  $bundle = Split-Path -Parent $target
+  if (-not (Test-Path -LiteralPath (Join-Path $bundle 'flutter_windows.dll') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\icudtl.dat') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\flutter_assets') -PathType Container)) { continue }
+  try {
+    $process = Start-Process -FilePath $target -WorkingDirectory $bundle -PassThru -ErrorAction Stop
+    # Start-Process succeeding does not mean Flutter actually started. If it
+    # crashes immediately, try the last known-good build instead.
+    if ($process.WaitForExit(3000)) {
+      if ($process.ExitCode -ne 0) { continue }
+    }
+    exit 0
+  } catch { continue }
+}
+exit 4
+'@
+  Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Launch.ps1') -Value $launchScript -Encoding UTF8
+  # Install the stable entry before updating the pointer. No executable is
+  # ever modified while running; the .cmd lives in application support.
+  Set-Content -LiteralPath $entry -Value $entryContent -Encoding ASCII
+  # Retain a known-good executable for the stable launcher if a release
+  # folder is removed after an otherwise successful update.
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Previous.txt') -Value $PreviousExe -Encoding UTF8
+  }
+  $pendingPointer = "$pointer.new"
+  Set-Content -LiteralPath $pendingPointer -Value $NextExe -Encoding UTF8
+  Move-Item -LiteralPath $pendingPointer -Destination $pointer -Force
+  # A user launching via the stable entry always gets the confirmed build.
+  # Create a durable user shortcut even for portable installations that
+  # never had an existing shortcut to migrate. Do not overwrite user links.
+  $shell = New-Object -ComObject WScript.Shell
+  $userLinks = @(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'All Hub.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'All Hub.lnk')
+  )
+  foreach ($link in $userLinks) {
+    try {
+      $parent = Split-Path -Parent $link
+      if (-not $parent -or -not (Test-Path -LiteralPath $parent -PathType Container)) { continue }
+      $shortcut = $shell.CreateShortcut($link)
+      if (Test-Path -LiteralPath $link) {
+        # Migrate only links belonging to this launcher. Never hijack an
+        # unrelated user shortcut that happens to share the display name.
+        $existingTarget = $shortcut.TargetPath
+        $owned = $false
+        if ($existingTarget) {
+          if ($PreviousExe -and
+              [string]::Equals($existingTarget, $PreviousExe,
+                [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
+          if ([string]::Equals($existingTarget, $entry,
+                [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
+          # A matching name is not proof of ownership. Only migrate links
+          # targeting the known previous executable or stable launcher.
+        }
+        if (-not $owned) { continue }
+      }
+      $shortcut.TargetPath = $entry
+      $shortcut.WorkingDirectory = $supportRoot
+      $shortcut.Save()
+    } catch {
+      # Shortcuts are optional; failure must not roll back a healthy update.
+    }
+  }
+  # Commit only after the durable entry point and pointer are installed.
+  # Shortcut migration is best-effort and must not block a healthy launch.
+  Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
+  # Existing shortcuts pointing to a previous EXE are migrated below.
+} catch {
+  # Never let a stale success receipt win over a failed activation.
+  try { Remove-Item -LiteralPath "$NextExe.committed" -Force -ErrorAction SilentlyContinue } catch {}
+  # Persist the failure independently of the new process. The old launcher
+  # reconciles this marker on startup and restores its version receipt.
+  try { Set-Content -LiteralPath "$NextExe.failed" -Value $_.Exception.Message } catch {}
+  # If the stable pointer was changed before a later failure, restore it.
+  try {
+    if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+      $pointer = Join-Path $SupportRoot 'AllHub-Current.txt'
+      Set-Content -LiteralPath "$pointer.rollback" -Value $PreviousExe -Encoding UTF8
+      Move-Item -LiteralPath "$pointer.rollback" -Destination $pointer -Force
+    }
+  } catch {}
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}
+  }
+  exit 3
+}
+# Migrate only shortcuts that explicitly target the previous launcher.
+# Do not alter unrelated shortcuts or system-wide shortcuts.
+if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $roots = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('StartMenu'))
+    foreach ($root in $roots) {
+      if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+      Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          $shortcut = $shell.CreateShortcut($_.FullName)
+          if ([string]::Equals($shortcut.TargetPath, $PreviousExe, [StringComparison]::OrdinalIgnoreCase) -or
+              [string]::Equals($shortcut.TargetPath, $NextExe, [StringComparison]::OrdinalIgnoreCase)) {
+            $shortcut.TargetPath = $entry
+            $shortcut.WorkingDirectory = $supportRoot
+            $shortcut.Save()
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
+''';
+        final helper = File('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}allhub-handoff-${DateTime.now().microsecondsSinceEpoch}.ps1');
+        await helper.writeAsString(script, flush: true);
+        // Record a recoverable transaction, not a successful installation.
+        // The new process commits it during startup; the old process restores
+        // the receipt if the external updater has to fall back.
+        // Rollback must point to the executable actually running, even if a
+        // stale preference points to a different historical installation.
+        await prefs.setString('allhub_previous_exe', Platform.resolvedExecutable);
+        if (previousVersion == null) {
+          await prefs.remove('allhub_previous_version');
+        } else {
+          await prefs.setString('allhub_previous_version', previousVersion);
+        }
+        await prefs.setString('allhub_pending_exe', nextExe);
+        if (version == null) {
+          await prefs.remove('allhub_pending_version');
+        } else {
+          await prefs.setString('allhub_pending_version', version);
+        }
+        await Process.start('powershell.exe', [
+          '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', helper.path, '-OldPid', pid.toString(),
+          '-NextExe', nextExe,
+          '-PreviousExe', Platform.resolvedExecutable,
+          '-SupportRoot', (await getApplicationSupportDirectory()).path,
+        ], mode: ProcessStartMode.detached);
+        // The detached helper cannot start the staged launcher while this
+        // process remains alive: it waits for OldPid to exit. The caller
+        // returns only after the helper was successfully started.
+      } catch (_) {
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
+        if (previousVersion == null) {
+          await prefs.remove('installed_version_all-hub');
+        } else {
+          await prefs.setString('installed_version_all-hub', previousVersion);
+        }
+        rethrow;
+      }
+    });
+    // A successful handoff MUST terminate the old launcher, otherwise the
+    // PowerShell helper waits forever and the user sees no update. Only exit
+    // after staging, integrity checks, receipt persistence and detached helper
+    // startup have all succeeded. Errors above keep the current app running.
+    // The helper owns startup confirmation, rollback and shortcut migration.
+    exit(0);
+  }
+
+  /// Check GitHub's published SHA-256 digest before activating an installer.
+  /// Older releases without a digest retain existing container checks.
+  static Future<void> verifyDownloadedDigest(File file, String? expected) async {
+    if (expected == null) {
+      return;
+    }
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(expected)) {
+      throw const FormatException('Некорректная контрольная сумма SHA-256');
+    }
+    final actual = (await sha256.bind(file.openRead()).first).toString();
+    if (actual != expected) {
+      throw const FormatException('SHA-256 файла не совпадает с GitHub Releases');
+    }
+  }
+
+  /// Verify that the APK has a complete ZIP central directory, not merely
+  /// the four-byte PK prefix. This rejects interrupted downloads with an
+  /// unknown Content-Length before invoking Android's package installer.
+  @visibleForTesting
+  static Future<void> requireCompleteApkContainer(File apk) async {
+    final length = await apk.length();
+    if (length < 1024) throw const FormatException('APK слишком мал');
+    final file = await apk.open();
+    try {
+      final header = await file.read(4);
+      if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
+          header[2] != 0x03 || header[3] != 0x04) {
+        throw const FormatException('Скачан не APK (не ZIP-контейнер)');
+      }
+      // EOCD is at most 22 + 65535 bytes from the end (ZIP comment).
+      final tailSize = length < 65557 ? length : 65557;
+      await file.setPosition(length - tailSize);
+      final tail = await file.read(tailSize);
+      int read16(int i) => tail[i] | (tail[i + 1] << 8);
+      int read32(int i) => tail[i] | (tail[i + 1] << 8) |
+          (tail[i + 2] << 16) | (tail[i + 3] << 24);
+      for (var i = tail.length - 22; i >= 0; i--) {
+        if (tail[i] != 0x50 || tail[i + 1] != 0x4b ||
+            tail[i + 2] != 0x05 || tail[i + 3] != 0x06) continue;
+        if (i + 22 + read16(i + 20) != tail.length) continue;
+        final centralSize = read32(i + 12);
+        final centralOffset = read32(i + 16);
+        final eocdOffset = length - tailSize + i;
+        if (read16(i + 4) != 0 || read16(i + 6) != 0 ||
+            read16(i + 8) != read16(i + 10) ||
+            centralSize == 0xffffffff || centralOffset == 0xffffffff ||
+            centralOffset + centralSize > eocdOffset) continue;
+        return;
+      }
+      throw const FormatException('APK повреждён или загружен не полностью (ZIP)');
+    } finally {
+      await file.close();
+    }
+  }
+
+  /// A system installer intent being launched is NOT proof of installation,
+  /// but false/null must be surfaced instead of marking the update successful.
+  static void requireAndroidInstallerOpened(bool? opened) {
+    if (opened != true) {
+      throw StateError('Не удалось открыть системный установщик Android');
+    }
+  }
+
+  /// A stale partial APK can have a valid HTTP range but a broken ZIP tail.
+  /// Retry once from byte zero on either container or digest corruption.
+  /// Never retry transport failures here: the resumable downloader already
+  /// handles them, and no unverified file is passed to Android.
+  @visibleForTesting
+  static Future<void> downloadVerifiedApk(
+    http.Client client, Uri uri, File temporary, {String? sha256Digest}
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await downloadResumableApk(client, uri, temporary);
+      try {
+        await requireCompleteApkContainer(temporary);
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        return;
+      } on FormatException {
+        if (await temporary.exists()) await temporary.delete();
+        downloadProgress.value = 0;
+        if (attempt == 1) rethrow;
+      }
+    }
+  }
+
+  /// Downloads a published APK directly, then asks Android to install it.
+  /// Android always requires user confirmation; this cannot silently install apps.
+  static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isAndroid) throw UnsupportedError('Android only');
+    final uri = Uri.tryParse(url);
+    if (uri == null || projectId == null ||
+        !(externalRepo == null
+            ? isTrustedProjectDownload(projectId, url, 'apk')
+            : isTrustedExternalDownload(projectId, externalRepo, url, 'apk'))) {
+      throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
+    }
+    return runInstallExclusive(projectId, () async {
+      activeDownloadProject.value = projectId;
+      downloadProgress.value = null;
+      final client = http.Client();
+    try {
+      final cache = await getTemporaryDirectory();
+      final cacheName = externalRepo == null
+          ? androidApkCacheName(projectId, url)
+          : ('${projectId}_${uri.pathSegments[4]}_${uri.pathSegments[5]}')
+              .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+      final apk = File('${cache.path}${Platform.pathSeparator}$cacheName');
+      final temporary = File('${apk.path}.download');
+      try {
+        downloadProgress.value = 0;
+        await downloadVerifiedApk(client, uri, temporary, sha256Digest: sha256Digest);
+        if (await apk.exists()) await apk.delete();
+        await temporary.rename(apk.path);
+        // Android owns the final install confirmation. A false/null result
+        // means the system installer could not even be opened; never report
+        // that as a successful update.
+        final expectedPackage = await expectedAndroidPackageName(projectId);
+        final opened = await _channel.invokeMethod<bool>(
+          'installApk', {
+            'path': apk.path,
+            if (expectedPackage != null) 'expectedPackageName': expectedPackage,
+          });
+        requireAndroidInstallerOpened(opened);
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+    }
+    });
+  }
+
+  static void requireWindowsInstallRegistered(bool saved) {
+    if (!saved) throw StateError('Не удалось сохранить путь установленного Windows-приложения');
+  }
+
+  // Installs a standalone Windows EXE from a published GitHub release.
+  // Portable ZIP distributions require their full folder and are not handled here.
+  static Future<void> installWindowsExe(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'exe')
+        : isTrustedExternalDownload(id, externalRepo, url, 'exe'))) {
+      throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
+    }
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri);
+      final response = await client.send(request).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      final root = await getApplicationSupportDirectory();
+      final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+      await projects.create(recursive: true);
+      // A running Windows EXE cannot be renamed or overwritten. Install each
+      // published standalone build into its own immutable version directory,
+      // just as we do for portable ZIP releases. The registered launcher path
+      // is switched only after the download and PE/digest checks succeed.
+      final releaseFolder = windowsReleaseFolder(
+          id, url, DateTime.now().microsecondsSinceEpoch);
+      final targetDirectory =
+          Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+      final staging = Directory('${targetDirectory.path}.staging');
+      final temporary = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download');
+      try {
+        await _download(response, temporary, maxBytes: 256 * 1024 * 1024);
+        if (await temporary.length() < 1024) {
+          throw const FormatException('Загруженный EXE слишком мал');
+        }
+        final file = await temporary.open();
+        try {
+          if (!hasWindowsExecutableHeader(await file.read(8192))) {
+            throw const FormatException('Файл не является корректным Windows PE (MZ/PE)');
+          }
+        } finally {
+          await file.close();
+        }
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        await staging.create(recursive: true);
+        final stagedExe = File('${staging.path}${Platform.pathSeparator}$id.exe');
+        await temporary.rename(stagedExe.path);
+        await staging.rename(targetDirectory.path);
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          requireWindowsInstallRegistered(await prefs.setString(
+              'exe_$id', '${targetDirectory.path}${Platform.pathSeparator}$id.exe'));
+        } catch (_) {
+          // Keep the previous registered EXE untouched on preferences failure.
+          if (await targetDirectory.exists()) {
+            await targetDirectory.delete(recursive: true);
+          }
+          rethrow;
+        }
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+        if (await staging.exists()) await staging.delete(recursive: true);
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+    }
+  }
+
+  /// Different builds must never overwrite a running Windows executable.
+  /// A unique generation suffix also makes reinstallation of the same
+  /// release safe while an older instance remains open.
+  @visibleForTesting
+  static String windowsReleaseFolder(String id, String url, int generation) {
+    if (!isValidProjectId(id) || generation < 0) {
+      throw ArgumentError('Некорректный проект или поколение установки');
+    }
+    final digest = sha256.convert(url.codeUnits).toString().substring(0, 16);
+    return '$id-$digest-$generation';
+  }
+
+  /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
+  /// Files are extracted to a staging directory and activated only after validation.
+  static Future<void> installWindowsZip(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'zip')
+        : isTrustedExternalDownload(id, externalRepo, url, 'zip'))) {
+      throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
+    }
+    final root = await getApplicationSupportDirectory();
+    final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+    await projects.create(recursive: true);
+    // A running Windows process locks its EXE and Flutter DLLs. Renaming the
+    // currently installed directory therefore fails with ACCESS_DENIED.
+    // Install each release side-by-side and atomically switch the registered
+    // launcher path only after validation. The running old version remains
+    // usable until the user launches the new one; never delete its files.
+    // Keep old releases for rollback and for apps that store data beside EXE.
+    final releaseFolder = windowsReleaseFolder(
+        id, url, DateTime.now().microsecondsSinceEpoch);
+    final target = Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+    final staging = Directory('${target.path}.staging');
+    final zipFile = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download.zip');
+    if (await staging.exists()) await staging.delete(recursive: true);
+    await staging.create(recursive: true);
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      await _download(response, zipFile, maxBytes: 256 * 1024 * 1024);
+      if (await zipFile.length() > 256 * 1024 * 1024) {
+        throw const FormatException('Windows ZIP слишком большой');
+      }
+      await verifyDownloadedDigest(zipFile, sha256Digest);
+      final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
+      if (!isSafeWindowsArchiveLayout(
+        archive.where((entry) => entry.isFile).map((entry) => entry.name),
+        archive.where((entry) => !entry.isFile).map((entry) => entry.name),
+      )) {
+        throw const FormatException('ZIP содержит конфликтующие пути файлов');
+      }
+      final rootPath = staging.absolute.path;
+      var unpackedBytes = 0;
+      var entriesSeen = 0;
+      for (final entry in archive) {
+        entriesSeen++;
+        if (!isSafeWindowsArchiveBudget(entriesSeen, unpackedBytes, entry.size)) {
+          throw const FormatException('ZIP превышает безопасный размер распаковки');
+        }
+        unpackedBytes += entry.size;
+        final name = entry.name.replaceAll('\\', '/');
+        if (!isSafeWindowsArchivePath(name)) {
+          throw const FormatException('Недопустимый путь в ZIP');
+        }
+        if (name.isEmpty) continue;
+        final destination = '$rootPath${Platform.pathSeparator}${name.replaceAll('/', Platform.pathSeparator)}';
+        if (entry.isFile) {
+          final file = File(destination);
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.content as List<int>, flush: true);
+        } else {
+          await Directory(destination).create(recursive: true);
+        }
+      }
+      final executables = await staging.list(recursive: true).where(
+        (entity) => entity is File && entity.path.toLowerCase().endsWith('.exe'),
+      ).cast<File>().toList();
+      if (executables.isEmpty) {
+        throw const FormatException('В архиве нет исполняемого EXE');
+      }
+      // A ZIP can contain arbitrary files named .exe. Reject an invalid
+      // launcher before activating the staging directory, preserving the
+      // previous installation and its settings.
+      for (final executable in executables) {
+        final handle = await executable.open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
+            throw const FormatException('ZIP содержит некорректный Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+      }
+      final relativeExe = selectWindowsLaunchExecutable(id,
+          executables.map((exe) => exe.path.substring(staging.path.length)));
+      if (relativeExe == null) {
+        throw const FormatException(
+            'В Windows ZIP несколько EXE без однозначного приложения');
+      }
+      // Validate Flutter projects before registration; Godot and native
+      // Windows games use different layouts and must not be rejected.
+      if (id == 'all-hub' || id == 'kopilka') {
+      final launchFile = File('${staging.path}$relativeExe');
+      final bundleRoot = launchFile.parent;
+      final runtimeDll = File('${bundleRoot.path}${Platform.pathSeparator}flutter_windows.dll');
+      final flutterAssets = Directory('${bundleRoot.path}${Platform.pathSeparator}data'
+          '${Platform.pathSeparator}flutter_assets');
+      final icuData = File('${bundleRoot.path}${Platform.pathSeparator}data'
+          '${Platform.pathSeparator}icudtl.dat');
+      if (!await runtimeDll.exists() || !await flutterAssets.exists() ||
+          !await icuData.exists()) {
+        throw const FormatException(
+            'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
+      }
+      // Empty asset directories are not usable Flutter installations.
+      if (await flutterAssets.list(followLinks: false).isEmpty) {
+        throw const FormatException('Windows ZIP содержит пустой flutter_assets');
+      }
+      }
+      // Publish only a fully unpacked and validated directory. No running
+      // EXE is overwritten, and the old registered path stays valid if this
+      // operation fails. This is also safe while the old game is still open.
+      try {
+        await staging.rename(target.path);
+        final prefs = await SharedPreferences.getInstance();
+        requireWindowsInstallRegistered(
+            await prefs.setString('exe_$id', '${target.path}$relativeExe'));
+      } catch (_) {
+        if (await target.exists()) await target.delete(recursive: true);
+        rethrow;
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+      if (await zipFile.exists()) await zipFile.delete();
+      if (await staging.exists()) await staging.delete(recursive: true);
+    }
+  }
+
+  static Future<bool> configureWindowsExecutable(String id) async {
+    if (!Platform.isWindows) return false;
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['exe']);
+    final path = selection?.files.single.path;
+    if (path == null || !path.toLowerCase().endsWith('.exe')) return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString('exe_$id', path);
+  }
+
+  static bool canLaunch(String id) => Platform.isWindows ||
+      (Platform.isAndroid &&
+          (packages.containsKey(id) || id.startsWith('external-')));
+}
+).hasMatch(expectedDigest)) return null;
+      final actualDigest = (await sha256.bind(file.openRead()).first).toString();
+      if (actualDigest != expectedDigest) return null;
+      return version;
+    } on FileSystemException {
+      return null;
+    }
+  }
+
+  static Future<String?> installedVersion(String id) async {
+    if (Platform.isAndroid) {
+      // The launcher itself is not an external launchable project, but its
+      // installed Android version must still be shown in the update catalog.
+      final packageName = id == 'all-hub' ? 'com.example.all_hub' :
+          (packages[id] ?? await externalPackageName(id));
+      if (packageName == null) return null;
+      try {
+        return await _channel.invokeMethod<String>('installedPackageVersion', {'packageName': packageName});
+      } catch (_) { return null; }
+    }
+    if (Platform.isWindows) {
+      // All Hub is the running executable, not a child app under projects/.
+      // Never require exe_all-hub to be manually bound to detect its version.
+      if (id == 'all-hub') {
+        final info = await PackageInfo.fromPlatform();
+        return info.buildNumber.isEmpty ? info.version : '${info.version}+${info.buildNumber}';
+      }
+      return installedWindowsVersion(id);
+    }
+    return null;
+  }
+  /// Never activate a Windows EXE/ZIP after a short HTTP response. A file
+  /// may still have an MZ header even when its body is truncated.
+  static void requireCompleteWindowsDownload(int received, int? expected) {
+    if (received < 0 || expected != null &&
+        (expected < 0 || received != expected)) {
+      throw const FormatException('Загрузка Windows-файла завершилась не полностью');
+    }
+  }
+
+  /// Stream a response to disk for Windows installers and archives.
+  static Future<void> _download(http.StreamedResponse response, File file, {int? maxBytes}) async {
+    if (maxBytes != null && response.contentLength != null &&
+        !isSafeWindowsDownloadBudget(0, response.contentLength!, maxBytes: maxBytes)) {
+      throw const FormatException('Windows ZIP слишком большой');
+    }
+    final sink = file.openWrite();
+    var received = 0;
+    downloadProgress.value = 0;
+    resetTransferTelemetry();
+    reportTransferBytes(0, total: response.contentLength);
+    try {
+      await for (final bytes in response.stream) {
+        if (maxBytes != null &&
+            !isSafeWindowsDownloadBudget(received, bytes.length, maxBytes: maxBytes)) {
+          throw const FormatException('Windows ZIP слишком большой');
+        }
+        sink.add(bytes);
+        received += bytes.length;
+        reportTransferBytes(received, total: response.contentLength);
+        if (response.contentLength != null && response.contentLength! > 0) {
+          downloadProgress.value =
+              (received / response.contentLength!).clamp(0.0, 1.0);
+        }
+      }
+      await sink.flush();
+      requireCompleteWindowsDownload(received, response.contentLength);
+      downloadProgress.value = 1;
+    } finally {
+      await sink.close();
+    }
+  }
+
+  /// Download with resumable HTTP Range requests. GitHub release asset links
+  /// redirect to short-lived URLs, so each retry starts at the public URL.
+  @visibleForTesting
+  static Future<void> downloadResumableApk(
+    http.Client client, Uri uri, File temporary,
+  ) async {
+    const maxAttempts = 5;
+    int? totalLength;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final existing = await temporary.exists() ? await temporary.length() : 0;
+      final request = http.Request('GET', uri);
+      if (existing > 0) request.headers['Range'] = 'bytes=$existing-';
+      try {
+        final response = await client.send(request)
+            .timeout(const Duration(seconds: 40));
+        if (response.statusCode == 416 && existing > 0) {
+          // GitHub rolling releases can replace an APK at the same URL.
+          // An old partial file may then be longer than the new asset.
+          // HTTP 416 means our saved Range cannot be resumed. Restart from
+          // byte zero rather than retrying the same invalid Range five times.
+          await response.stream.drain<void>();
+          await temporary.delete();
+          downloadProgress.value = 0;
+          continue;
+        }
+        if (response.statusCode != 200 && response.statusCode != 206) {
+          throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+        }
+        final isPartial = response.statusCode == 206;
+        int? expectedResponseBytes;
+        if (isPartial) {
+          final range = response.headers['content-range'];
+          if (!isSafeApkContentRange(range, existing)) {
+            throw const FormatException('Сервер вернул неверный диапазон APK');
+          }
+          final bounds = RegExp(r'bytes (\d+)-(\d+)/(\d+)')
+              .firstMatch(range!.trim())!;
+          final start = int.parse(bounds.group(1)!);
+          final end = int.parse(bounds.group(2)!);
+          expectedResponseBytes = end - start + 1;
+          totalLength = int.parse(bounds.group(3)!);
+          if (response.contentLength != null &&
+              response.contentLength != expectedResponseBytes) {
+            throw const FormatException('Размер HTTP-диапазона APK не совпадает с заголовком');
+          }
+        } else {
+          totalLength = response.contentLength;
+        }
+        if (totalLength != null && totalLength > 256 * 1024 * 1024) {
+          throw const FormatException('APK превышает ограничение 256 МиБ');
+        }
+        final sink = temporary.openWrite(
+          mode: isPartial ? FileMode.append : FileMode.write,
+        );
+        var received = isPartial ? existing : 0;
+        resetTransferTelemetry();
+        reportTransferBytes(received, total: totalLength);
+        try {
+          await for (final chunk in response.stream.timeout(
+            const Duration(seconds: 45),
+          )) {
+            if (!isSafeWindowsDownloadBudget(received, chunk.length)) {
+              throw const FormatException('APK превышает ограничение 256 МиБ');
+            }
+            sink.add(chunk);
+            received += chunk.length;
+            reportTransferBytes(received, total: totalLength);
+            if (totalLength != null && totalLength > 0) {
+              downloadProgress.value =
+                  (received / totalLength).clamp(0.0, 1.0);
+            }
+          }
+          await sink.flush();
+        } finally {
+          await sink.close();
+        }
+        final actual = await temporary.length();
+        // A 206 response may cover only part of the remaining APK. Never
+        // accept missing/extra bytes from that declared range, even when the
+        // final file size happens to equal the expected total.
+        if (expectedResponseBytes != null &&
+            actual - existing != expectedResponseBytes) {
+          throw const HttpException('HTTP-диапазон APK загружен не полностью');
+        }
+        if (totalLength != null && actual < totalLength) {
+          throw const HttpException('Соединение оборвалось до конца APK');
+        }
+        if (totalLength != null && actual > totalLength) {
+          throw const FormatException('Размер APK превышает ожидаемый');
+        }
+        downloadProgress.value = 1;
+        return;
+      } catch (_) {
+        if (attempt == maxAttempts - 1) rethrow;
+        await Future<void>.delayed(Duration(seconds: attempt + 1));
+      }
+    }
+  }
+
+  static const _channel = MethodChannel('allhub/launcher');
+  static const packages = <String, String>{
+    'shadow-rp': 'com.shadowrp.app',
+    'kopilka': 'com.veyrion.kopilka_app',
+    'eclipse-arena': 'org.eclipsearena.prototype',
+    'nova-game': 'com.perchikhot.novagame',
+  };
+
+  static Future<bool> isAvailable(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id] ?? await externalPackageName(id);
+      if (packageName == null) return false;
+      try {
+        return await _channel.invokeMethod<bool>(
+          'isPackageInstalled', {'packageName': packageName}) ?? false;
+      } catch (_) {
+        return false;
+      }
+    }
+    if (Platform.isWindows) {
+      final prefs = await SharedPreferences.getInstance();
+      final executable = prefs.getString('exe_$id');
+      return executable != null && await File(executable).exists();
+    }
+    return false;
+  }
+
+  static Future<bool> launch(String id) async {
+    if (Platform.isAndroid) {
+      final packageName = packages[id] ?? await externalPackageName(id);
+      if (packageName == null) return false;
+      return await _channel.invokeMethod<bool>('launchPackage', {'packageName': packageName}) ?? false;
+    }
+    if (Platform.isWindows) {
+      final prefs = await SharedPreferences.getInstance();
+      final executable = prefs.getString('exe_$id');
+      if (executable == null || !await File(executable).exists()) return false;
+      // A successful CreateProcess call is not proof that the new release
+      // actually starts. Detect immediate crashes (missing DLLs, invalid
+      // bundled assets, etc.) before committing the version receipt.
+      final process = await Process.start(executable, [],
+          mode: ProcessStartMode.normal,
+          workingDirectory: File(executable).parent.path);
+      final earlyExit = await Future.any<bool>([
+        process.exitCode.then((code) => true),
+        Future<bool>.delayed(const Duration(seconds: 3), () => false),
+      ]);
+      if (earlyExit) {
+        throw StateError('Windows-приложение завершилось сразу после запуска; обновление отменено');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Install and launch a Windows release as one transaction. If Windows
+  /// rejects the new executable, restore the previous launch target and
+  /// version receipt so the user can still open the working installation.
+  /// Old release files are intentionally retained for rollback.
+  static Future<void> updateAndLaunchWindows(
+    String id, String url, {
+    String? version,
+    String? externalRepo,
+    String? sha256Digest,
+  }) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id) || id == 'all-hub') {
+      throw ArgumentError('Самообновление All Hub требует отдельного установщика');
+    }
+    await runInstallExclusive(id, () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_$id');
+      final previousVersion = prefs.getString('installed_version_$id');
+      var installed = false;
+      try {
+        final path = Uri.parse(url).path.toLowerCase();
+        if (path.endsWith('.zip')) {
+          await installWindowsZip(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else if (path.endsWith('.exe')) {
+          await installWindowsExe(id, url,
+              externalRepo: externalRepo, sha256Digest: sha256Digest);
+        } else {
+          throw StateError('Формат обновления Windows не поддерживается');
+        }
+        installed = true;
+        if (!await launch(id)) {
+          throw StateError('Windows не удалось запустить обновлённое приложение');
+        }
+        await recordInstalledVersion(id, version);
+      } catch (_) {
+        if (installed) {
+          if (previousExe == null) {
+            await prefs.remove('exe_$id');
+          } else {
+            await prefs.setString('exe_$id', previousExe);
+          }
+          if (previousVersion == null) {
+            await prefs.remove('installed_version_$id');
+          } else {
+            await prefs.setString('installed_version_$id', previousVersion);
+          }
+        }
+        rethrow;
+      }
+    });
+  }
+
+  /// Reconcile a pending handoff on startup. The new launcher confirms the
+  /// receipt only after Flutter has initialized; a fallback to the previous
+  /// executable restores the old receipt instead of claiming an update.
+  static Future<void> reconcileAllHubWindowsHandoff() async {
+    if (!Platform.isWindows) return;
+    final prefs = await SharedPreferences.getInstance();
+    final next = prefs.getString('allhub_pending_exe');
+    if (next == null) return;
+    final current = File(Platform.resolvedExecutable).absolute.path.toLowerCase();
+    final expected = File(next).absolute.path.toLowerCase();
+    final previous = prefs.getString('allhub_previous_exe');
+    final previousVersion = prefs.getString('allhub_previous_version');
+    // The external updater writes a failure receipt before launching the old
+    // binary. A previous app must never leave the failed new version registered.
+    final failed = File('$next.failed');
+    if (await failed.exists() && previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+      await prefs.setString('allhub_last_update_error',
+          (await failed.readAsString()).trim());
+      await failed.delete();
+      for (final key in [
+        'allhub_pending_exe', 'allhub_pending_version',
+        'allhub_previous_exe', 'allhub_previous_version',
+      ]) {
+        await prefs.remove(key);
+      }
+      return;
+    }
+    if (current == expected) {
+      await prefs.setString('exe_all-hub', next);
+      final version = prefs.getString('allhub_pending_version');
+      if (version != null && version.isNotEmpty) {
+        await prefs.setString('installed_version_all-hub', version);
+      }
+    } else if (previous != null &&
+        current == File(previous).absolute.path.toLowerCase()) {
+      await prefs.setString('exe_all-hub', previous);
+      if (previousVersion == null) {
+        await prefs.remove('installed_version_all-hub');
+      } else {
+        await prefs.setString('installed_version_all-hub', previousVersion);
+      }
+    } else {
+      // Do not clear a pending transaction for an unrelated executable.
+      return;
+    }
+    // Keep the rollback receipt until the external updater has observed a
+    // stable process. Otherwise an early crash leaves the old launcher unable
+    // to restore the previous registered version.
+    final committed = File('$next.committed');
+    if (current == expected && !await committed.exists()) {
+      await File('$next.confirmed').writeAsString('ready', flush: true);
+      return;
+    }
+    for (final key in [
+      'allhub_pending_exe', 'allhub_pending_version',
+      'allhub_previous_exe', 'allhub_previous_version',
+    ]) {
+      await prefs.remove(key);
+    }
+    if (current == expected && await committed.exists()) {
+      await committed.delete();
+    }
+  }
+
+  /// Stage the launcher side-by-side, then hand off activation to a separate
+  /// Windows process. The old running EXE is never overwritten or deleted.
+  /// This is intentionally not a shortcut migration: existing shortcuts may
+  /// still point at the previous launcher until a stable bootstrapper is added.
+  static Future<void> updateAllHubWindows(
+    String url, {String? version, String? sha256Digest}
+  ) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    await runInstallExclusive('all-hub', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final previousExe = prefs.getString('exe_all-hub');
+      final previousVersion = prefs.getString('installed_version_all-hub');
+      try {
+        final extension = Uri.parse(url).path.toLowerCase();
+        // Flutter Windows applications are not standalone EXEs: they require
+        // flutter_windows.dll, data/flutter_assets and plugin DLLs. Never
+        // replace the running launcher with a bare EXE from a release.
+        if (!extension.endsWith('.zip')) {
+          throw StateError(
+              'Для самообновления All Hub нужен полный Windows ZIP с DLL и ресурсами');
+        }
+        await installWindowsZip('all-hub', url, sha256Digest: sha256Digest);
+        final nextExe = prefs.getString('exe_all-hub');
+        if (nextExe == null || !await File(nextExe).exists()) {
+          throw StateError('Новая версия лаунчера не найдена');
+        }
+        // Check the complete Flutter runtime before asking the old process
+        // to exit. A valid PE header alone cannot detect missing dependencies.
+        final bundle = File(nextExe).parent;
+        final runtime = File('${bundle.path}${Platform.pathSeparator}flutter_windows.dll');
+        final assets = Directory(
+            '${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}flutter_assets');
+        final icu = File('${bundle.path}${Platform.pathSeparator}data'
+            '${Platform.pathSeparator}icudtl.dat');
+        if (!await runtime.exists() || !await assets.exists() ||
+            !await icu.exists()) {
+          throw StateError(
+              'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
+        }
+        // The installer stages a release by writing exe_all-hub. That is not
+        // activation: keep the current launcher registered until the new
+        // process confirms startup in reconcileAllHubWindowsHandoff().
+        // A failed or never-started helper must not leave a phantom install.
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
+        // Process.start is independent of the running Flutter application.
+        // Validate the executable before requesting the current process exit.
+        final handle = await File(nextExe).open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
+            throw const FormatException('Новая версия All Hub не является Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+        // Remove any stale receipt from a previous attempted launch before
+        // starting the helper; otherwise it could accept a false success.
+        final confirmation = File('$nextExe.confirmed');
+        if (await confirmation.exists()) await confirmation.delete();
+        final committed = File('$nextExe.committed');
+        if (await committed.exists()) await committed.delete();
+        final failed = File('$nextExe.failed');
+        if (await failed.exists()) await failed.delete();
+        await prefs.remove('allhub_last_update_error');
+        // PowerShell's argument list is passed as individual arguments, never
+        // through a shell command assembled from an untrusted release URL.
+        // The helper waits for the current process to finish, then starts the
+        // staged launcher in its own working directory.
+        final script = r'''
+param([int]$OldPid, [string]$NextExe, [string]$PreviousExe, [string]$SupportRoot)
+$ErrorActionPreference = 'Stop'
+try { Wait-Process -Id $OldPid -ErrorAction SilentlyContinue } catch {}
+if (-not (Test-Path -LiteralPath $NextExe -PathType Leaf)) { exit 2 }
+try {
+  $newProcess = Start-Process -FilePath $NextExe -WorkingDirectory (Split-Path -Parent $NextExe) -PassThru
+  # Do not migrate shortcuts until Flutter confirms its installed-version
+  # receipt has been persisted. Timeout or early exit triggers rollback.
+  $confirmed = "$NextExe.confirmed"
+  $deadline = (Get-Date).AddSeconds(60)
+  while (-not (Test-Path -LiteralPath $confirmed -PathType Leaf)) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited before confirming startup' }
+    if ((Get-Date) -ge $deadline) { throw 'New launcher did not confirm startup' }
+    Start-Sleep -Milliseconds 500
+  }
+  # A receipt written during startup is not enough if the UI immediately
+  # crashes. Observe a short post-confirmation window before moving shortcuts.
+  $stableUntil = (Get-Date).AddSeconds(8)
+  while ((Get-Date) -lt $stableUntil) {
+    $newProcess.Refresh()
+    if ($newProcess.HasExited) { throw 'New launcher exited after startup confirmation' }
+    Start-Sleep -Milliseconds 500
+  }
+  # The update is not committed until the stable launcher pointer has
+  # been installed. Otherwise a shortcut/pointer failure can roll back the
+  # old executable while the new process later accepts a false commit.
+  # Stable entry point: shortcuts must never point at an immutable release EXE.
+  # Store the pointer outside version folders so future updates only change
+  # this pointer. A failed handoff leaves the previous pointer untouched.
+  $supportRoot = $SupportRoot
+  $entry = Join-Path $supportRoot 'AllHub-Launch.cmd'
+  $pointer = Join-Path $supportRoot 'AllHub-Current.txt'
+  $entryContent = @'
+@echo off
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0AllHub-Launch.ps1"
+'@
+  $launchScript = @'
+$ErrorActionPreference = 'Stop'
+$pointer = Join-Path $PSScriptRoot 'AllHub-Current.txt'
+$backup = Join-Path $PSScriptRoot 'AllHub-Previous.txt'
+# A broken or deleted release must not strand the user behind a dead shortcut.
+# Never execute arbitrary command lines: both pointer files contain only paths
+# to previously installed EXEs, and Start-Process receives a literal path.
+foreach ($file in @($pointer, $backup)) {
+  if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+  $target = (Get-Content -LiteralPath $file -Encoding UTF8 -TotalCount 1).Trim()
+  if (-not $target -or -not [IO.Path]::IsPathRooted($target) -or
+      -not $target.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase) -or
+      -not (Test-Path -LiteralPath $target -PathType Leaf)) { continue }
+  # A Flutter Windows build needs its runtime beside the EXE. A valid
+  # executable alone is not enough: missing DLL/assets cause a dead shortcut.
+  $bundle = Split-Path -Parent $target
+  if (-not (Test-Path -LiteralPath (Join-Path $bundle 'flutter_windows.dll') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\icudtl.dat') -PathType Leaf) -or
+      -not (Test-Path -LiteralPath (Join-Path $bundle 'data\\flutter_assets') -PathType Container)) { continue }
+  try {
+    $process = Start-Process -FilePath $target -WorkingDirectory $bundle -PassThru -ErrorAction Stop
+    # Start-Process succeeding does not mean Flutter actually started. If it
+    # crashes immediately, try the last known-good build instead.
+    if ($process.WaitForExit(3000)) {
+      if ($process.ExitCode -ne 0) { continue }
+    }
+    exit 0
+  } catch { continue }
+}
+exit 4
+'@
+  Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Launch.ps1') -Value $launchScript -Encoding UTF8
+  # Install the stable entry before updating the pointer. No executable is
+  # ever modified while running; the .cmd lives in application support.
+  Set-Content -LiteralPath $entry -Value $entryContent -Encoding ASCII
+  # Retain a known-good executable for the stable launcher if a release
+  # folder is removed after an otherwise successful update.
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    Set-Content -LiteralPath (Join-Path $supportRoot 'AllHub-Previous.txt') -Value $PreviousExe -Encoding UTF8
+  }
+  $pendingPointer = "$pointer.new"
+  Set-Content -LiteralPath $pendingPointer -Value $NextExe -Encoding UTF8
+  Move-Item -LiteralPath $pendingPointer -Destination $pointer -Force
+  # A user launching via the stable entry always gets the confirmed build.
+  # Create a durable user shortcut even for portable installations that
+  # never had an existing shortcut to migrate. Do not overwrite user links.
+  $shell = New-Object -ComObject WScript.Shell
+  $userLinks = @(
+    (Join-Path ([Environment]::GetFolderPath('Desktop')) 'All Hub.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'All Hub.lnk')
+  )
+  foreach ($link in $userLinks) {
+    try {
+      $parent = Split-Path -Parent $link
+      if (-not $parent -or -not (Test-Path -LiteralPath $parent -PathType Container)) { continue }
+      $shortcut = $shell.CreateShortcut($link)
+      if (Test-Path -LiteralPath $link) {
+        # Migrate only links belonging to this launcher. Never hijack an
+        # unrelated user shortcut that happens to share the display name.
+        $existingTarget = $shortcut.TargetPath
+        $owned = $false
+        if ($existingTarget) {
+          if ($PreviousExe -and
+              [string]::Equals($existingTarget, $PreviousExe,
+                [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
+          if ([string]::Equals($existingTarget, $entry,
+                [StringComparison]::OrdinalIgnoreCase)) { $owned = $true }
+          # A matching name is not proof of ownership. Only migrate links
+          # targeting the known previous executable or stable launcher.
+        }
+        if (-not $owned) { continue }
+      }
+      $shortcut.TargetPath = $entry
+      $shortcut.WorkingDirectory = $supportRoot
+      $shortcut.Save()
+    } catch {
+      # Shortcuts are optional; failure must not roll back a healthy update.
+    }
+  }
+  # Commit only after the durable entry point and pointer are installed.
+  # Shortcut migration is best-effort and must not block a healthy launch.
+  Set-Content -LiteralPath "$NextExe.committed" -Value 'stable'
+  # Existing shortcuts pointing to a previous EXE are migrated below.
+} catch {
+  # Never let a stale success receipt win over a failed activation.
+  try { Remove-Item -LiteralPath "$NextExe.committed" -Force -ErrorAction SilentlyContinue } catch {}
+  # Persist the failure independently of the new process. The old launcher
+  # reconciles this marker on startup and restores its version receipt.
+  try { Set-Content -LiteralPath "$NextExe.failed" -Value $_.Exception.Message } catch {}
+  # If the stable pointer was changed before a later failure, restore it.
+  try {
+    if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+      $pointer = Join-Path $SupportRoot 'AllHub-Current.txt'
+      Set-Content -LiteralPath "$pointer.rollback" -Value $PreviousExe -Encoding UTF8
+      Move-Item -LiteralPath "$pointer.rollback" -Destination $pointer -Force
+    }
+  } catch {}
+  if ($PreviousExe -and (Test-Path -LiteralPath $PreviousExe -PathType Leaf)) {
+    try { Start-Process -FilePath $PreviousExe -WorkingDirectory (Split-Path -Parent $PreviousExe) } catch {}
+  }
+  exit 3
+}
+# Migrate only shortcuts that explicitly target the previous launcher.
+# Do not alter unrelated shortcuts or system-wide shortcuts.
+if ($PreviousExe -and ($PreviousExe -ne $NextExe)) {
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $roots = @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('StartMenu'))
+    foreach ($root in $roots) {
+      if (-not $root -or -not (Test-Path -LiteralPath $root)) { continue }
+      Get-ChildItem -LiteralPath $root -Filter '*.lnk' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+          $shortcut = $shell.CreateShortcut($_.FullName)
+          if ([string]::Equals($shortcut.TargetPath, $PreviousExe, [StringComparison]::OrdinalIgnoreCase) -or
+              [string]::Equals($shortcut.TargetPath, $NextExe, [StringComparison]::OrdinalIgnoreCase)) {
+            $shortcut.TargetPath = $entry
+            $shortcut.WorkingDirectory = $supportRoot
+            $shortcut.Save()
+          }
+        } catch {}
+      }
+    }
+  } catch {}
+}
+''';
+        final helper = File('${(await getTemporaryDirectory()).path}${Platform.pathSeparator}allhub-handoff-${DateTime.now().microsecondsSinceEpoch}.ps1');
+        await helper.writeAsString(script, flush: true);
+        // Record a recoverable transaction, not a successful installation.
+        // The new process commits it during startup; the old process restores
+        // the receipt if the external updater has to fall back.
+        // Rollback must point to the executable actually running, even if a
+        // stale preference points to a different historical installation.
+        await prefs.setString('allhub_previous_exe', Platform.resolvedExecutable);
+        if (previousVersion == null) {
+          await prefs.remove('allhub_previous_version');
+        } else {
+          await prefs.setString('allhub_previous_version', previousVersion);
+        }
+        await prefs.setString('allhub_pending_exe', nextExe);
+        if (version == null) {
+          await prefs.remove('allhub_pending_version');
+        } else {
+          await prefs.setString('allhub_pending_version', version);
+        }
+        await Process.start('powershell.exe', [
+          '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', helper.path, '-OldPid', pid.toString(),
+          '-NextExe', nextExe,
+          '-PreviousExe', Platform.resolvedExecutable,
+          '-SupportRoot', (await getApplicationSupportDirectory()).path,
+        ], mode: ProcessStartMode.detached);
+        // The detached helper cannot start the staged launcher while this
+        // process remains alive: it waits for OldPid to exit. The caller
+        // returns only after the helper was successfully started.
+      } catch (_) {
+        if (previousExe == null) {
+          await prefs.remove('exe_all-hub');
+        } else {
+          await prefs.setString('exe_all-hub', previousExe);
+        }
+        if (previousVersion == null) {
+          await prefs.remove('installed_version_all-hub');
+        } else {
+          await prefs.setString('installed_version_all-hub', previousVersion);
+        }
+        rethrow;
+      }
+    });
+    // A successful handoff MUST terminate the old launcher, otherwise the
+    // PowerShell helper waits forever and the user sees no update. Only exit
+    // after staging, integrity checks, receipt persistence and detached helper
+    // startup have all succeeded. Errors above keep the current app running.
+    // The helper owns startup confirmation, rollback and shortcut migration.
+    exit(0);
+  }
+
+  /// Check GitHub's published SHA-256 digest before activating an installer.
+  /// Older releases without a digest retain existing container checks.
+  static Future<void> verifyDownloadedDigest(File file, String? expected) async {
+    if (expected == null) {
+      return;
+    }
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(expected)) {
+      throw const FormatException('Некорректная контрольная сумма SHA-256');
+    }
+    final actual = (await sha256.bind(file.openRead()).first).toString();
+    if (actual != expected) {
+      throw const FormatException('SHA-256 файла не совпадает с GitHub Releases');
+    }
+  }
+
+  /// Verify that the APK has a complete ZIP central directory, not merely
+  /// the four-byte PK prefix. This rejects interrupted downloads with an
+  /// unknown Content-Length before invoking Android's package installer.
+  @visibleForTesting
+  static Future<void> requireCompleteApkContainer(File apk) async {
+    final length = await apk.length();
+    if (length < 1024) throw const FormatException('APK слишком мал');
+    final file = await apk.open();
+    try {
+      final header = await file.read(4);
+      if (header.length != 4 || header[0] != 0x50 || header[1] != 0x4b ||
+          header[2] != 0x03 || header[3] != 0x04) {
+        throw const FormatException('Скачан не APK (не ZIP-контейнер)');
+      }
+      // EOCD is at most 22 + 65535 bytes from the end (ZIP comment).
+      final tailSize = length < 65557 ? length : 65557;
+      await file.setPosition(length - tailSize);
+      final tail = await file.read(tailSize);
+      int read16(int i) => tail[i] | (tail[i + 1] << 8);
+      int read32(int i) => tail[i] | (tail[i + 1] << 8) |
+          (tail[i + 2] << 16) | (tail[i + 3] << 24);
+      for (var i = tail.length - 22; i >= 0; i--) {
+        if (tail[i] != 0x50 || tail[i + 1] != 0x4b ||
+            tail[i + 2] != 0x05 || tail[i + 3] != 0x06) continue;
+        if (i + 22 + read16(i + 20) != tail.length) continue;
+        final centralSize = read32(i + 12);
+        final centralOffset = read32(i + 16);
+        final eocdOffset = length - tailSize + i;
+        if (read16(i + 4) != 0 || read16(i + 6) != 0 ||
+            read16(i + 8) != read16(i + 10) ||
+            centralSize == 0xffffffff || centralOffset == 0xffffffff ||
+            centralOffset + centralSize > eocdOffset) continue;
+        return;
+      }
+      throw const FormatException('APK повреждён или загружен не полностью (ZIP)');
+    } finally {
+      await file.close();
+    }
+  }
+
+  /// A system installer intent being launched is NOT proof of installation,
+  /// but false/null must be surfaced instead of marking the update successful.
+  static void requireAndroidInstallerOpened(bool? opened) {
+    if (opened != true) {
+      throw StateError('Не удалось открыть системный установщик Android');
+    }
+  }
+
+  /// A stale partial APK can have a valid HTTP range but a broken ZIP tail.
+  /// Retry once from byte zero on either container or digest corruption.
+  /// Never retry transport failures here: the resumable downloader already
+  /// handles them, and no unverified file is passed to Android.
+  @visibleForTesting
+  static Future<void> downloadVerifiedApk(
+    http.Client client, Uri uri, File temporary, {String? sha256Digest}
+  ) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      await downloadResumableApk(client, uri, temporary);
+      try {
+        await requireCompleteApkContainer(temporary);
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        return;
+      } on FormatException {
+        if (await temporary.exists()) await temporary.delete();
+        downloadProgress.value = 0;
+        if (attempt == 1) rethrow;
+      }
+    }
+  }
+
+  /// Downloads a published APK directly, then asks Android to install it.
+  /// Android always requires user confirmation; this cannot silently install apps.
+  static Future<void> installAndroidApk(String url, {String? projectId, String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isAndroid) throw UnsupportedError('Android only');
+    final uri = Uri.tryParse(url);
+    if (uri == null || projectId == null ||
+        !(externalRepo == null
+            ? isTrustedProjectDownload(projectId, url, 'apk')
+            : isTrustedExternalDownload(projectId, externalRepo, url, 'apk'))) {
+      throw ArgumentError('Нужна прямая ссылка на APK из GitHub Releases');
+    }
+    return runInstallExclusive(projectId, () async {
+      activeDownloadProject.value = projectId;
+      downloadProgress.value = null;
+      final client = http.Client();
+    try {
+      final cache = await getTemporaryDirectory();
+      final cacheName = externalRepo == null
+          ? androidApkCacheName(projectId, url)
+          : ('${projectId}_${uri.pathSegments[4]}_${uri.pathSegments[5]}')
+              .replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+      final apk = File('${cache.path}${Platform.pathSeparator}$cacheName');
+      final temporary = File('${apk.path}.download');
+      try {
+        downloadProgress.value = 0;
+        await downloadVerifiedApk(client, uri, temporary, sha256Digest: sha256Digest);
+        if (await apk.exists()) await apk.delete();
+        await temporary.rename(apk.path);
+        // Android owns the final install confirmation. A false/null result
+        // means the system installer could not even be opened; never report
+        // that as a successful update.
+        final expectedPackage = await expectedAndroidPackageName(projectId);
+        final opened = await _channel.invokeMethod<bool>(
+          'installApk', {
+            'path': apk.path,
+            if (expectedPackage != null) 'expectedPackageName': expectedPackage,
+          });
+        requireAndroidInstallerOpened(opened);
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+    }
+    });
+  }
+
+  static void requireWindowsInstallRegistered(bool saved) {
+    if (!saved) throw StateError('Не удалось сохранить путь установленного Windows-приложения');
+  }
+
+  // Installs a standalone Windows EXE from a published GitHub release.
+  // Portable ZIP distributions require their full folder and are not handled here.
+  static Future<void> installWindowsExe(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'exe')
+        : isTrustedExternalDownload(id, externalRepo, url, 'exe'))) {
+      throw ArgumentError('Нужна прямая ссылка на EXE из GitHub Releases');
+    }
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri);
+      final response = await client.send(request).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      final root = await getApplicationSupportDirectory();
+      final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+      await projects.create(recursive: true);
+      // A running Windows EXE cannot be renamed or overwritten. Install each
+      // published standalone build into its own immutable version directory,
+      // just as we do for portable ZIP releases. The registered launcher path
+      // is switched only after the download and PE/digest checks succeed.
+      final releaseFolder = windowsReleaseFolder(
+          id, url, DateTime.now().microsecondsSinceEpoch);
+      final targetDirectory =
+          Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+      final staging = Directory('${targetDirectory.path}.staging');
+      final temporary = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download');
+      try {
+        await _download(response, temporary, maxBytes: 256 * 1024 * 1024);
+        if (await temporary.length() < 1024) {
+          throw const FormatException('Загруженный EXE слишком мал');
+        }
+        final file = await temporary.open();
+        try {
+          if (!hasWindowsExecutableHeader(await file.read(8192))) {
+            throw const FormatException('Файл не является корректным Windows PE (MZ/PE)');
+          }
+        } finally {
+          await file.close();
+        }
+        await verifyDownloadedDigest(temporary, sha256Digest);
+        await staging.create(recursive: true);
+        final stagedExe = File('${staging.path}${Platform.pathSeparator}$id.exe');
+        await temporary.rename(stagedExe.path);
+        await staging.rename(targetDirectory.path);
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          requireWindowsInstallRegistered(await prefs.setString(
+              'exe_$id', '${targetDirectory.path}${Platform.pathSeparator}$id.exe'));
+        } catch (_) {
+          // Keep the previous registered EXE untouched on preferences failure.
+          if (await targetDirectory.exists()) {
+            await targetDirectory.delete(recursive: true);
+          }
+          rethrow;
+        }
+      } finally {
+        if (await temporary.exists()) await temporary.delete();
+        if (await staging.exists()) await staging.delete(recursive: true);
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+    }
+  }
+
+  /// Different builds must never overwrite a running Windows executable.
+  /// A unique generation suffix also makes reinstallation of the same
+  /// release safe while an older instance remains open.
+  @visibleForTesting
+  static String windowsReleaseFolder(String id, String url, int generation) {
+    if (!isValidProjectId(id) || generation < 0) {
+      throw ArgumentError('Некорректный проект или поколение установки');
+    }
+    final digest = sha256.convert(url.codeUnits).toString().substring(0, 16);
+    return '$id-$digest-$generation';
+  }
+
+  /// Install a complete Windows portable ZIP, including runtime DLLs and assets.
+  /// Files are extracted to a staging directory and activated only after validation.
+  static Future<void> installWindowsZip(String id, String url, {String? externalRepo, String? sha256Digest}) async {
+    if (!Platform.isWindows) throw UnsupportedError('Windows only');
+    if (!isValidProjectId(id)) {
+      throw ArgumentError('Некорректный идентификатор проекта');
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !(externalRepo == null
+        ? isTrustedProjectDownload(id, url, 'zip')
+        : isTrustedExternalDownload(id, externalRepo, url, 'zip'))) {
+      throw ArgumentError('Нужна ссылка на Windows ZIP из GitHub Releases');
+    }
+    final root = await getApplicationSupportDirectory();
+    final projects = Directory('${root.path}${Platform.pathSeparator}projects');
+    await projects.create(recursive: true);
+    // A running Windows process locks its EXE and Flutter DLLs. Renaming the
+    // currently installed directory therefore fails with ACCESS_DENIED.
+    // Install each release side-by-side and atomically switch the registered
+    // launcher path only after validation. The running old version remains
+    // usable until the user launches the new one; never delete its files.
+    // Keep old releases for rollback and for apps that store data beside EXE.
+    final releaseFolder = windowsReleaseFolder(
+        id, url, DateTime.now().microsecondsSinceEpoch);
+    final target = Directory('${projects.path}${Platform.pathSeparator}$releaseFolder');
+    final staging = Directory('${target.path}.staging');
+    final zipFile = File('${projects.path}${Platform.pathSeparator}$releaseFolder.download.zip');
+    if (await staging.exists()) await staging.delete(recursive: true);
+    await staging.create(recursive: true);
+    activeDownloadProject.value = id;
+    downloadProgress.value = null;
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) {
+        throw HttpException('Ошибка скачивания: HTTP ${response.statusCode}');
+      }
+      await _download(response, zipFile, maxBytes: 256 * 1024 * 1024);
+      if (await zipFile.length() > 256 * 1024 * 1024) {
+        throw const FormatException('Windows ZIP слишком большой');
+      }
+      await verifyDownloadedDigest(zipFile, sha256Digest);
+      final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
+      if (!isSafeWindowsArchiveLayout(
+        archive.where((entry) => entry.isFile).map((entry) => entry.name),
+        archive.where((entry) => !entry.isFile).map((entry) => entry.name),
+      )) {
+        throw const FormatException('ZIP содержит конфликтующие пути файлов');
+      }
+      final rootPath = staging.absolute.path;
+      var unpackedBytes = 0;
+      var entriesSeen = 0;
+      for (final entry in archive) {
+        entriesSeen++;
+        if (!isSafeWindowsArchiveBudget(entriesSeen, unpackedBytes, entry.size)) {
+          throw const FormatException('ZIP превышает безопасный размер распаковки');
+        }
+        unpackedBytes += entry.size;
+        final name = entry.name.replaceAll('\\', '/');
+        if (!isSafeWindowsArchivePath(name)) {
+          throw const FormatException('Недопустимый путь в ZIP');
+        }
+        if (name.isEmpty) continue;
+        final destination = '$rootPath${Platform.pathSeparator}${name.replaceAll('/', Platform.pathSeparator)}';
+        if (entry.isFile) {
+          final file = File(destination);
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.content as List<int>, flush: true);
+        } else {
+          await Directory(destination).create(recursive: true);
+        }
+      }
+      final executables = await staging.list(recursive: true).where(
+        (entity) => entity is File && entity.path.toLowerCase().endsWith('.exe'),
+      ).cast<File>().toList();
+      if (executables.isEmpty) {
+        throw const FormatException('В архиве нет исполняемого EXE');
+      }
+      // A ZIP can contain arbitrary files named .exe. Reject an invalid
+      // launcher before activating the staging directory, preserving the
+      // previous installation and its settings.
+      for (final executable in executables) {
+        final handle = await executable.open();
+        try {
+          if (!hasWindowsExecutableHeader(await handle.read(8192))) {
+            throw const FormatException('ZIP содержит некорректный Windows EXE');
+          }
+        } finally {
+          await handle.close();
+        }
+      }
+      final relativeExe = selectWindowsLaunchExecutable(id,
+          executables.map((exe) => exe.path.substring(staging.path.length)));
+      if (relativeExe == null) {
+        throw const FormatException(
+            'В Windows ZIP несколько EXE без однозначного приложения');
+      }
+      // Validate Flutter projects before registration; Godot and native
+      // Windows games use different layouts and must not be rejected.
+      if (id == 'all-hub' || id == 'kopilka') {
+      final launchFile = File('${staging.path}$relativeExe');
+      final bundleRoot = launchFile.parent;
+      final runtimeDll = File('${bundleRoot.path}${Platform.pathSeparator}flutter_windows.dll');
+      final flutterAssets = Directory('${bundleRoot.path}${Platform.pathSeparator}data'
+          '${Platform.pathSeparator}flutter_assets');
+      final icuData = File('${bundleRoot.path}${Platform.pathSeparator}data'
+          '${Platform.pathSeparator}icudtl.dat');
+      if (!await runtimeDll.exists() || !await flutterAssets.exists() ||
+          !await icuData.exists()) {
+        throw const FormatException(
+            'Windows ZIP неполный: отсутствуют Flutter DLL, assets или ICU');
+      }
+      // Empty asset directories are not usable Flutter installations.
+      if (await flutterAssets.list(followLinks: false).isEmpty) {
+        throw const FormatException('Windows ZIP содержит пустой flutter_assets');
+      }
+      }
+      // Publish only a fully unpacked and validated directory. No running
+      // EXE is overwritten, and the old registered path stays valid if this
+      // operation fails. This is also safe while the old game is still open.
+      try {
+        await staging.rename(target.path);
+        final prefs = await SharedPreferences.getInstance();
+        requireWindowsInstallRegistered(
+            await prefs.setString('exe_$id', '${target.path}$relativeExe'));
+      } catch (_) {
+        if (await target.exists()) await target.delete(recursive: true);
+        rethrow;
+      }
+    } finally {
+      client.close();
+      downloadProgress.value = null;
+      activeDownloadProject.value = null;
+      if (await zipFile.exists()) await zipFile.delete();
+      if (await staging.exists()) await staging.delete(recursive: true);
+    }
+  }
+
+  static Future<bool> configureWindowsExecutable(String id) async {
+    if (!Platform.isWindows) return false;
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['exe']);
+    final path = selection?.files.single.path;
+    if (path == null || !path.toLowerCase().endsWith('.exe')) return false;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.setString('exe_$id', path);
+  }
+
+  static bool canLaunch(String id) => Platform.isWindows ||
+      (Platform.isAndroid &&
+          (packages.containsKey(id) || id.startsWith('external-')));
+}
+).hasMatch(expected) && expected == actual;
+
   static Future<String?> installedWindowsVersion(String id) async {
     if (!isValidProjectId(id)) return null;
     final prefs = await SharedPreferences.getInstance();

@@ -248,7 +248,7 @@ class _EyraAccessPageState extends State<EyraAccessPage> {
         ? 'Совпадающих файлов среди выбранных нет.'
         : matches.map((group) =>
             '${group.names.length} совпадения (${group.bytes} байт): '
-            '${group.names.join(", ")}').join('\\n');
+            '${group.names.join(", ")}').join('\n');
       await EyraAccessPolicy.appendLog(
         'Ручной поиск дубликатов среди ${picked.files.length} файлов; '
         'групп: ${matches.length} (без сохранения путей)');

@@ -152,8 +152,8 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image, allowMultiple: true, withData: false);
       if (result == null) return;
-      await _addFiles(result.files.where((f) => f.path != null)
-          .map((f) => File(f.path!)).toList().asStream());
+      await _addFiles(Stream<File>.fromIterable(result.files
+          .where((f) => f.path != null).map((f) => File(f.path!))));
     } catch (error) {
       if (mounted) setState(() => _message = 'Ошибка выбора файлов: $error');
     }

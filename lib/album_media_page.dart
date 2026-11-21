@@ -151,6 +151,12 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
   Future<void> _importFolder() async {
     if (_picking) return;
     try {
+      // Android's Storage Access Framework may return a tree URI rather than
+      // a readable filesystem path; directory listing with dart:io then fails.
+      if (Platform.isAndroid) {
+        await _importImages();
+        return;
+      }
       final path = await FilePicker.platform.getDirectoryPath(
         dialogTitle: 'Выбрать папку — импортировать все фото');
       if (path == null) return;
@@ -203,7 +209,9 @@ class _AlbumMediaPageState extends State<AlbumMediaPage>
               label: Text(_picking ? 'Импорт...' : 'Добавить фото в ленту')),
             FilledButton.icon(onPressed: _picking ? null : _importFolder,
               icon: const Icon(Icons.select_all),
-              label: const Text('Выделить всё в папке и добавить')),
+              label: Text(Platform.isAndroid
+                ? 'Выбрать фото для массового импорта'
+                : 'Добавить все фото из папки')),
           ]),
           const SizedBox(height: 6),
           const Text('Google Фото не предоставляет по публичной ссылке стабильный список прямых адресов всех снимков. Выбери файлы или всю папку: изображения копируются в хранилище All Hub и остаются после перезапуска. Это импорт, не автоматическая синхронизация.'),

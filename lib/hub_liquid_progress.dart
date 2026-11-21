@@ -99,7 +99,34 @@ class _LiquidPainter extends CustomPainter {
         ? progress!.clamp(0.0, 1.0).toDouble() : null;
     // Unknown-duration work is a gently breathing reservoir, not a white
     // slug racing from left to right and impersonating a download percentage.
-    final fill = bounded == null ? w : w * bounded;
+    // Indeterminate mode must never resemble 100% completed progress.
+    // A travelling glassy highlight communicates activity without a fake fill.
+    if (bounded == null) {
+      final travel = (phase * 1.4) % 1.0;
+      final center = (travel * 1.4 - .2) * w;
+      final bandWidth = math.min(w * .32, math.max(h * 2.4, 24.0));
+      final band = Rect.fromCenter(
+        center: Offset(center, h / 2),
+        width: bandWidth,
+        height: h,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(band, Radius.circular(h / 2)),
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [
+              Color(0x00FFFFFF),
+              Color(0x77FFFFFF),
+              Color(0xFFEAF8FF),
+              Color(0x77FFFFFF),
+              Color(0x00FFFFFF),
+            ],
+          ).createShader(band),
+      );
+      canvas.restore();
+      return;
+    }
+    final fill = w * bounded;
     if (bounded == 0) {
       canvas.restore();
       return;
